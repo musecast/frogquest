@@ -1,0 +1,60 @@
+[gd_scene load_steps=8 format=3 uid="uid://d11bgp8c05tpc"]
+
+[ext_resource type="PackedScene" uid="uid://ni4rfdtergc8" path="res://scenes/player.tscn" id="1_ihkvx"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_gk8j1"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_gw4lm"]
+size = Vector2(1.00133, 1.00027)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bjymc"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_46bcl"]
+size = Vector2(10.4996, 20)
+
+[sub_resource type="BoxMesh" id="BoxMesh_1uwpi"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_s2p5s"]
+size = Vector2(0.991727, 10.5)
+
+[node name="Main" type="Node2D"]
+
+[node name="Player" parent="." instance=ExtResource("1_ihkvx")]
+position = Vector2(165, 120)
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="floor" type="StaticBody2D" parent="World"]
+position = Vector2(153, 688)
+scale = Vector2(936.75, 924.75)
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="World/floor"]
+mesh = SubResource("BoxMesh_gk8j1")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/floor"]
+position = Vector2(0.00106741, 0.000540853)
+shape = SubResource("RectangleShape2D_gw4lm")
+
+[node name="floor2" type="StaticBody2D" parent="World"]
+position = Vector2(-682, 306.344)
+scale = Vector2(936.75, 1334.69)
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="World/floor2"]
+position = Vector2(0, -0.679934)
+scale = Vector2(1, 2.35987)
+mesh = SubResource("BoxMesh_bjymc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/floor2"]
+position = Vector2(-4.7502, 0)
+shape = SubResource("RectangleShape2D_46bcl")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="World"]
+position = Vector2(1041, 311.844)
+scale = Vector2(936.75, 1369.69)
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="World/StaticBody2D"]
+mesh = SubResource("BoxMesh_1uwpi")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="World/StaticBody2D"]
+position = Vector2(-0.00373733, 4.75)
+shape = SubResource("RectangleShape2D_s2p5s")
