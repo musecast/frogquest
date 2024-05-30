@@ -1,0 +1,30 @@
+[gd_scene load_steps=5 format=3 uid="uid://ni4rfdtergc8"]
+
+[ext_resource type="Script" path="res://scenes/player.gd" id="1_1ly2r"]
+[ext_resource type="Script" path="res://scenes/Trajectory.gd" id="1_ayjid"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_qqbbt"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_v8aux"]
+radius = 0.5
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_1ly2r")
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="."]
+scale = Vector2(20, 20)
+mesh = SubResource("SphereMesh_qqbbt")
+
+[node name="Trajectory" type="Node2D" parent="."]
+script = ExtResource("1_ayjid")
+
+[node name="RigidBody2D" type="RigidBody2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+scale = Vector2(20, 20)
+shape = SubResource("CircleShape2D_v8aux")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+offset = Vector2(0, -50)
+zoom = Vector2(0.5, 0.5)
+position_smoothing_enabled = true
