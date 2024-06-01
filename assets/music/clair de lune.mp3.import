@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://c3w7plv2xy56y"
+path="res://.godot/imported/clair de lune.mp3-890538d35bf7498b99669c5fa098d751.mp3str"
+
+[deps]
+
+source_file="res://assets/music/clair de lune.mp3"
+dest_files=["res://.godot/imported/clair de lune.mp3-890538d35bf7498b99669c5fa098d751.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
