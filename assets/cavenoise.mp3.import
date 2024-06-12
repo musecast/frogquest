@@ -13,7 +13,7 @@ dest_files=["res://.godot/imported/cavenoise.mp3-1c2f14565ddd8237a5c94b97c99d44f
 [params]
 
 loop=true
-loop_offset=0
+loop_offset=2.0
 bpm=0
 beat_count=0
 bar_beats=4

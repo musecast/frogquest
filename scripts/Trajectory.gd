@@ -24,18 +24,29 @@ func _process(delta):
 				var velocity = get_parent().velocity
 				velocity = mousePath * 2
 				velocity.x *= 1.5
-				velocity.y *= 1.05
+				velocity.y *= 1.1
 				velocity.x = clamp(velocity.x, -800, 800)
 				velocity.y = clamp(velocity.y, -450, 450)
 				
 				if abs(velocity.x) < 450:
-					velocity.y *= 1.1
-					velocity.x = 250 * sign(velocity.x) + velocity.x
+					velocity.y *= 1.0
+					velocity.x = 200 * sign(velocity.x) + velocity.x
 					print("vel multiplied")
 					
-				if abs(velocity.x) >= 450 and abs(velocity.x) <= 520:
-					velocity.y *= 1.1
+				if abs(velocity.x) < 450 and abs(velocity.y) > 350:
+					velocity.y *= 1.0
 					velocity.x = 50 * sign(velocity.x) + velocity.x
+					#FIX
+					#FIX
+					#FIX
+					#FIX
+					#FIX
+					#FIX
+					print("more vel multiplied")
+					
+				if abs(velocity.x) >= 450 and abs(velocity.x) <= 520:
+					velocity.y *= 1.0
+					#velocity.x = 50 * sign(velocity.x) + velocity.x
 					print("STRONG vel multiplied")
 					
 				get_parent().velocity = velocity

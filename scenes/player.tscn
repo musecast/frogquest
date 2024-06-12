@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://ni4rfdtergc8"]
+[gd_scene load_steps=26 format=3 uid="uid://ni4rfdtergc8"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_o2au2"]
 [ext_resource type="Script" path="res://scripts/Trajectory.gd" id="2_1o20b"]
@@ -12,6 +12,13 @@
 [ext_resource type="Texture2D" uid="uid://1a5r1kihr5ui" path="res://assets/frogsad.png" id="10_k61rh"]
 [ext_resource type="Texture2D" uid="uid://cfdstetx138a1" path="res://assets/frogsad2.png" id="11_dc2lb"]
 [ext_resource type="FontFile" uid="uid://b86kug8tw1x7w" path="res://assets/fibberish.ttf" id="12_rif3d"]
+[ext_resource type="Shader" path="res://scripts/crt.gdshader" id="13_2frmi"]
+[ext_resource type="Shader" path="res://scripts/shadow.gdshader" id="14_6ufw2"]
+[ext_resource type="Texture2D" uid="uid://dcpabw2a7gkq0" path="res://assets/light.png" id="15_5wlej"]
+[ext_resource type="AudioStream" uid="uid://c1ntg4rtgymh6" path="res://assets/lanternigniting.mp3" id="16_7leay"]
+[ext_resource type="Script" path="res://scenes/FrogLantern.gd" id="16_hvn0b"]
+[ext_resource type="AudioStream" uid="uid://dtmjjl7bfwm5s" path="res://assets/lanterngone.mp3" id="18_to5un"]
+[ext_resource type="Shader" path="res://scenes/SCANLINES.gdshader" id="19_wjes2"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_v8aux"]
 radius = 0.5
@@ -60,6 +67,56 @@ animations = [{
 "speed": 5.0
 }]
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_21w3e"]
+shader = ExtResource("13_2frmi")
+shader_parameter/overlay = true
+shader_parameter/scanlines_opacity = 0.0
+shader_parameter/scanlines_width = 0.0
+shader_parameter/grille_opacity = 0.0
+shader_parameter/resolution = Vector2(640, 480)
+shader_parameter/pixelate = false
+shader_parameter/roll = false
+shader_parameter/roll_speed = 8.0
+shader_parameter/roll_size = 19.018
+shader_parameter/roll_variation = 0.671
+shader_parameter/distort_intensity = 0.01
+shader_parameter/noise_opacity = 0.0
+shader_parameter/noise_speed = 5.0
+shader_parameter/static_noise_intensity = 0.05
+shader_parameter/aberration = 0.01
+shader_parameter/brightness = 1.05
+shader_parameter/discolor = false
+shader_parameter/warp_amount = 0.031
+shader_parameter/clip_warp = false
+shader_parameter/vignette_intensity = 0.0
+shader_parameter/vignette_opacity = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dn5pw"]
+shader = ExtResource("14_6ufw2")
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_o4ev2"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("5_xkilc")
+}],
+"loop": true,
+"name": &"airborne",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_26egt")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_d1h6k"]
+shader = ExtResource("19_wjes2")
+shader_parameter/scanline_count = 50.0
+
 [node name="Player" type="CharacterBody2D"]
 z_index = 1
 scale = Vector2(1.2, 1.2)
@@ -92,31 +149,34 @@ texture_filter = 1
 position = Vector2(0, -1)
 scale = Vector2(0.76, 0.76)
 sprite_frames = SubResource("SpriteFrames_n5hox")
-animation = &"sad"
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
 [node name="current height" type="Label" parent="CanvasLayer"]
 visible = false
-offset_left = 5.0
+offset_left = 141.0
 offset_top = 4.0
-offset_right = 45.0
+offset_right = 181.0
 offset_bottom = 27.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 4
+theme_override_constants/outline_size = 7
 theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 25
+horizontal_alignment = 1
 
 [node name="high score" type="Label" parent="CanvasLayer"]
 visible = false
-offset_left = 5.0
+offset_left = 141.0
 offset_top = 18.0
-offset_right = 45.0
+offset_right = 181.0
 offset_bottom = 50.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
+horizontal_alignment = 1
 
 [node name="time" type="Label" parent="CanvasLayer"]
+visible = false
 offset_left = 252.0
 offset_top = 4.0
 offset_right = 292.0
@@ -126,6 +186,7 @@ theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
 
 [node name="jumpcount" type="Label" parent="CanvasLayer"]
+visible = false
 offset_left = 252.0
 offset_top = 18.0
 offset_right = 292.0
@@ -135,7 +196,45 @@ theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
 
 [node name="sadTimer" type="Timer" parent="."]
-wait_time = 15.0
+wait_time = 20.0
 one_shot = true
 
 [node name="Timer" type="Timer" parent="."]
+
+[node name="CRT Shader" type="CanvasLayer" parent="."]
+
+[node name="ColorRect" type="ColorRect" parent="CRT Shader"]
+material = SubResource("ShaderMaterial_21w3e")
+offset_right = 40.0
+offset_bottom = 40.0
+scale = Vector2(8, 4.52)
+
+[node name="Shadow" type="AnimatedSprite2D" parent="."]
+light_mask = 0
+z_index = -1
+material = SubResource("ShaderMaterial_dn5pw")
+position = Vector2(21.6667, 2.08333)
+scale = Vector2(0.677083, 0.651042)
+sprite_frames = SubResource("SpriteFrames_o4ev2")
+
+[node name="FrogLantern" type="PointLight2D" parent="."]
+color = Color(1, 0.858824, 0.572549, 1)
+energy = 1.27
+texture = ExtResource("15_5wlej")
+texture_scale = 0.4
+script = ExtResource("16_hvn0b")
+
+[node name="lanternignite" type="AudioStreamPlayer2D" parent="FrogLantern"]
+stream = ExtResource("16_7leay")
+volume_db = 3.935
+
+[node name="lanternout" type="AudioStreamPlayer2D" parent="FrogLantern"]
+stream = ExtResource("18_to5un")
+volume_db = 3.935
+
+[node name="SCANLINES" type="CanvasLayer" parent="."]
+
+[node name="ColorRect" type="ColorRect" parent="SCANLINES"]
+material = SubResource("ShaderMaterial_d1h6k")
+offset_right = 320.0
+offset_bottom = 179.0

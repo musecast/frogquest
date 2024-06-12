@@ -11,19 +11,30 @@ var time_start
 var tempVelocityx = 0.0
 var minutes = 0
 var seconds = 0
+@export var max_y_position: float = 500.0 # The Y position at which the opacity should be 100%
+var fade_duration = 1.0 # Duration for fading in seconds
+var bangersCount = 1
+var songTrigger = 70
+@export var has_lantern = false
+@export var has_key = false
+
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var highScore
 var currentHeight
 
-func _ready():	
+func _ready():
+	
 	currentHeight = (-position.y - 472) /10
 	highScore = currentHeight
 	time_start = Time.get_unix_time_from_system()
 
 
 func _physics_process(delta):
+	
+	
+	
 	
 	currentHeight = (-position.y - 472) /10
 	
@@ -51,7 +62,7 @@ func _physics_process(delta):
 		
 		velocity.y += gravity * delta
 		$Sprite2D.play("airborne")
-		
+		$Shadow.play("airborne")
 		
 		if is_on_wall():
 			print("Wall detected at position: ", position)
@@ -64,17 +75,30 @@ func _physics_process(delta):
 		if $Trajectory.mousePath.length() > 200:
 			$Sprite2D.play("prejump")
 		else:	
-			if currentHeight < highScore - 70 and bestRun == 1:
+			if currentHeight < highScore - songTrigger and bestRun == 1:
+				songTrigger += 15
 				$sadTimer.start()
 				bestRun = 0
 			
 			if $sadTimer.is_stopped():
 				$Sprite2D.play("default")
+				$Shadow.play("default")
 			else:
 				$Sprite2D.play("sad")
-				if $"../Environmental Audio/Classical Bangers".playing == false:
-					await get_tree().create_timer(0.8).timeout
-					$"../Environmental Audio/Classical Bangers".play(0.0)
+				if not $"../World Sprites/Control/froggod".playing:
+					if not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount  == 0:
+						await get_tree().create_timer(0.8).timeout
+						$"../Environmental Audio/Classical Bangers".play(0.0)
+						bangersCount = 1
+					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount == 1:
+						await get_tree().create_timer(0.8).timeout
+						$"../Environmental Audio/Classical Bangers2".play(0.0)
+						bangersCount = 2
+					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount == 2:
+						await get_tree().create_timer(0.8).timeout
+						$"../Environmental Audio/Classical Bangers3".play(0.0)
+						bangersCount = 0
+					
 				
 
 				
@@ -83,6 +107,16 @@ func _physics_process(delta):
 		velocity.x = move_toward(velocity.x, 0, SPEED)
 		
 		
+	if has_lantern and Input.is_action_just_pressed("ui_light"):
+		if $FrogLantern.visible:
+			$FrogLantern.visible = false
+			$FrogLantern/lanternout.play()
+			fade_lantern(0.0)
+		else:
+			$FrogLantern.visible = true
+			$FrogLantern/lanternignite.play()
+			fade_lantern(1.0)
+	
 	tempVelocityx = velocity.x/2.5
 	
 	$"CanvasLayer/current height".text = str(int(currentHeight))
@@ -90,9 +124,60 @@ func _physics_process(delta):
 	$CanvasLayer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
 	$CanvasLayer/jumpcount.text = ("jumps: " + str(int(jumpCount)))
 	
+	
+	fade_darkness()
+	
 	move_and_slide()
 
 
 func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	velocity = Vector2(-500, -400)
 	$"../frogNPC3/campfire/Area2D/burnSound".play()
+	
+	
+	
+
+func fade_lantern(target_alpha):
+	var start_alpha = $FrogLantern.modulate.a
+	var elapsed_time = 0.0
+	
+	while elapsed_time < fade_duration:
+		elapsed_time += get_process_delta_time()
+		var new_alpha = lerp(start_alpha, target_alpha, elapsed_time / fade_duration)
+		$FrogLantern.modulate.a = new_alpha
+		await get_tree().create_timer(0.01).timeout
+
+func fade_darkness():
+	var heightCheck = currentHeight - 145
+	var darknessHeight = (clamp(heightCheck, 0, 100)/100) * 2
+	
+	if darknessHeight > 1:
+		darknessHeight = 1
+	
+	if currentHeight > 315:
+		$"../Darkness".visible = false
+		$FrogLantern.visible = false
+	elif currentHeight > 155:
+		$"../Darkness".visible = true
+		#RGB VALUES ARE FROM 0 TO 1 DUHHHHHH
+		$"../Darkness".color.r = 1 - darknessHeight
+		$"../Darkness".color.g = 1 - darknessHeight
+		$"../Darkness".color.b = 1 - darknessHeight
+		#print($"../Darkness".color.r)
+	else:
+		$FrogLantern.visible = false
+		$"../Darkness".visible = false
+
+
+func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	print("keyhole attempt")
+	if has_key == true:
+		print("keyhole success")
+		$"../Keyhole/Area2Dkeyholeblocker".queue_free()
+		$"../Keyhole".visible = false
+		$"../Keyhole/havekey".play()
+		await get_tree().create_timer(0.5).timeout
+		$"../Keyhole".queue_free()
+	else:
+		$"../Keyhole/donthavekey".play()
+		print("keyhole fail")

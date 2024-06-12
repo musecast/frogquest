@@ -3,11 +3,14 @@ extends Node2D
 var npc1 = 0
 var npc2 = 0
 var npc3 = 0
+var npc4 = 0
 
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	pass # Replace with function body.
+	
+	print($TileMap.get_layer_name(1))
+	pass
 
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
@@ -78,7 +81,7 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC2/npc2talk.play()
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC2/npc2talk.play()
-			await get_tree().create_timer(0.5).timeout
+			await get_tree().create_timer(0.49).timeout
 			$frogNPC2/npc2talk.play()
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC2.play("default")
@@ -97,7 +100,7 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 	if npc3 == 1:
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.visible = true
-		$frogNPC3/npc3speechbubble.text = "godspeed lil\nfroggy..."
+		$frogNPC3/npc3speechbubble.text = "press 'f' to\nuse the lantern"
 		
 	if npc3 == 0:
 		npc3 = 3
@@ -108,10 +111,13 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.text = "take this with you,\nit will help"
 		await get_tree().create_timer(2.0).timeout
-		$frogNPC3/npc3itempickup.play()
-		$frogNPC3/Lantern.visible = true
+		$frogNPC3/lanternhitbox.visible = true
+		$frogNPC3/lanternhitbox.position = Vector2(0,0)
+		$frogNPC3/npc3itemspawn.play()
 		await get_tree().create_timer(2.0).timeout
-		$frogNPC3/Lantern.visible = false
+		$frogNPC3/npc3talk.play()
+		$frogNPC3/npc3speechbubble.text = "press 'f' to\nuse the lantern"
+		await get_tree().create_timer(3.0).timeout
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.text = "godspeed lil\nfroggy..."
 		await get_tree().create_timer(3.0).timeout
@@ -121,4 +127,51 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 
 
 func _on_area_2d_3_body_shape_exited(_body_rid, body, _body_shape_index, local_shape_index):
+	if npc3 == 1:
 		$frogNPC3/npc3speechbubble.visible = false
+
+
+func _on_lanternhitbox_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$frogNPC3/lanternhitbox.queue_free()
+	$frogNPC3/npc3itempickup.play()
+	$Player.has_lantern = true
+
+
+func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
+	if npc4 == 1:
+		$frogNPC4/npc4talk.play()
+		$frogNPC4/npc4speechbubble.visible = true
+		$frogNPC4/npc4speechbubble.text = "hello again..."
+		
+	if npc4 == 0:
+		npc4 = 3
+		$frogNPC4/npc4talk.play()
+		$frogNPC4/npc4speechbubble.visible = true
+		$frogNPC4/npc4speechbubble.text = "oh hello"
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC4/npc4talk.play()
+		$frogNPC4/npc4speechbubble.text = "i'm lost..."
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC4/npc4speechbubble.visible = false
+		npc4 = 1
+
+
+func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
+	if npc4 == 1:
+		$frogNPC4/npc4speechbubble.visible = false
+
+
+func _on_area_2dkey_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Key/Area2DKEY".queue_free()
+	$Player.has_key = true
+	$"World Sprites/Key".visible = false
+	$"World Sprites/Key/keypickup".play()
+
+
+
+func _on_frogking_2_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING2/frogking2".queue_free()
+	$"World Sprites/Control/FROG KING2".visible = true
+	$"World Sprites/Control/frogappear".play()
+	await get_tree().create_timer(2.0).timeout
+	$"World Sprites/Control/froggod".play()
