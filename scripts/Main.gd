@@ -175,3 +175,63 @@ func _on_frogking_2_body_shape_entered(body_rid, body, body_shape_index, local_s
 	$"World Sprites/Control/frogappear".play()
 	await get_tree().create_timer(2.0).timeout
 	$"World Sprites/Control/froggod".play()
+
+
+func _on_frogking_3_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING3/frogking3".queue_free()
+	$"World Sprites/Control/FROG KING3".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_4_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING4/frogking4".queue_free()
+	$"World Sprites/Control/FROG KING4".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_5_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING5/frogking5".queue_free()
+	$"World Sprites/Control/FROG KING5".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_6_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING6/frogking6".queue_free()
+	$"World Sprites/Control/FROG KING6".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_7_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING7/frogking7".queue_free()
+	$"World Sprites/Control/FROG KING7".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_8_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING8/frogking8".queue_free()
+	$"World Sprites/Control/FROG KING8".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_9_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING9/frogking9".queue_free()
+	$"World Sprites/Control/FROG KING9".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_10_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING10/frogking10".queue_free()
+	$"World Sprites/Control/FROG KING10".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_11_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING11/frogking11".queue_free()
+	$"World Sprites/Control/FROG KING11".visible = true
+	$"World Sprites/Control/frogappear".play()
+
+
+func _on_frogking_12_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"World Sprites/Control/FROG KING12/frogking12".queue_free()
+	$"World Sprites/Control/FROG KING12".visible = true
+	$"World Sprites/Control/frogappear".play()
