@@ -5,10 +5,13 @@ var npc2 = 0
 var npc3 = 0
 var npc4 = 0
 
+#top of script
+@onready var previous_window = DisplayServer.window_get_mode()
+@onready var current_window = DisplayServer.window_get_mode()
+
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	
 	print($TileMap.get_layer_name(1))
 	pass
 
@@ -16,8 +19,27 @@ func _ready():
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
 	$frogNPC1.play("prejump1")
+	if Input.is_action_just_pressed("pause"):
+		if Engine.time_scale != 1.0:
+			#GAME IS UNPAUSED HERE
+			$Player/PauseScreen.visible=false
+			Engine.time_scale = 1.0
+		else:
+			#GAME IS PAUSED HERE
+			$Player/PauseScreen.visible=true
+			Engine.time_scale = 0.05
 
-
+#body of script
+func _input(event):
+	if Input.is_action_just_pressed("toggle_fullscreen"):
+		current_window = DisplayServer.window_get_mode()
+		if current_window != 4:
+			previous_window = current_window
+			DisplayServer.window_set_mode(4)
+		else:
+			if previous_window == 4:
+				previous_window = 2
+			DisplayServer.window_set_mode(previous_window)
 
 
 func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
@@ -170,68 +192,58 @@ func _on_area_2dkey_body_shape_entered(body_rid, body, body_shape_index, local_s
 
 
 func _on_frogking_2_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING2/frogking2".queue_free()
-	$"World Sprites/Control/FROG KING2".visible = true
-	$"World Sprites/Control/frogappear".play()
+	$"finale/Control/FROG KING2/frogking2".queue_free()
+	$"finale/Control/FROG KING2".visible = true
+	$finale/Control/frogappear.play()
 	await get_tree().create_timer(2.0).timeout
-	$"World Sprites/Control/froggod".play()
-
+	$"finale/Control/froggod".play()
 
 func _on_frogking_3_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING3/frogking3".queue_free()
-	$"World Sprites/Control/FROG KING3".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING3/frogking3".queue_free()
+	$"finale/Control/FROG KING3".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_4_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING4/frogking4".queue_free()
-	$"World Sprites/Control/FROG KING4".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING4/frogking4".queue_free()
+	$"finale/Control/FROG KING4".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_5_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING5/frogking5".queue_free()
-	$"World Sprites/Control/FROG KING5".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING5/frogking5".queue_free()
+	$"finale/Control/FROG KING5".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_6_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING6/frogking6".queue_free()
-	$"World Sprites/Control/FROG KING6".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING6/frogking6".queue_free()
+	$"finale/Control/FROG KING6".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_7_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING7/frogking7".queue_free()
-	$"World Sprites/Control/FROG KING7".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING7/frogking7".queue_free()
+	$"finale/Control/FROG KING7".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_8_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING8/frogking8".queue_free()
-	$"World Sprites/Control/FROG KING8".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING8/frogking8".queue_free()
+	$"finale/Control/FROG KING8".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_9_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING9/frogking9".queue_free()
-	$"World Sprites/Control/FROG KING9".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING9/frogking9".queue_free()
+	$"finale/Control/FROG KING9".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_10_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING10/frogking10".queue_free()
-	$"World Sprites/Control/FROG KING10".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING10/frogking10".queue_free()
+	$"finale/Control/FROG KING10".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_11_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING11/frogking11".queue_free()
-	$"World Sprites/Control/FROG KING11".visible = true
-	$"World Sprites/Control/frogappear".play()
-
+	$"finale/Control/FROG KING11/frogking11".queue_free()
+	$"finale/Control/FROG KING11".visible = true
+	$finale/Control/frogappear.play()
 
 func _on_frogking_12_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
-	$"World Sprites/Control/FROG KING12/frogking12".queue_free()
-	$"World Sprites/Control/FROG KING12".visible = true
-	$"World Sprites/Control/frogappear".play()
+	$"finale/Control/FROG KING12/frogking12".queue_free()
+	$"finale/Control/FROG KING12".visible = true
+	$finale/Control/frogappear.play()

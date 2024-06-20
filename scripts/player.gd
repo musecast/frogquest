@@ -13,10 +13,12 @@ var minutes = 0
 var seconds = 0
 @export var max_y_position: float = 500.0 # The Y position at which the opacity should be 100%
 var fade_duration = 1.0 # Duration for fading in seconds
-var bangersCount = 1
+var bangersCount = 0
 var songTrigger = 70
 @export var has_lantern = false
 @export var has_key = false
+var music_bus = AudioServer.get_bus_index("Master")
+var SpeedrunMode = false
 
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
@@ -85,7 +87,7 @@ func _physics_process(delta):
 				$Shadow.play("default")
 			else:
 				$Sprite2D.play("sad")
-				if not $"../World Sprites/Control/froggod".playing:
+				if not $"../finale/Control/froggod".playing:
 					if not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount  == 0:
 						await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers".play(0.0)
@@ -154,7 +156,7 @@ func fade_darkness():
 	if darknessHeight > 1:
 		darknessHeight = 1
 	
-	if currentHeight > 315:
+	if currentHeight > 313:
 		$"../Darkness".visible = false
 		$FrogLantern.visible = false
 	elif currentHeight > 155:
@@ -173,11 +175,31 @@ func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, lo
 	print("keyhole attempt")
 	if has_key == true:
 		print("keyhole success")
-		$"../Keyhole/Area2Dkeyholeblocker".queue_free()
-		$"../Keyhole".visible = false
-		$"../Keyhole/havekey".play()
+		$"../World Sprites/Keyhole/Area2Dkeyholeblocker".queue_free()
+		$"../World Sprites/Keyhole".visible = false
+		$"../World Sprites/Keyhole/havekey".play()
 		await get_tree().create_timer(0.5).timeout
-		$"../Keyhole".queue_free()
+		$"../World Sprites/Keyhole".queue_free()
 	else:
-		$"../Keyhole/donthavekey".play()
+		$"../World Sprites/Keyhole/donthavekey".play()
 		print("keyhole fail")
+
+
+func _on_restart_button_pressed():
+	get_tree().reload_current_scene()
+	Engine.time_scale = 1.0
+
+
+func _on_mute_button_pressed():
+	AudioServer.set_bus_mute(music_bus, not AudioServer.is_bus_mute(music_bus))
+
+
+func _on_speedrun_mode_button_pressed():
+	SpeedrunMode = !SpeedrunMode
+	if SpeedrunMode == true:
+		$CanvasLayer/time.visible = true
+		$CanvasLayer/jumpcount.visible = true
+	else:
+		$CanvasLayer/time.visible = false
+		$CanvasLayer/jumpcount.visible = false
+

@@ -3,13 +3,22 @@ extends Node2D
 var mouseOrigin = Vector2()
 var mousePosition = Vector2()
 var mousePath = Vector2()
+var cursorLock = false
 
 func _ready():
+
 	pass
 
 func _process(delta):
-	if get_parent().is_on_floor():
+	if cursorLock == false:
+		Input.mouse_mode = 0
+	if get_parent().is_on_floor() and Engine.time_scale != 0.05:
 		if Input.is_action_just_pressed("ui_mouse"):
+			if cursorLock == true:
+				Input.mouse_mode = 3
+				get_viewport().warp_mouse(Vector2(160,15))
+			else:
+				Input.mouse_mode = 0
 			mouseOrigin = get_global_mouse_position()
 			$"../frogaim".play()
 			
@@ -70,3 +79,7 @@ func _draw():
 		var lineColor = 1.2 - normalized_length
 		
 		draw_line(Vector2(0,0), trajectory / 5, Color(255, lineColor, lineColor, 1), 2.0)
+
+
+func _on_cursor_lock_button_pressed():
+	cursorLock = !cursorLock
