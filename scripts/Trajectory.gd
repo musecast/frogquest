@@ -15,7 +15,7 @@ func _process(delta):
 	if get_parent().is_on_floor() and Engine.time_scale != 0.05:
 		if Input.is_action_just_pressed("ui_mouse"):
 			if cursorLock == true:
-				Input.mouse_mode = 3
+				Input.mouse_mode = 4
 				get_viewport().warp_mouse(Vector2(160,15))
 			else:
 				Input.mouse_mode = 0
@@ -29,6 +29,9 @@ func _process(delta):
 				queue_redraw()
 			
 		if Input.is_action_just_released("ui_mouse"):
+			if cursorLock == true:
+				#Input.mouse_mode = 3
+				pass
 			if mouseOrigin != Vector2(0, 0):
 				var velocity = get_parent().velocity
 				velocity = mousePath * 2

@@ -26,6 +26,7 @@ func _process(delta):
 			Engine.time_scale = 1.0
 		else:
 			#GAME IS PAUSED HERE
+			Input.mouse_mode = 0
 			$Player/PauseScreen.visible=true
 			Engine.time_scale = 0.05
 
