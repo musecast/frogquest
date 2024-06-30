@@ -12,7 +12,7 @@ func _ready():
 func _process(delta):
 	if cursorLock == false:
 		Input.mouse_mode = 0
-	if get_parent().is_on_floor() and Engine.time_scale != 0.05:
+	if get_parent().is_on_floor() and Engine.time_scale != 0.05 and Engine.time_scale != 0.0:
 		if Input.is_action_just_pressed("ui_mouse"):
 			if cursorLock == true:
 				Input.mouse_mode = 4

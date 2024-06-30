@@ -4,6 +4,9 @@ var npc1 = 0
 var npc2 = 0
 var npc3 = 0
 var npc4 = 0
+var npc5 = 0
+var npc6 = 0
+var finaledamage = -2
 
 #top of script
 @onready var previous_window = DisplayServer.window_get_mode()
@@ -248,3 +251,118 @@ func _on_frogking_12_body_shape_entered(body_rid, body, body_shape_index, local_
 	$"finale/Control/FROG KING12/frogking12".queue_free()
 	$"finale/Control/FROG KING12".visible = true
 	$finale/Control/frogappear.play()
+
+
+
+
+func _on_blockedpath_area_2d_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	#MAKE FIREFLY VISIBLE
+	$"World Sprites/Firefly5".visible = true
+
+
+func _on_blockedpath_area_2d_body_entered(body):
+	#MAKE FIREFLY VISIBLE
+	$"World Sprites/Firefly5".visible = true
+
+
+func _on_finaleexit_body_entered(body):
+	finaledamage += 1
+	
+	if finaledamage == 1:
+		$finale/glasshurt.play()
+		$"finale/finale sprites/Exit-entrance".play("2")
+		$"World Sprites/GodraysContainer".visible = true
+		
+	if finaledamage == 2:
+		$finale/glasshurt.play()
+		$"finale/finale sprites/Exit-entrance".play("3")
+		$"World Sprites/GodraysContainer2".visible = true
+		
+	if finaledamage == 3:
+		print("you win...")
+		$"finale/finale sprites/Exit-entrance".queue_free()
+		$finale/Control/froggod.stop()
+		$finale/glassbreak.play()
+		$"World Sprites/GodraysContainer3".visible = true
+
+
+func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
+	
+		if npc5 == 1:
+			$frogNPC5/npc5talk.play()
+			$frogNPC5/npc5speechbubble.visible = true
+			$frogNPC5/npc5speechbubble.text = "the way forward is a\nleap of faith to your right..."
+			
+		if npc5 == 0:
+			npc5 = 3
+			print("npc croak")
+			$frogNPC5/npc5talk.play()
+			$frogNPC5/npc5speechbubble.visible = true
+			$frogNPC5/npc5speechbubble.text = "o ho ho ho so you\nwant another joke, do you?"
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC5/npc5talk.play()
+			$frogNPC5/npc5speechbubble.text = "why are frogs\nso happy..?"
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC5/npc5talk.play()
+			$frogNPC5/npc5speechbubble.text = "...because they eat\nwhatever bugs them"
+			await get_tree().create_timer(0.75).timeout
+			$frogNPC5/npc5rimshot.play()
+			await get_tree().create_timer(0.5).timeout
+			$frogNPC5.play("laughing")
+			await get_tree().create_timer(0.5).timeout
+			$frogNPC5/npc5talk.play()
+			await get_tree().create_timer(0.5).timeout
+			$frogNPC5/npc5talk.play()
+			await get_tree().create_timer(0.5).timeout
+			$frogNPC5/npc5talk.play()
+			await get_tree().create_timer(0.49).timeout
+			$frogNPC5/npc5talk.play()
+			await get_tree().create_timer(0.5).timeout
+			$frogNPC5.play("default")
+			await get_tree().create_timer(0.5).timeout
+			$frogNPC5/npc5talk.play()
+			$frogNPC5/npc5speechbubble.text = "hehehehe...\nnow let me help you"
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC5/npc5talk.play()
+			$frogNPC5/npc5speechbubble.text = "the way forward is a\nleap of faith to your right..."
+			await get_tree().create_timer(10.0).timeout
+			$frogNPC5/npc5speechbubble.visible = false
+			npc5 = 1
+
+
+func _on_area_2d_5_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
+	if npc5 == 1:
+		$frogNPC5/npc5speechbubble.visible = false
+
+
+func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
+	
+		if npc6 == 1:
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.visible = true
+			$frogNPC6/npc6speechbubble.text = "godspeed\nlil froggy..."
+			
+		if npc6 == 0:
+			npc6 = 3
+			print("npc croak")
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.visible = true
+			$frogNPC6/npc6speechbubble.text = "the froggy of fate\nin the flesh..."
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "your final test\nawaits you..."
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "allow me to open\nthe path for you..."
+			await get_tree().create_timer(3.0).timeout
+			#OPEN PATH NOISE AND HIDE OUTSIDE (SHOW OUTSIDE SPRITES)
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "godspeed\nlil froggy..."
+			await get_tree().create_timer(10.0).timeout
+			$frogNPC6/npc6speechbubble.visible = false
+			npc6 = 1
+
+
+func _on_area_2d_6_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
+	if npc6 == 1:
+		$frogNPC6/npc6speechbubble.visible = false

@@ -35,6 +35,11 @@ func _ready():
 
 func _physics_process(delta):
 	
+	if Input.is_action_just_pressed("mute_music"):
+		$"../Environmental Audio/Classical Bangers".stop()
+		$"../Environmental Audio/Classical Bangers2".stop()
+		$"../Environmental Audio/Classical Bangers3".stop()
+		$"../finale/Control/froggod".stop()
 	
 	
 	
@@ -56,9 +61,15 @@ func _physics_process(delta):
 	if currentHeight > highScore:
 		highScore = currentHeight
 		bestRun = 1
-		
-	if currentHeight >= 0:
+	
+	
+	if currentHeight > 779:
+		$CanvasLayer.visible = false
+			
+	elif currentHeight >= 0:
 		$"CanvasLayer/current height".visible = true
+		
+		
 	# Add the gravity.
 	if not is_on_floor():
 		
@@ -89,15 +100,15 @@ func _physics_process(delta):
 				$Sprite2D.play("sad")
 				if not $"../finale/Control/froggod".playing:
 					if not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount  == 0:
-						await get_tree().create_timer(0.8).timeout
+						#await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers".play(0.0)
 						bangersCount = 1
 					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount == 1:
-						await get_tree().create_timer(0.8).timeout
+						#await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers2".play(0.0)
 						bangersCount = 2
 					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount == 2:
-						await get_tree().create_timer(0.8).timeout
+						#await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers3".play(0.0)
 						bangersCount = 0
 					
@@ -118,6 +129,8 @@ func _physics_process(delta):
 			$FrogLantern.visible = true
 			$FrogLantern/lanternignite.play()
 			fade_lantern(1.0)
+			
+			
 	
 	tempVelocityx = velocity.x/2.5
 	
@@ -203,3 +216,9 @@ func _on_speedrun_mode_button_pressed():
 		$CanvasLayer/time.visible = false
 		$CanvasLayer/jumpcount.visible = false
 
+
+
+func _on_blockedpath_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	velocity = Vector2(500, -300)
+	$"../Environmental Audio/pathBreaking".play()
+	$"../World Sprites/Blockedpath".queue_free()
