@@ -200,7 +200,7 @@ func _on_frogking_2_body_shape_entered(body_rid, body, body_shape_index, local_s
 	$"finale/Control/FROG KING2".visible = true
 	$finale/Control/frogappear.play()
 	await get_tree().create_timer(2.0).timeout
-	$"finale/Control/froggod".play()
+	#$"finale/Control/froggod".play()
 
 func _on_frogking_3_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
 	$"finale/Control/FROG KING3/frogking3".queue_free()
@@ -252,7 +252,75 @@ func _on_frogking_12_body_shape_entered(body_rid, body, body_shape_index, local_
 	$"finale/Control/FROG KING12".visible = true
 	$finale/Control/frogappear.play()
 
-
+func _on_frogking_13_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING13/frogking13".queue_free()
+	$"finale/Control/FROG KING13".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_14_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING14/frogking14".queue_free()
+	$"finale/Control/FROG KING14".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_15_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING15/frogking15".queue_free()
+	$"finale/Control/FROG KING15".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_16_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING16/frogking16".queue_free()
+	$"finale/Control/FROG KING16".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_17_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING17/frogking17".queue_free()
+	$"finale/Control/FROG KING17".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_18_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING18/frogking18".queue_free()
+	$"finale/Control/FROG KING18".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_19_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING19/frogking19".queue_free()
+	$"finale/Control/FROG KING19".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_20_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING20/frogking20".queue_free()
+	$"finale/Control/FROG KING20".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_21_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING21/frogking21".queue_free()
+	$"finale/Control/FROG KING21".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_22_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING22/frogking22".queue_free()
+	$"finale/Control/FROG KING22".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_23_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING23/frogking23".queue_free()
+	$"finale/Control/FROG KING23".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_24_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING24/frogking24".queue_free()
+	$"finale/Control/FROG KING24".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_25_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING25/frogking25".queue_free()
+	$"finale/Control/FROG KING25".visible = true
+	$finale/Control/frogappear.play()
+	
+func _on_frogking_26_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	$"finale/Control/FROG KING26/frogking26".queue_free()
+	$"finale/Control/FROG KING26".visible = true
+	$finale/Control/frogappear.play()
 
 
 func _on_blockedpath_area_2d_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
@@ -337,7 +405,11 @@ func _on_area_2d_5_body_shape_exited(body_rid, body, body_shape_index, local_sha
 
 func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	
+		$"finale/finale walls/toshow/Screenshot2024-06-26160646/StaticBody2D".set_collision_layer_value(1, 1)
+		print("collision enabled")
+		
 		if npc6 == 1:
+			$frogNPC6.queue_free()
 			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.visible = true
 			$frogNPC6/npc6speechbubble.text = "godspeed\nlil froggy..."
@@ -350,19 +422,35 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC6/npc6speechbubble.text = "the froggy of fate\nin the flesh..."
 			await get_tree().create_timer(3.0).timeout
 			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "i commend you for\nmaking it this far..."
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.text = "your final test\nawaits you..."
 			await get_tree().create_timer(3.0).timeout
 			$frogNPC6/npc6talk.play()
-			$frogNPC6/npc6speechbubble.text = "allow me to open\nthe path for you..."
+			$frogNPC6/npc6speechbubble.text = "allow me to\nopen the path..."
 			await get_tree().create_timer(3.0).timeout
 			#OPEN PATH NOISE AND HIDE OUTSIDE (SHOW OUTSIDE SPRITES)
+			$frogNPC6/pathopen.play()
+			$"finale/finale walls/toshow".visible = true
+			$"finale/finale walls/hidethis".visible = false
+			$TileMap.set_layer_enabled(2, 1)
+			$finale/Control/froggod.play()
+			
+			
+			await get_tree().create_timer(3.0).timeout
 			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.text = "godspeed\nlil froggy..."
-			await get_tree().create_timer(10.0).timeout
-			$frogNPC6/npc6speechbubble.visible = false
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC6/pathopen.play()
+			$frogNPC6.visible = false
 			npc6 = 1
+			#$frogNPC6.queue_free()
 
 
 func _on_area_2d_6_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
 	if npc6 == 1:
 		$frogNPC6/npc6speechbubble.visible = false
+
+
+

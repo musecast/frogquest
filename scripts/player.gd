@@ -36,6 +36,7 @@ func _ready():
 func _physics_process(delta):
 	
 	if Input.is_action_just_pressed("mute_music"):
+		$sadTimer.stop()
 		$"../Environmental Audio/Classical Bangers".stop()
 		$"../Environmental Audio/Classical Bangers2".stop()
 		$"../Environmental Audio/Classical Bangers3".stop()
@@ -68,6 +69,11 @@ func _physics_process(delta):
 			
 	elif currentHeight >= 0:
 		$"CanvasLayer/current height".visible = true
+		
+	if currentHeight > 787:
+		$Trajectory.endGame = 1
+		position.y = -8382
+		velocity = Vector2(0,0)
 		
 		
 	# Add the gravity.
@@ -191,6 +197,7 @@ func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, lo
 		$"../World Sprites/Keyhole/Area2Dkeyholeblocker".queue_free()
 		$"../World Sprites/Keyhole".visible = false
 		$"../World Sprites/Keyhole/havekey".play()
+		$"../frogNPC6/pathopen".play()
 		await get_tree().create_timer(0.5).timeout
 		$"../World Sprites/Keyhole".queue_free()
 	else:
