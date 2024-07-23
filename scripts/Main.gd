@@ -37,11 +37,11 @@ func _process(delta):
 func _input(event):
 	if Input.is_action_just_pressed("toggle_fullscreen"):
 		current_window = DisplayServer.window_get_mode()
-		if current_window != 4:
+		if current_window != 3:
 			previous_window = current_window
-			DisplayServer.window_set_mode(4)
+			DisplayServer.window_set_mode(3)
 		else:
-			if previous_window == 4:
+			if previous_window == 3:
 				previous_window = 2
 			DisplayServer.window_set_mode(previous_window)
 

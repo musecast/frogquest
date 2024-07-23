@@ -11,13 +11,13 @@ func _ready():
 	pass
 
 func _process(delta):
-	if cursorLock == false:
-		Input.mouse_mode = 0
 	if get_parent().is_on_floor() and Engine.time_scale != 0.05 and Engine.time_scale != 0.0 and endGame == 0:
 		if Input.is_action_just_pressed("ui_mouse"):
 			if cursorLock == true:
 				Input.mouse_mode = 4
 				get_viewport().warp_mouse(Vector2(160,15))
+			#elif DisplayServer.window_get_mode() == 3:
+			#	Input.mouse_mode = 3
 			else:
 				Input.mouse_mode = 0
 			mouseOrigin = get_global_mouse_position()
