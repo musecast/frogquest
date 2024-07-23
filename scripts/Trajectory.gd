@@ -4,7 +4,7 @@ var mouseOrigin = Vector2()
 var mousePosition = Vector2()
 var mousePath = Vector2()
 var cursorLock = false
-var endGame = 0
+var endGame = 1
 
 func _ready():
 

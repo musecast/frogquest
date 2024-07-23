@@ -229,3 +229,11 @@ func _on_blockedpath_body_shape_entered(body_rid, body, body_shape_index, local_
 	velocity = Vector2(500, -300)
 	$"../Environmental Audio/pathBreaking".play()
 	$"../World Sprites/Blockedpath".queue_free()
+
+
+func _on_button_pressed():
+	$Trajectory.endGame = 0
+	$".".visible = true
+	$titlescreen. visible = false
+	$"../finale/Control/frogappear".play()
+	$"../frogNPC6/pathopen".play()

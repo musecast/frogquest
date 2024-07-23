@@ -2129,6 +2129,7 @@ script = ExtResource("1_0tpyy")
 scale = Vector2(1.2, 1.2)
 
 [node name="Player" parent="." instance=ExtResource("1_ihkvx")]
+visible = false
 texture_filter = 1
 position = Vector2(671.903, 184.324)
 collision_layer = 9
@@ -3700,10 +3701,10 @@ stream = ExtResource("111_f8aip")
 [connection signal="area_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_area_entered"]
 [connection signal="area_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_area_exited"]
 [connection signal="area_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_area_shape_entered"]
-[connection signal="body_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_2_body_shape_entered"]
 [connection signal="body_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_body_shape_entered"]
-[connection signal="body_shape_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_body_shape_exited"]
+[connection signal="body_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_2_body_shape_entered"]
 [connection signal="body_shape_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_2_body_shape_exited"]
+[connection signal="body_shape_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_body_shape_exited"]
 [connection signal="body_shape_entered" from="frogNPC3/lanternhitbox" to="." method="_on_lanternhitbox_body_shape_entered"]
 [connection signal="body_shape_entered" from="frogNPC3/campfire/Area2D" to="Player" method="_on_area_2d_body_shape_entered"]
 [connection signal="body_shape_entered" from="frogNPC3/Area2D3" to="." method="_on_area_2d_3_body_shape_entered"]
