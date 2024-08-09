@@ -19,6 +19,9 @@ var songTrigger = 70
 @export var has_key = false
 var music_bus = AudioServer.get_bus_index("Master")
 var SpeedrunMode = false
+var finalTime
+var finalTimeBool = 0
+var finalbuttonBool = 0
 
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
@@ -31,17 +34,21 @@ func _ready():
 	currentHeight = (-position.y - 472) /10
 	highScore = currentHeight
 	time_start = Time.get_unix_time_from_system()
+	
+	if MusicManager.froggyCrown != 0:
+		$Froggycrown.visible = true
 
 
 func _physics_process(delta):
 	
 	if Input.is_action_just_pressed("mute_music"):
-		$sadTimer.stop()
-		$"../Environmental Audio/Classical Bangers".stop()
-		$"../Environmental Audio/Classical Bangers2".stop()
-		$"../Environmental Audio/Classical Bangers3".stop()
-		$"../finale/Control/froggod".stop()
-	
+		pass
+		#$sadTimer.stop()
+		#$"../Environmental Audio/Classical Bangers".stop()
+		#$"../Environmental Audio/Classical Bangers2".stop()
+		#$"../Environmental Audio/Classical Bangers3".stop()
+		#$"../finale/Control/froggod".stop()
+		#$winscreen/goodbyefroggy.stop()
 	
 	
 	currentHeight = (-position.y - 472) /10
@@ -73,8 +80,35 @@ func _physics_process(delta):
 	if currentHeight > 787:
 		$Trajectory.endGame = 1
 		position.y = -8382
+		position.x = 2804
 		velocity = Vector2(0,0)
+		$"../finale/finale walls/toshow".visible = false
+		await get_tree().create_timer(1.0).timeout
+		$Camera2D/AnimationPlayer.play("end")
+		if finalTimeBool == 0:
+			finalTime = str(int(minutes))+ ":"+str("%02d" % seconds)
+			finalTimeBool =1
+			await get_tree().create_timer(3.0).timeout
+			$winscreen/goodbyefroggy.play()
+
 		
+	if $Camera2D/AnimationPlayer.is_playing and $Camera2D/AnimationPlayer.current_animation:
+		position.y = -8382
+		position.x = 2804
+		if $Camera2D/AnimationPlayer.current_animation_position > 12:
+			$Camera2D/AnimationPlayer.seek(13)
+			
+			$winscreen/time2.text = ("In " + str(finalTime) + " and " + str(int(jumpCount)) + " jumps")
+			#$winscreen/jumpcount2.text = ("jumps: " + str(int(jumpCount)))
+			
+			if finalbuttonBool == 0:
+				$winscreen.visible = true
+				$winscreen/thanksforplayingButton.visible = false
+				$winscreen/thanksforplayingTimer.start()
+				finalbuttonBool = 1
+				$Camera2D.position = Vector2(-1770.67, 7144.045)
+	
+
 		
 	# Add the gravity.
 	if not is_on_floor():
@@ -105,15 +139,15 @@ func _physics_process(delta):
 			else:
 				$Sprite2D.play("sad")
 				if not $"../finale/Control/froggod".playing:
-					if not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount  == 0:
+					if not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and not $winscreen/goodbyefroggy.playing and bangersCount  == 0:
 						#await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers".play(0.0)
 						bangersCount = 1
-					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount == 1:
+					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and not $winscreen/goodbyefroggy.playing and bangersCount == 1:
 						#await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers2".play(0.0)
 						bangersCount = 2
-					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and bangersCount == 2:
+					elif not $"../Environmental Audio/Classical Bangers".playing and not $"../Environmental Audio/Classical Bangers2".playing and not $"../Environmental Audio/Classical Bangers3".playing and not $winscreen/goodbyefroggy.playing and bangersCount == 2:
 						#await get_tree().create_timer(0.8).timeout
 						$"../Environmental Audio/Classical Bangers3".play(0.0)
 						bangersCount = 0
@@ -140,11 +174,20 @@ func _physics_process(delta):
 	
 	tempVelocityx = velocity.x/2.5
 	
-	$"CanvasLayer/current height".text = str(int(currentHeight))
+	# Scale the current height from 0-779 to 0-1000
+	var scaledHeight = int((currentHeight / 779.0) * 1000)
+	
+	$"CanvasLayer/current height".text = str(int(scaledHeight))
 	$"CanvasLayer/high score".text = str(int(highScore))
 	$CanvasLayer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
 	$CanvasLayer/jumpcount.text = ("jumps: " + str(int(jumpCount)))
 	
+	if minutes > 18:
+		$CanvasLayer/time.position = Vector2(245, 4)
+	
+	if jumpCount> 1000:
+		$CanvasLayer/jumpcount.position.x = 245
+		
 	
 	fade_darkness()
 	
@@ -206,12 +249,15 @@ func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, lo
 
 
 func _on_restart_button_pressed():
-	get_tree().reload_current_scene()
-	Engine.time_scale = 1.0
-
+	$PauseScreen/RestartButton.visible = false
+	$PauseScreen/ResumeButton.visible = false
+	$PauseScreen/SettingsButton.visible = false
+	$PauseScreen/RestartConfirmContainer.visible = true
+	
 
 func _on_mute_button_pressed():
-	AudioServer.set_bus_mute(music_bus, not AudioServer.is_bus_mute(music_bus))
+	#MUTE MUSIC
+	AudioServer.set_bus_mute(1, not AudioServer.is_bus_mute(1))
 
 
 func _on_speedrun_mode_button_pressed():
@@ -237,3 +283,79 @@ func _on_button_pressed():
 	$titlescreen. visible = false
 	$"../finale/Control/frogappear".play()
 	$"../frogNPC6/pathopen".play()
+
+
+func _on_thanksforplaying_timer_timeout():
+	$winscreen/thanksforplayingButton.visible = true
+
+
+func _on_thanksforplaying_button_pressed():
+	MusicManager.MusicPosition = $winscreen/goodbyefroggy.get_playback_position()
+	MusicManager.froggyCrown = 1
+	get_tree().reload_current_scene()
+	Engine.time_scale = 1.0
+
+
+func _on_settings_button_pressed():
+	$frogaim.play()
+	
+	
+	$PauseScreen/RestartButton.visible=false
+	$PauseScreen/SettingsButton.visible=false
+	$PauseScreen/ResumeButton.visible=false
+	
+	$PauseScreen/settingsContainer.visible=true
+	$PauseScreen/BackfromSettingsButton.visible = true
+	
+
+
+func _on_backfrom_settings_button_pressed():
+	$frogaim.play()
+	
+	
+	$PauseScreen/RestartButton.visible=true
+	$PauseScreen/SettingsButton.visible=true
+	$PauseScreen/ResumeButton.visible=true
+	
+	$PauseScreen/settingsContainer.visible=false
+	$PauseScreen/BackfromSettingsButton.visible = false
+
+
+func _on_resume_button_pressed():
+
+	$frogjump.pitch_scale = randf_range(0.8, 1.2)	
+	$frogjump.play()
+	#GAME IS UNPAUSED HERE
+	$PauseScreen.visible=false
+	Engine.time_scale = 1.0
+
+#CHANGE SENSITIVITY
+#CHANGE SENSITIVITY
+#CHANGE SENSITIVITY
+func _on_l_pressed():
+	$Trajectory.sensitivity = 1.5
+
+
+func _on_m_pressed():
+	$Trajectory.sensitivity = 2
+
+
+func _on_h_pressed():
+	$Trajectory.sensitivity = 4
+
+
+func _on_restart_yes_pressed():
+	get_tree().reload_current_scene()
+	Engine.time_scale = 1.0
+
+
+func _on_restart_no_pressed():
+	$PauseScreen/RestartButton.visible = true
+	$PauseScreen/ResumeButton.visible = true
+	$PauseScreen/SettingsButton.visible = true
+	$PauseScreen/RestartConfirmContainer.visible = false
+
+
+func _on_mute_button_2_pressed():
+	#MUTE MUSIC
+	AudioServer.set_bus_mute(2, not AudioServer.is_bus_mute(2))

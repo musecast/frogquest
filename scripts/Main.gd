@@ -7,6 +7,8 @@ var npc4 = 0
 var npc5 = 0
 var npc6 = 0
 var finaledamage = -2
+var jokeCheck = 0
+var foreshadowBool = 0
 
 #top of script
 @onready var previous_window = DisplayServer.window_get_mode()
@@ -16,15 +18,39 @@ var finaledamage = -2
 # Called when the node enters the scene tree for the first time.
 func _ready():
 	print($TileMap.get_layer_name(1))
-	pass
-
+	Engine.time_scale=1.0
+		
+	$frogNPC1.play("farmer")
+	
+	if MusicManager.MusicPosition != 0:
+		$Player/winscreen/goodbyefroggy.play(MusicManager.MusicPosition)
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
-	$frogNPC1.play("prejump1")
-	if Input.is_action_just_pressed("pause"):
+	
+	#DELETE THIS IN FINAL PRODUCT
+	#DELETE THIS IN FINAL PRODUCT
+	#DELETE THIS IN FINAL PRODUCT
+	#if Input.is_action_pressed("ui_fastforward"):
+	#	Engine.time_scale = 8.0
+	#else:
+	#	Engine.time_scale = 1.0
+	#DELETE THIS IN FINAL PRODUCT
+	#DELETE THIS IN FINAL PRODUCT
+	#DELETE THIS IN FINAL PRODUCT
+	
+	
+	if Input.is_action_just_pressed("pause") and $Player/Trajectory.endGame == 0:
 		if Engine.time_scale != 1.0:
 			#GAME IS UNPAUSED HERE
+					
+			$Player/PauseScreen/RestartButton.visible = true
+			$Player/PauseScreen/ResumeButton.visible = true
+			$Player/PauseScreen/SettingsButton.visible = true
+			$Player/PauseScreen/RestartConfirmContainer.visible = false
+			$Player/PauseScreen/settingsContainer.visible = false
+			$Player/PauseScreen/BackfromSettingsButton.visible = false
+			
 			$Player/PauseScreen.visible=false
 			Engine.time_scale = 1.0
 		else:
@@ -100,7 +126,7 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(0.75).timeout
 			$frogNPC2/npc2rimshot.play()
 			await get_tree().create_timer(0.5).timeout
-			$frogNPC2.play("laughing")
+			$frogNPC2.play("wizlaugh")
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC2/npc2talk.play()
 			await get_tree().create_timer(0.5).timeout
@@ -110,10 +136,11 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(0.49).timeout
 			$frogNPC2/npc2talk.play()
 			await get_tree().create_timer(0.5).timeout
-			$frogNPC2.play("default")
+			$frogNPC2.play("wiz")
 			await get_tree().create_timer(0.3).timeout
 			$frogNPC2/npc2speechbubble.visible = false
 			npc2 = 1
+			jokeCheck = 1
 
 
 func _on_area_2d_2_body_shape_exited(_body_rid, body, _body_shape_index, local_shape_index):
@@ -340,13 +367,20 @@ func _on_finaleexit_body_entered(body):
 		$finale/glasshurt.play()
 		$"finale/finale sprites/Exit-entrance".play("2")
 		$"World Sprites/GodraysContainer".visible = true
+		$"World Sprites/GodraysContainer".modulate = Color(1, 1, 1, 0.7)
 		
 	if finaledamage == 2:
 		$finale/glasshurt.play()
 		$"finale/finale sprites/Exit-entrance".play("3")
-		$"World Sprites/GodraysContainer2".visible = true
+		$"World Sprites/GodraysContainer2".visible = true		
 		
 	if finaledamage == 3:
+		$finale/glasshurt.play()
+		$"finale/finale sprites/Exit-entrance".modulate = Color(1, 1, 1, 0.7)
+		$"World Sprites/GodraysContainer".modulate = Color(1, 1, 1, 1.0)
+		$"World Sprites/GodraysContainer2".visible = true
+		
+	if finaledamage == 4:
 		print("you win...")
 		$"finale/finale sprites/Exit-entrance".queue_free()
 		$finale/Control/froggod.stop()
@@ -366,8 +400,11 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			print("npc croak")
 			$frogNPC5/npc5talk.play()
 			$frogNPC5/npc5speechbubble.visible = true
-			$frogNPC5/npc5speechbubble.text = "o ho ho ho so you\nwant another joke, do you?"
-			await get_tree().create_timer(3.0).timeout
+			if jokeCheck == 1:
+				$frogNPC5/npc5speechbubble.text = "o ho ho ho so you\nwant another joke, do you?"
+			else:
+				$frogNPC5/npc5speechbubble.text = "o ho ho ho you must be\nhere for a good joke, yes?"
+			await get_tree().create_timer(5.0).timeout
 			$frogNPC5/npc5talk.play()
 			$frogNPC5/npc5speechbubble.text = "why are frogs\nso happy..?"
 			await get_tree().create_timer(3.0).timeout
@@ -376,7 +413,7 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(0.75).timeout
 			$frogNPC5/npc5rimshot.play()
 			await get_tree().create_timer(0.5).timeout
-			$frogNPC5.play("laughing")
+			$frogNPC5.play("wizlaugh")
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC5/npc5talk.play()
 			await get_tree().create_timer(0.5).timeout
@@ -386,7 +423,7 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(0.49).timeout
 			$frogNPC5/npc5talk.play()
 			await get_tree().create_timer(0.5).timeout
-			$frogNPC5.play("default")
+			$frogNPC5.play("wiz")
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC5/npc5talk.play()
 			$frogNPC5/npc5speechbubble.text = "hehehehe...\nnow let me help you"
@@ -434,7 +471,9 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC6/pathopen.play()
 			$"finale/finale walls/toshow".visible = true
 			$"finale/finale walls/hidethis".visible = false
-			$TileMap.set_layer_enabled(2, 1)
+			$"finale/finale walls/hidethis/delete".queue_free()
+			$TileMap.set_layer_enabled(2, 1) #enable finale foreground
+			$shadowtilemap.set_layer_enabled(3, 1) #enable finale foreground shadows
 			$finale/Control/froggod.play()
 			
 			
@@ -454,3 +493,11 @@ func _on_area_2d_6_body_shape_exited(body_rid, body, body_shape_index, local_sha
 
 
 
+
+
+
+
+func _on_castleaudiocue_body_entered(body):
+	if foreshadowBool == 0:
+		$"Environmental Audio/castleaudiocue/froggodglimpse".play()
+		foreshadowBool = 1

@@ -1,7 +1,8 @@
-[gd_scene load_steps=93 format=3 uid="uid://ni4rfdtergc8"]
+[gd_scene load_steps=98 format=3 uid="uid://ni4rfdtergc8"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_o2au2"]
 [ext_resource type="Script" path="res://scripts/Trajectory.gd" id="2_1o20b"]
+[ext_resource type="Texture2D" uid="uid://ba8uis32vsu5n" path="res://assets/froggycrown.png" id="2_c8w13"]
 [ext_resource type="Texture2D" uid="uid://b1b6thh4adw3a" path="res://assets/frog.png" id="3_26egt"]
 [ext_resource type="AudioStream" uid="uid://dcrd5pv04wqw1" path="res://assets/frogaim.wav" id="3_q8pba"]
 [ext_resource type="AudioStream" uid="uid://kfscduqfv213" path="res://assets/frogjump.wav" id="4_cc7fu"]
@@ -80,10 +81,48 @@
 [ext_resource type="Texture2D" uid="uid://3alq0nc6vwev" path="res://assets/ebsquiggle/frame_57_delay-s.png" id="78_e7t4i"]
 [ext_resource type="Texture2D" uid="uid://vy5exkmxyla2" path="res://assets/ebsquiggle/frame_58_delay-s.png" id="79_0u5y3"]
 [ext_resource type="Texture2D" uid="uid://bgk2vuovimbpl" path="res://assets/title.png" id="81_ory1h"]
+[ext_resource type="AudioStream" uid="uid://chi82lw4on52o" path="res://assets/music/goodbyefroggy.mp3" id="82_5ly6s"]
 [ext_resource type="Script" path="res://scenes/Titlewobble.gd" id="82_06nya"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_v8aux"]
 radius = 0.5
+
+[sub_resource type="Animation" id="Animation_ilk8k"]
+length = 0.001
+
+[sub_resource type="Animation" id="Animation_vtklk"]
+resource_name = "end"
+length = 15.0
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = false
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 10, 12),
+"transitions": PackedFloat32Array(1, 2, 1.18921, 0.732043),
+"update": 0,
+"values": [Vector2(0, 0), Vector2(0, 200), Vector2(0, 6500), Vector2(-1770.67, 7144.04)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath(".:zoom")
+tracks/1/interp = 1
+tracks/1/loop_wrap = false
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 3.2, 8, 10, 12),
+"transitions": PackedFloat32Array(2, 1, 1, -1.7411, 1),
+"update": 0,
+"values": [Vector2(0.55, 0.55), Vector2(0.345, 0.345), Vector2(0.27, 0.27), Vector2(0.25, 0.25), Vector2(0.55, 0.55)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_hrv0h"]
+_data = {
+"RESET": SubResource("Animation_ilk8k"),
+"end": SubResource("Animation_vtklk")
+}
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_n5hox"]
 animations = [{
@@ -397,9 +436,16 @@ Button/styles/normal = SubResource("StyleBoxFlat_j8mn3")
 
 [node name="Player" type="CharacterBody2D"]
 z_index = 1
+texture_filter = 1
 scale = Vector2(1.2, 1.2)
 script = ExtResource("1_o2au2")
 has_key = true
+
+[node name="Froggycrown" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(1.42109e-14, -9.16667)
+scale = Vector2(0.54, 0.54)
+texture = ExtResource("2_c8w13")
 
 [node name="Trajectory" type="Node2D" parent="."]
 script = ExtResource("2_1o20b")
@@ -416,13 +462,21 @@ zoom = Vector2(0.55, 0.55)
 limit_top = -8302
 position_smoothing_enabled = true
 
+[node name="AnimationPlayer" type="AnimationPlayer" parent="Camera2D"]
+libraries = {
+"": SubResource("AnimationLibrary_hrv0h")
+}
+speed_scale = 0.12
+
 [node name="frogaim" type="AudioStreamPlayer2D" parent="."]
 stream = ExtResource("3_q8pba")
 volume_db = -6.972
+bus = &"FX"
 
 [node name="frogjump" type="AudioStreamPlayer2D" parent="."]
 stream = ExtResource("4_cc7fu")
 volume_db = -6.391
+bus = &"FX"
 
 [node name="Sprite2D" type="AnimatedSprite2D" parent="."]
 texture_filter = 1
@@ -459,7 +513,7 @@ horizontal_alignment = 1
 visible = false
 offset_left = 252.0
 offset_top = 4.0
-offset_right = 292.0
+offset_right = 291.999
 offset_bottom = 27.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
@@ -467,9 +521,9 @@ theme_override_fonts/font = ExtResource("12_rif3d")
 
 [node name="jumpcount" type="Label" parent="CanvasLayer"]
 visible = false
-offset_left = 252.0
+offset_left = 251.0
 offset_top = 18.0
-offset_right = 292.0
+offset_right = 291.0
 offset_bottom = 41.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
@@ -508,10 +562,12 @@ script = ExtResource("16_hvn0b")
 [node name="lanternignite" type="AudioStreamPlayer2D" parent="FrogLantern"]
 stream = ExtResource("16_7leay")
 volume_db = 3.935
+bus = &"FX"
 
 [node name="lanternout" type="AudioStreamPlayer2D" parent="FrogLantern"]
 stream = ExtResource("18_to5un")
 volume_db = 3.935
+bus = &"FX"
 
 [node name="SCANLINES" type="CanvasLayer" parent="."]
 
@@ -531,10 +587,11 @@ scale = Vector2(359, 202)
 mesh = SubResource("BoxMesh_nays2")
 
 [node name="Paused" type="Label" parent="PauseScreen"]
+texture_filter = 1
 offset_left = 90.0
-offset_top = 26.0
+offset_top = 19.0
 offset_right = 228.0
-offset_bottom = 71.0
+offset_bottom = 64.0
 pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
@@ -542,21 +599,66 @@ text = "PAUSED"
 script = ExtResource("20_nk8tl")
 
 [node name="RestartButton" type="Button" parent="PauseScreen"]
+texture_filter = 1
+offset_left = 122.0
+offset_top = 140.0
+offset_right = 195.0
+offset_bottom = 166.0
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 20
+text = "❌EXIT"
+
+[node name="ResumeButton" type="Button" parent="PauseScreen"]
+texture_filter = 1
+clip_contents = true
+offset_left = 106.0
+offset_top = 62.0
+offset_right = 211.0
+offset_bottom = 98.0
+theme_override_colors/font_color = Color(0.730985, 0.86972, 0.74616, 1)
+theme_override_colors/font_hover_color = Color(0.642355, 0.746837, 0.813178, 1)
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 31
+text = "RESUME"
+
+[node name="SettingsButton" type="Button" parent="PauseScreen"]
+texture_filter = 1
+offset_left = 104.0
+offset_top = 104.0
+offset_right = 214.0
+offset_bottom = 132.0
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 20
+text = "⚙️SETTINGS"
+
+[node name="BackfromSettingsButton" type="Button" parent="PauseScreen"]
+visible = false
+texture_filter = 1
 offset_left = 122.0
 offset_top = 67.0
 offset_right = 195.0
 offset_bottom = 93.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
-text = "RESTART"
+text = "BACK"
 
-[node name="MuteButton" type="CheckButton" parent="PauseScreen"]
-offset_left = 71.0
-offset_top = 98.0
-offset_right = 115.0
-offset_bottom = 122.0
+[node name="settingsContainer" type="Control" parent="PauseScreen"]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_left = 118.0
+offset_top = 102.0
+offset_right = 158.0
+offset_bottom = 142.0
 
-[node name="Paused2" type="Label" parent="PauseScreen/MuteButton"]
+[node name="MuteButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
+texture_filter = 1
+offset_left = -100.0
+offset_top = -1.0
+offset_right = -56.0
+offset_bottom = 23.0
+
+[node name="MuteMusic" type="Label" parent="PauseScreen/settingsContainer/MuteButton"]
 layout_mode = 0
 offset_left = 7.16641
 offset_top = -22.776
@@ -566,33 +668,38 @@ scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
-text = "MUTE"
+text = "Mute Music"
 
-[node name="SpeedrunModeButton" type="CheckButton" parent="PauseScreen"]
-offset_left = 71.0
-offset_top = 119.0
-offset_right = 115.0
-offset_bottom = 143.0
+[node name="SpeedrunModeButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
+texture_filter = 1
+offset_left = 41.0
+offset_top = -1.0
+offset_right = 85.0
+offset_bottom = 23.0
 
-[node name="Paused3" type="Label" parent="PauseScreen/SpeedrunModeButton"]
+[node name="Paused3" type="Label" parent="PauseScreen/settingsContainer/SpeedrunModeButton"]
+texture_filter = 1
 layout_mode = 0
-offset_left = 8.16641
-offset_top = -22.776
-offset_right = 318.166
-offset_bottom = 22.224
+offset_left = -2.0
+offset_top = -23.0
+offset_right = 308.0
+offset_bottom = 22.0
 scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
-text = "SPEEDRUN MODE"
+text = "Speedrun Mode"
 
-[node name="CursorLockButton" type="CheckButton" parent="PauseScreen"]
-offset_left = 71.0
-offset_top = 140.0
-offset_right = 115.0
-offset_bottom = 164.0
+[node name="CursorLockButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
+visible = false
+texture_filter = 1
+offset_left = -117.0
+offset_top = 41.0
+offset_right = -73.0
+offset_bottom = 65.0
 
-[node name="Paused4" type="Label" parent="PauseScreen/CursorLockButton"]
+[node name="Paused4" type="Label" parent="PauseScreen/settingsContainer/CursorLockButton"]
+texture_filter = 1
 layout_mode = 0
 offset_left = 8.16639
 offset_top = -22.776
@@ -602,7 +709,92 @@ scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
-text = "CURSOR LOCK"
+text = "Cursor Lock"
+
+[node name="MuteButton2" type="CheckButton" parent="PauseScreen/settingsContainer"]
+texture_filter = 1
+offset_left = -101.0
+offset_top = 24.0
+offset_right = -57.0
+offset_bottom = 48.0
+
+[node name="MuteFX" type="Label" parent="PauseScreen/settingsContainer/MuteButton2"]
+layout_mode = 0
+offset_left = 7.16641
+offset_top = -22.776
+offset_right = 145.166
+offset_bottom = 22.224
+scale = Vector2(0.36, 0.36)
+pivot_offset = Vector2(68.49, 43.4)
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 50
+text = "Mute FX"
+
+[node name="Sensitivity" type="Label" parent="PauseScreen/settingsContainer"]
+texture_filter = 1
+layout_mode = 0
+offset_left = 65.0
+offset_top = 2.00001
+offset_right = 375.0
+offset_bottom = 47.0
+scale = Vector2(0.36, 0.36)
+pivot_offset = Vector2(68.49, 43.4)
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 50
+text = "Sensitivity"
+
+[node name="L" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
+texture_filter = 1
+offset_left = -160.649
+offset_top = -7.7111
+offset_right = -118.649
+offset_bottom = 46.2889
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 52
+text = "L"
+
+[node name="M" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
+texture_filter = 1
+offset_left = -107.871
+offset_top = -7.7111
+offset_right = -65.8711
+offset_bottom = 46.2889
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 52
+text = "M
+"
+
+[node name="H" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
+texture_filter = 1
+offset_left = -55.0934
+offset_top = -7.71112
+offset_right = -13.0934
+offset_bottom = 46.2889
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 52
+text = "H
+"
+
+[node name="CursorLockButton2" type="CheckButton" parent="PauseScreen/settingsContainer"]
+visible = false
+texture_filter = 1
+offset_left = 44.0
+offset_top = 20.0
+offset_right = 88.0
+offset_bottom = 44.0
+
+[node name="Paused4" type="Label" parent="PauseScreen/settingsContainer/CursorLockButton2"]
+texture_filter = 1
+layout_mode = 0
+offset_left = 8.16639
+offset_top = -22.776
+offset_right = 318.166
+offset_bottom = 22.224
+scale = Vector2(0.36, 0.36)
+pivot_offset = Vector2(68.49, 43.4)
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 50
+text = "Put on Bow"
 
 [node name="earthboundbattleFX2" type="AnimatedSprite2D" parent="PauseScreen"]
 modulate = Color(0.576352, 0.881429, 1, 1)
@@ -616,6 +808,138 @@ autoplay = "default"
 speed_scale = 8.0
 flip_h = true
 flip_v = true
+
+[node name="RestartConfirmContainer" type="Control" parent="PauseScreen"]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Paused2" type="Label" parent="PauseScreen/RestartConfirmContainer"]
+texture_filter = 1
+offset_left = 36.0
+offset_top = 46.0
+offset_right = 434.0
+offset_bottom = 139.0
+scale = Vector2(0.475, 0.475)
+pivot_offset = Vector2(68.49, 43.4)
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 50
+text = "ARE YOU SURE YOU
+WANT TO RESTART?"
+
+[node name="RestartYES" type="Button" parent="PauseScreen/RestartConfirmContainer"]
+texture_filter = 1
+offset_left = 61.0
+offset_top = 125.0
+offset_right = 134.0
+offset_bottom = 151.0
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 20
+text = "YES"
+
+[node name="RestartNO" type="Button" parent="PauseScreen/RestartConfirmContainer"]
+texture_filter = 1
+offset_left = 192.0
+offset_top = 126.0
+offset_right = 265.0
+offset_bottom = 152.0
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 20
+text = "NO"
+
+[node name="winscreen" type="CanvasLayer" parent="."]
+visible = false
+
+[node name="by muse2" type="Label" parent="winscreen"]
+offset_left = 42.0
+offset_top = 135.0
+offset_right = 478.0
+offset_bottom = 228.0
+scale = Vector2(0.3, 0.3)
+pivot_offset = Vector2(69.9, 42.31)
+size_flags_horizontal = 4
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 12
+theme_override_constants/line_spacing = -2
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 50
+text = "made by muse"
+horizontal_alignment = 1
+
+[node name="Title2" type="Sprite2D" parent="winscreen"]
+position = Vector2(163, 81)
+scale = Vector2(0.175, 0.175)
+texture = ExtResource("81_ory1h")
+script = ExtResource("82_06nya")
+
+[node name="congrats" type="Label" parent="winscreen"]
+offset_left = -49.0
+offset_top = -16.0
+offset_right = 1016.0
+offset_bottom = 394.0
+scale = Vector2(0.3, 0.3)
+pivot_offset = Vector2(69.9, 42.31)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 12
+theme_override_constants/line_spacing = -2
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 60
+text = "Congratulations... 
+you have completed the
+
+"
+horizontal_alignment = 1
+
+[node name="time2" type="Label" parent="winscreen"]
+offset_left = 86.0
+offset_top = 110.0
+offset_right = 212.0
+offset_bottom = 133.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("12_rif3d")
+text = "in a billion seconds"
+
+[node name="jumpcount2" type="Label" parent="winscreen"]
+visible = false
+offset_left = 93.0
+offset_top = 110.0
+offset_right = 133.0
+offset_bottom = 133.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_fonts/font = ExtResource("12_rif3d")
+text = "in a billion seconds"
+
+[node name="goodbyefroggy" type="AudioStreamPlayer" parent="winscreen"]
+stream = ExtResource("82_5ly6s")
+bus = &"Music"
+
+[node name="thanksforplayingButton" type="Button" parent="winscreen"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -84.0
+offset_top = 35.0
+offset_right = 83.0
+offset_bottom = 73.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+theme = SubResource("Theme_bhcve")
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 5
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 20
+text = "Thanks for playing!"
+icon_alignment = 1
+
+[node name="thanksforplayingTimer" type="Timer" parent="winscreen"]
+wait_time = 10.0
 
 [node name="titlescreen" type="CanvasLayer" parent="."]
 
@@ -676,7 +1000,19 @@ text = "made by muse"
 horizontal_alignment = 1
 
 [connection signal="pressed" from="PauseScreen/RestartButton" to="." method="_on_restart_button_pressed"]
-[connection signal="pressed" from="PauseScreen/MuteButton" to="." method="_on_mute_button_pressed"]
-[connection signal="pressed" from="PauseScreen/SpeedrunModeButton" to="." method="_on_speedrun_mode_button_pressed"]
-[connection signal="pressed" from="PauseScreen/CursorLockButton" to="Trajectory" method="_on_cursor_lock_button_pressed"]
+[connection signal="pressed" from="PauseScreen/ResumeButton" to="." method="_on_resume_button_pressed"]
+[connection signal="pressed" from="PauseScreen/SettingsButton" to="." method="_on_settings_button_pressed"]
+[connection signal="pressed" from="PauseScreen/BackfromSettingsButton" to="." method="_on_backfrom_settings_button_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/MuteButton" to="." method="_on_mute_button_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/SpeedrunModeButton" to="." method="_on_speedrun_mode_button_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/CursorLockButton" to="Trajectory" method="_on_cursor_lock_button_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/MuteButton2" to="." method="_on_mute_button_2_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/Sensitivity/L" to="." method="_on_l_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/Sensitivity/M" to="." method="_on_m_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/Sensitivity/H" to="." method="_on_h_pressed"]
+[connection signal="pressed" from="PauseScreen/settingsContainer/CursorLockButton2" to="Trajectory" method="_on_cursor_lock_button_pressed"]
+[connection signal="pressed" from="PauseScreen/RestartConfirmContainer/RestartYES" to="." method="_on_restart_yes_pressed"]
+[connection signal="pressed" from="PauseScreen/RestartConfirmContainer/RestartNO" to="." method="_on_restart_no_pressed"]
+[connection signal="pressed" from="winscreen/thanksforplayingButton" to="." method="_on_thanksforplaying_button_pressed"]
+[connection signal="timeout" from="winscreen/thanksforplayingTimer" to="." method="_on_thanksforplaying_timer_timeout"]
 [connection signal="pressed" from="titlescreen/Button" to="." method="_on_button_pressed"]
