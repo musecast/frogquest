@@ -1,4 +1,4 @@
-[gd_scene load_steps=98 format=3 uid="uid://ni4rfdtergc8"]
+[gd_scene load_steps=99 format=3 uid="uid://ni4rfdtergc8"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_o2au2"]
 [ext_resource type="Script" path="res://scripts/Trajectory.gd" id="2_1o20b"]
@@ -434,6 +434,191 @@ shadow_offset = Vector2(0, 1.91)
 Button/styles/hover = SubResource("StyleBoxFlat_ninsa")
 Button/styles/normal = SubResource("StyleBoxFlat_j8mn3")
 
+[sub_resource type="SpriteFrames" id="SpriteFrames_r2773"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("21_ofbjs")
+}, {
+"duration": 1.0,
+"texture": ExtResource("22_lpvta")
+}, {
+"duration": 1.0,
+"texture": ExtResource("23_lp7rr")
+}, {
+"duration": 1.0,
+"texture": ExtResource("24_60olp")
+}, {
+"duration": 1.0,
+"texture": ExtResource("25_4gtv6")
+}, {
+"duration": 1.0,
+"texture": ExtResource("26_mq8ib")
+}, {
+"duration": 1.0,
+"texture": ExtResource("27_ywlob")
+}, {
+"duration": 1.0,
+"texture": ExtResource("28_xiutr")
+}, {
+"duration": 1.0,
+"texture": ExtResource("29_jm3wa")
+}, {
+"duration": 1.0,
+"texture": ExtResource("30_xtygh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("31_067ko")
+}, {
+"duration": 1.0,
+"texture": ExtResource("32_57qeu")
+}, {
+"duration": 1.0,
+"texture": ExtResource("33_g0cdx")
+}, {
+"duration": 1.0,
+"texture": ExtResource("34_5j76h")
+}, {
+"duration": 1.0,
+"texture": ExtResource("35_jg3js")
+}, {
+"duration": 1.0,
+"texture": ExtResource("36_ywktp")
+}, {
+"duration": 1.0,
+"texture": ExtResource("37_tcr6s")
+}, {
+"duration": 1.0,
+"texture": ExtResource("38_jv8kx")
+}, {
+"duration": 1.0,
+"texture": ExtResource("39_fx2k8")
+}, {
+"duration": 1.0,
+"texture": ExtResource("40_6ul8d")
+}, {
+"duration": 1.0,
+"texture": ExtResource("41_ohiub")
+}, {
+"duration": 1.0,
+"texture": ExtResource("42_j87bh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("43_326nh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("44_jq5it")
+}, {
+"duration": 1.0,
+"texture": ExtResource("45_xemvt")
+}, {
+"duration": 1.0,
+"texture": ExtResource("46_qw18i")
+}, {
+"duration": 1.0,
+"texture": ExtResource("47_fmfqy")
+}, {
+"duration": 1.0,
+"texture": ExtResource("48_fi0cx")
+}, {
+"duration": 1.0,
+"texture": ExtResource("49_xujjv")
+}, {
+"duration": 1.0,
+"texture": ExtResource("50_hiv1m")
+}, {
+"duration": 1.0,
+"texture": ExtResource("51_q5vng")
+}, {
+"duration": 1.0,
+"texture": ExtResource("52_klr5u")
+}, {
+"duration": 1.0,
+"texture": ExtResource("53_seywh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("54_86678")
+}, {
+"duration": 1.0,
+"texture": ExtResource("55_q2kbh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("56_8xux3")
+}, {
+"duration": 1.0,
+"texture": ExtResource("57_o2b3y")
+}, {
+"duration": 1.0,
+"texture": ExtResource("58_gc7th")
+}, {
+"duration": 1.0,
+"texture": ExtResource("59_3yvfa")
+}, {
+"duration": 1.0,
+"texture": ExtResource("60_m48a1")
+}, {
+"duration": 1.0,
+"texture": ExtResource("61_4lxbw")
+}, {
+"duration": 1.0,
+"texture": ExtResource("62_5j3dq")
+}, {
+"duration": 1.0,
+"texture": ExtResource("63_r0kfb")
+}, {
+"duration": 1.0,
+"texture": ExtResource("64_i1yei")
+}, {
+"duration": 1.0,
+"texture": ExtResource("65_350t0")
+}, {
+"duration": 1.0,
+"texture": ExtResource("66_ju0ak")
+}, {
+"duration": 1.0,
+"texture": ExtResource("67_2wh5t")
+}, {
+"duration": 1.0,
+"texture": ExtResource("68_4lr8c")
+}, {
+"duration": 1.0,
+"texture": ExtResource("69_shvrg")
+}, {
+"duration": 1.0,
+"texture": ExtResource("70_um1nk")
+}, {
+"duration": 1.0,
+"texture": ExtResource("71_inxmp")
+}, {
+"duration": 1.0,
+"texture": ExtResource("72_jlql1")
+}, {
+"duration": 1.0,
+"texture": ExtResource("73_o204p")
+}, {
+"duration": 1.0,
+"texture": ExtResource("74_ndfx7")
+}, {
+"duration": 1.0,
+"texture": ExtResource("75_2dnf6")
+}, {
+"duration": 1.0,
+"texture": ExtResource("76_71bow")
+}, {
+"duration": 1.0,
+"texture": ExtResource("77_phrev")
+}, {
+"duration": 1.0,
+"texture": ExtResource("78_e7t4i")
+}, {
+"duration": 1.0,
+"texture": ExtResource("79_0u5y3")
+}],
+"loop": true,
+"name": &"default",
+"speed": 30.0
+}]
+
 [node name="Player" type="CharacterBody2D"]
 z_index = 1
 texture_filter = 1
@@ -458,7 +643,7 @@ shape = SubResource("CircleShape2D_v8aux")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 offset = Vector2(0, -50)
-zoom = Vector2(0.55, 0.55)
+zoom = Vector2(0.549, 0.549)
 limit_top = -8302
 position_smoothing_enabled = true
 
@@ -598,16 +783,6 @@ theme_override_font_sizes/font_size = 50
 text = "PAUSED"
 script = ExtResource("20_nk8tl")
 
-[node name="RestartButton" type="Button" parent="PauseScreen"]
-texture_filter = 1
-offset_left = 122.0
-offset_top = 140.0
-offset_right = 195.0
-offset_bottom = 166.0
-theme_override_fonts/font = ExtResource("12_rif3d")
-theme_override_font_sizes/font_size = 20
-text = "❌EXIT"
-
 [node name="ResumeButton" type="Button" parent="PauseScreen"]
 texture_filter = 1
 clip_contents = true
@@ -624,12 +799,22 @@ text = "RESUME"
 [node name="SettingsButton" type="Button" parent="PauseScreen"]
 texture_filter = 1
 offset_left = 104.0
-offset_top = 104.0
+offset_top = 100.0
 offset_right = 214.0
-offset_bottom = 132.0
+offset_bottom = 138.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "⚙️SETTINGS"
+
+[node name="RestartButton" type="Button" parent="PauseScreen"]
+texture_filter = 1
+offset_left = 122.0
+offset_top = 140.0
+offset_right = 195.0
+offset_bottom = 166.0
+theme_override_fonts/font = ExtResource("12_rif3d")
+theme_override_font_sizes/font_size = 20
+text = "❌EXIT"
 
 [node name="BackfromSettingsButton" type="Button" parent="PauseScreen"]
 visible = false
@@ -653,6 +838,7 @@ offset_bottom = 142.0
 
 [node name="MuteButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
 texture_filter = 1
+layout_mode = 0
 offset_left = -100.0
 offset_top = -1.0
 offset_right = -56.0
@@ -666,12 +852,16 @@ offset_right = 145.166
 offset_bottom = 22.224
 scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 7
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Mute Music"
 
 [node name="SpeedrunModeButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
 texture_filter = 1
+layout_mode = 0
 offset_left = 41.0
 offset_top = -1.0
 offset_right = 85.0
@@ -686,13 +876,17 @@ offset_right = 308.0
 offset_bottom = 22.0
 scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 7
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
-text = "Speedrun Mode"
+text = "Enable Timer"
 
 [node name="CursorLockButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
 visible = false
 texture_filter = 1
+layout_mode = 0
 offset_left = -117.0
 offset_top = 41.0
 offset_right = -73.0
@@ -713,6 +907,7 @@ text = "Cursor Lock"
 
 [node name="MuteButton2" type="CheckButton" parent="PauseScreen/settingsContainer"]
 texture_filter = 1
+layout_mode = 0
 offset_left = -101.0
 offset_top = 24.0
 offset_right = -57.0
@@ -726,6 +921,9 @@ offset_right = 145.166
 offset_bottom = 22.224
 scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 7
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Mute FX"
@@ -739,12 +937,16 @@ offset_right = 375.0
 offset_bottom = 47.0
 scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 7
+theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Sensitivity"
 
 [node name="L" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
 texture_filter = 1
+layout_mode = 0
 offset_left = -160.649
 offset_top = -7.7111
 offset_right = -118.649
@@ -755,6 +957,7 @@ text = "L"
 
 [node name="M" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
 texture_filter = 1
+layout_mode = 0
 offset_left = -107.871
 offset_top = -7.7111
 offset_right = -65.8711
@@ -766,6 +969,7 @@ text = "M
 
 [node name="H" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
 texture_filter = 1
+layout_mode = 0
 offset_left = -55.0934
 offset_top = -7.71112
 offset_right = -13.0934
@@ -778,6 +982,7 @@ text = "H
 [node name="CursorLockButton2" type="CheckButton" parent="PauseScreen/settingsContainer"]
 visible = false
 texture_filter = 1
+layout_mode = 0
 offset_left = 44.0
 offset_top = 20.0
 offset_right = 88.0
@@ -795,6 +1000,17 @@ pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Put on Bow"
+
+[node name="ColorRect" type="ColorRect" parent="PauseScreen/settingsContainer"]
+z_index = -2
+layout_mode = 0
+offset_left = -103.0
+offset_top = -7.0
+offset_right = 191.0
+offset_bottom = 54.0
+mouse_filter = 2
+mouse_force_pass_scroll_events = false
+color = Color(0.568627, 0.533333, 0.847059, 0.807843)
 
 [node name="earthboundbattleFX2" type="AnimatedSprite2D" parent="PauseScreen"]
 modulate = Color(0.576352, 0.881429, 1, 1)
@@ -818,6 +1034,7 @@ offset_bottom = 40.0
 
 [node name="Paused2" type="Label" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
+layout_mode = 0
 offset_left = 36.0
 offset_top = 46.0
 offset_right = 434.0
@@ -831,6 +1048,7 @@ WANT TO RESTART?"
 
 [node name="RestartYES" type="Button" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
+layout_mode = 0
 offset_left = 61.0
 offset_top = 125.0
 offset_right = 134.0
@@ -841,6 +1059,7 @@ text = "YES"
 
 [node name="RestartNO" type="Button" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
+layout_mode = 0
 offset_left = 192.0
 offset_top = 126.0
 offset_right = 265.0
@@ -876,31 +1095,40 @@ script = ExtResource("82_06nya")
 
 [node name="congrats" type="Label" parent="winscreen"]
 offset_left = -49.0
-offset_top = -16.0
+offset_top = -17.0
 offset_right = 1016.0
-offset_bottom = 394.0
+offset_bottom = 393.0
 scale = Vector2(0.3, 0.3)
 pivot_offset = Vector2(69.9, 42.31)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 12
 theme_override_constants/line_spacing = -2
 theme_override_fonts/font = ExtResource("12_rif3d")
-theme_override_font_sizes/font_size = 60
+theme_override_font_sizes/font_size = 65
 text = "Congratulations... 
-you have completed the
-
-"
+you have completed the"
 horizontal_alignment = 1
 
 [node name="time2" type="Label" parent="winscreen"]
-offset_left = 86.0
-offset_top = 110.0
-offset_right = 212.0
-offset_bottom = 133.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -62.0
+offset_top = 19.0
+offset_right = 64.0
+offset_bottom = 33.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(68, 8)
+size_flags_horizontal = 0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
-text = "in a billion seconds"
+text = "in a billion seconds and a billion jumps"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="jumpcount2" type="Label" parent="winscreen"]
 visible = false
@@ -978,7 +1206,7 @@ z_index = -1
 texture_filter = 5
 position = Vector2(181, 83)
 scale = Vector2(1.3, 1.18)
-sprite_frames = SubResource("SpriteFrames_hcvjt")
+sprite_frames = SubResource("SpriteFrames_r2773")
 autoplay = "default"
 speed_scale = 0.305
 flip_h = true
@@ -999,18 +1227,16 @@ theme_override_font_sizes/font_size = 50
 text = "made by muse"
 horizontal_alignment = 1
 
-[connection signal="pressed" from="PauseScreen/RestartButton" to="." method="_on_restart_button_pressed"]
 [connection signal="pressed" from="PauseScreen/ResumeButton" to="." method="_on_resume_button_pressed"]
 [connection signal="pressed" from="PauseScreen/SettingsButton" to="." method="_on_settings_button_pressed"]
+[connection signal="pressed" from="PauseScreen/RestartButton" to="." method="_on_restart_button_pressed"]
 [connection signal="pressed" from="PauseScreen/BackfromSettingsButton" to="." method="_on_backfrom_settings_button_pressed"]
 [connection signal="pressed" from="PauseScreen/settingsContainer/MuteButton" to="." method="_on_mute_button_pressed"]
 [connection signal="pressed" from="PauseScreen/settingsContainer/SpeedrunModeButton" to="." method="_on_speedrun_mode_button_pressed"]
-[connection signal="pressed" from="PauseScreen/settingsContainer/CursorLockButton" to="Trajectory" method="_on_cursor_lock_button_pressed"]
 [connection signal="pressed" from="PauseScreen/settingsContainer/MuteButton2" to="." method="_on_mute_button_2_pressed"]
 [connection signal="pressed" from="PauseScreen/settingsContainer/Sensitivity/L" to="." method="_on_l_pressed"]
 [connection signal="pressed" from="PauseScreen/settingsContainer/Sensitivity/M" to="." method="_on_m_pressed"]
 [connection signal="pressed" from="PauseScreen/settingsContainer/Sensitivity/H" to="." method="_on_h_pressed"]
-[connection signal="pressed" from="PauseScreen/settingsContainer/CursorLockButton2" to="Trajectory" method="_on_cursor_lock_button_pressed"]
 [connection signal="pressed" from="PauseScreen/RestartConfirmContainer/RestartYES" to="." method="_on_restart_yes_pressed"]
 [connection signal="pressed" from="PauseScreen/RestartConfirmContainer/RestartNO" to="." method="_on_restart_no_pressed"]
 [connection signal="pressed" from="winscreen/thanksforplayingButton" to="." method="_on_thanksforplaying_button_pressed"]

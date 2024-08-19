@@ -5,7 +5,7 @@ var mousePosition = Vector2()
 var mousePath = Vector2()
 var cursorLock = false
 var endGame = 1
-var sensitivity = 2
+var sensitivity = 3.5
 
 func _ready():
 
@@ -45,7 +45,7 @@ func _process(delta):
 					pass
 				if mouseOrigin != Vector2(0, 0):
 					var velocity = get_parent().velocity
-					#MULTIPLY BY SENSITIVITY
+					# dont? MULTIPLY BY SENSITIVITY
 					velocity = mousePath * sensitivity
 					velocity.x *= 1.5
 					velocity.y *= 1.1

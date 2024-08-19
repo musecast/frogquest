@@ -53,17 +53,19 @@ func _physics_process(delta):
 	
 	currentHeight = (-position.y - 472) /10
 	
-	time_now = Time.get_unix_time_from_system()
-	var time_elapsed = time_now - time_start
-	
-	if time_elapsed > seconds:
+	if Engine.time_scale != 0.05:
+		time_now = Time.get_unix_time_from_system()
+		var time_elapsed = time_now - time_start
+		
 		seconds = time_elapsed
-	
-	if time_elapsed > 59:
-		minutes += 1
-		time_elapsed = 0
-		seconds = 0
-		time_start = Time.get_unix_time_from_system()
+		
+		if time_elapsed >= 60:
+			minutes += 1
+			time_elapsed = 0
+			seconds = 0
+			time_start = Time.get_unix_time_from_system()
+	else:
+		time_start = Time.get_unix_time_from_system() - seconds
 	
 		
 	if currentHeight > highScore:
@@ -76,6 +78,10 @@ func _physics_process(delta):
 			
 	elif currentHeight >= 0:
 		$"CanvasLayer/current height".visible = true
+		$"../World Sprites/tutorial".visible = false
+		$"../World Sprites/tutorial2".visible = false
+		$"../World Sprites/tutorial3".visible = false
+		$"../World Sprites/tutorial4".visible = false
 		
 	if currentHeight > 787:
 		$Trajectory.endGame = 1
@@ -86,8 +92,19 @@ func _physics_process(delta):
 		await get_tree().create_timer(1.0).timeout
 		$Camera2D/AnimationPlayer.play("end")
 		if finalTimeBool == 0:
+			# THIS HAPPENS ONCE WHEN GAME ENDS
 			finalTime = str(int(minutes))+ ":"+str("%02d" % seconds)
 			finalTimeBool =1
+			
+			$"../frogNPC1".position = Vector2(3038, -1236)
+			$"../frogNPC1/Jonathan-dodd-hut-wo-details".visible = false
+			
+			$"../frogNPC2".position = Vector2(2541, -1750)
+			$"../frogNPC2/wiztheme".queue_free()
+			
+			$"../frogNPC5".position = Vector2(3096, -4573)
+			$"../frogNPC5/wiztheme2".queue_free()
+			
 			await get_tree().create_timer(3.0).timeout
 			$winscreen/goodbyefroggy.play()
 
@@ -179,8 +196,10 @@ func _physics_process(delta):
 	
 	$"CanvasLayer/current height".text = str(int(scaledHeight))
 	$"CanvasLayer/high score".text = str(int(highScore))
-	$CanvasLayer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
 	$CanvasLayer/jumpcount.text = ("jumps: " + str(int(jumpCount)))
+	
+	if Engine.time_scale != 0.05:
+		$CanvasLayer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
 	
 	if minutes > 18:
 		$CanvasLayer/time.position = Vector2(245, 4)
@@ -283,6 +302,8 @@ func _on_button_pressed():
 	$titlescreen. visible = false
 	$"../finale/Control/frogappear".play()
 	$"../frogNPC6/pathopen".play()
+	$"../World Sprites/tutorial".visible = true
+	
 
 
 func _on_thanksforplaying_timer_timeout():
@@ -333,11 +354,11 @@ func _on_resume_button_pressed():
 #CHANGE SENSITIVITY
 #CHANGE SENSITIVITY
 func _on_l_pressed():
-	$Trajectory.sensitivity = 1.5
+	$Trajectory.sensitivity = 3
 
 
 func _on_m_pressed():
-	$Trajectory.sensitivity = 2
+	$Trajectory.sensitivity = 3.5
 
 
 func _on_h_pressed():
