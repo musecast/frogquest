@@ -10,11 +10,13 @@ config_version=5
 
 [application]
 
-config/name="slingshot"
+config/name="Frog Quest"
+config/description="CLIMB THE TREE"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.2", "Forward Plus")
 boot_splash/bg_color=Color(0.794948, 0.928631, 0.993728, 1)
-config/icon="res://icon.svg"
+boot_splash/image="res://assets/title.png"
+config/icon="res://frogicon.svg"
 
 [autoload]
 
