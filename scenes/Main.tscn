@@ -3294,6 +3294,21 @@ scale = Vector2(0.1, 0.1)
 texture = ExtResource("15_1n5x8")
 flip_h = true
 
+[node name="Arrow20" type="Sprite2D" parent="World Sprites"]
+z_index = -1
+position = Vector2(1769.85, -939.474)
+rotation = 4.80074
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("15_1n5x8")
+flip_h = true
+
+[node name="Arrow19" type="Sprite2D" parent="World Sprites"]
+z_index = -1
+position = Vector2(4202.85, -1413.53)
+rotation = 3.54667
+scale = Vector2(0.1, 0.1)
+texture = ExtResource("15_1n5x8")
+
 [node name="Arrow9" type="Sprite2D" parent="World Sprites"]
 z_index = -1
 position = Vector2(3123, -2342)
@@ -3741,8 +3756,8 @@ pivot_offset = Vector2(181.73, 33.76)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_fonts/font = ExtResource("3_powbi")
 theme_override_font_sizes/font_size = 35
-text = "Click and drag anywhere
-to launch lil froggy...!"
+text = "Click & Drag
+anywhere to jump...!"
 horizontal_alignment = 1
 script = ExtResource("129_4thyy")
 
@@ -3761,31 +3776,30 @@ horizontal_alignment = 1
 script = ExtResource("129_4thyy")
 
 [node name="tutorial3" type="Label" parent="World Sprites"]
-offset_left = 21.0
-offset_top = -367.0
-offset_right = 428.0
-offset_bottom = -268.0
+offset_left = -20.0074
+offset_top = -344.718
+offset_right = 492.993
+offset_bottom = -245.718
 pivot_offset = Vector2(181.73, 33.76)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_fonts/font = ExtResource("3_powbi")
 theme_override_font_sizes/font_size = 35
-text = "Adjust sensitivity
-in the settings to 
-fine-tune controls...!"
+text = "Try adjusting sensitivity in
+settings if your jump feels off..."
 horizontal_alignment = 1
 script = ExtResource("129_4thyy")
 
 [node name="tutorial4" type="Label" parent="World Sprites"]
-offset_left = 574.0
-offset_top = -385.0
-offset_right = 981.0
-offset_bottom = -286.0
+offset_left = 700.206
+offset_top = -301.202
+offset_right = 1107.21
+offset_bottom = -202.202
 pivot_offset = Vector2(181.73, 33.76)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_fonts/font = ExtResource("3_powbi")
 theme_override_font_sizes/font_size = 35
-text = "good luck
-lil froggy..."
+text = "and lastly,
+good luck lil froggy...!"
 horizontal_alignment = 1
 script = ExtResource("129_4thyy")
 
@@ -3914,10 +3928,10 @@ bus = &"FX"
 [connection signal="area_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_area_entered"]
 [connection signal="area_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_area_exited"]
 [connection signal="area_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_area_shape_entered"]
-[connection signal="body_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_body_shape_entered"]
 [connection signal="body_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_2_body_shape_entered"]
-[connection signal="body_shape_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_2_body_shape_exited"]
+[connection signal="body_shape_entered" from="frogNPC2/Area2D2" to="." method="_on_area_2d_body_shape_entered"]
 [connection signal="body_shape_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_body_shape_exited"]
+[connection signal="body_shape_exited" from="frogNPC2/Area2D2" to="." method="_on_area_2d_2_body_shape_exited"]
 [connection signal="body_shape_entered" from="frogNPC3/lanternhitbox" to="." method="_on_lanternhitbox_body_shape_entered"]
 [connection signal="body_shape_entered" from="frogNPC3/campfire/Area2D" to="Player" method="_on_area_2d_body_shape_entered"]
 [connection signal="body_shape_entered" from="frogNPC3/Area2D3" to="." method="_on_area_2d_3_body_shape_entered"]
