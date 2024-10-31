@@ -20,6 +20,8 @@ var SpeedrunMode = null
 var froggyCrown = null
 var map_variables = null
 var jumpCount = null
+var velocity = null
+var gateDestroyed = null
 
 const RESTRICTED_HEIGHT = 513
 
@@ -30,7 +32,12 @@ const RESTRICTED_HEIGHT = 513
 
 # Called when the node enters the scene tree for the first time.
 func _ready():	# Start a timer for autosaving every 60 seconds (or your preferred interval)
+	
+	$"Player".visible = false
+	
+	
 	load_game()
+	velocity = $Player.velocity
 	has_key = $Player.has_key
 	has_lantern = $Player.has_lantern
 	jokeCheck = $".".jokeCheck
@@ -44,12 +51,21 @@ func _ready():	# Start a timer for autosaving every 60 seconds (or your preferre
 	
 	$Player/Trajectory.endGame = 1
 	
+	if has_key == true:
+		$"World Sprites/Key".queue_free()
+	if gateDestroyed == 1:
+		$"World Sprites/Keyhole".queue_free()
+		
 	
+	if MusicManager.froggyCrown == 1:
+		$Player/Froggycrown.visible = true
+
+	print("MusicManager.froggyCrown is ", MusicManager.froggyCrown)
 	#Save Capabilities
 
 	print(OS.get_user_data_dir())
 	var autosave_timer = $AutosaveTimer  # The Timer node you added
-	autosave_timer.start(3)  # Interval in seconds
+	autosave_timer.start(0.5)  # Interval in seconds
 	
 	
 	
@@ -459,6 +475,10 @@ func _on_finaleexit_body_entered(body):
 		$"World Sprites/GodraysContainer2".visible = true
 		
 	if finaledamage == 4:
+		$"World Sprites/tutorial".visible = false
+		$"World Sprites/tutorial2".visible = false
+		$"World Sprites/tutorial3".visible = false
+		$"World Sprites/tutorial4".visible = false
 		print("you win...")
 		$"finale/finale sprites/Exit-entrance".queue_free()
 		$finale/Control/froggod.stop()
@@ -607,6 +627,7 @@ func autosave(current_height):
 
 	var save_data = {
 		"position": $Player.position,
+		"gateDestroyed": gateDestroyed,
 		"has_key": $Player.has_key,
 		"has_lantern": $Player.has_lantern,
 		"jokeCheck": jokeCheck,
@@ -631,7 +652,9 @@ func load_game():
 		var save_data = file.get_var()
 		file.close()
 		
-		$Player.position = save_data["position"]
+		$Player.position = save_data.get("position", 0)
+		gateDestroyed = save_data.get("gateDestroyed", 0) 
+		$Player.velocity = save_data.get("velocity", Vector2(0,0))
 		$Player.has_key = save_data["has_key"]
 		$Player.has_lantern = save_data["has_lantern"]
 		jokeCheck = save_data["jokeCheck"]
@@ -641,6 +664,7 @@ func load_game():
 		$Player.seconds = save_data["seconds"]
 		$Player.time_start = $Player.time_start - save_data["seconds"]
 		$Player.SpeedrunMode = save_data["SpeedrunMode"]
+		froggyCrown = save_data["froggyCrown"]
 		MusicManager.froggyCrown = save_data["froggyCrown"]
 		map_variables = save_data["map_variables"]
 		$Player.jumpCount = save_data.get("jumpCount", 0) 

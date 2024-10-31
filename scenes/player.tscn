@@ -891,7 +891,7 @@ offset_right = 234.0
 offset_bottom = 167.84
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
-text = "❌EXIT"
+text = "❌RESET"
 metadata/_edit_use_anchors_ = true
 
 [node name="BackfromSettingsButton" type="Button" parent="PauseScreen"]
@@ -1130,7 +1130,10 @@ metadata/_edit_use_anchors_ = true
 
 [node name="Paused2" type="Label" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
-layout_mode = 0
+layout_mode = 1
+anchors_preset = -1
+anchor_left = -0.4
+anchor_right = 1.45
 offset_left = 36.0
 offset_top = 46.0
 offset_right = 434.0
@@ -1140,7 +1143,8 @@ pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "ARE YOU SURE YOU
-WANT TO RESTART?"
+WANT TO START OVER?"
+horizontal_alignment = 1
 metadata/_edit_use_anchors_ = true
 
 [node name="RestartYES" type="Button" parent="PauseScreen/RestartConfirmContainer"]
@@ -1150,6 +1154,7 @@ offset_left = 61.0
 offset_top = 125.0
 offset_right = 134.0
 offset_bottom = 151.0
+theme_override_colors/font_color = Color(1, 0.273989, 0.21327, 1)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "YES"
@@ -1171,9 +1176,9 @@ metadata/_edit_use_anchors_ = true
 visible = false
 
 [node name="by muse2" type="Label" parent="winscreen"]
-offset_left = 42.0
+offset_left = 79.0
 offset_top = 135.0
-offset_right = 478.0
+offset_right = 515.0
 offset_bottom = 228.0
 scale = Vector2(0.3, 0.3)
 pivot_offset = Vector2(69.9, 42.31)
@@ -1187,16 +1192,16 @@ text = "made by muse"
 horizontal_alignment = 1
 
 [node name="Title2" type="Sprite2D" parent="winscreen"]
-position = Vector2(163, 81)
+position = Vector2(197, 81)
 scale = Vector2(0.175, 0.175)
 texture = ExtResource("81_ory1h")
 script = ExtResource("82_06nya")
 
 [node name="congrats" type="Label" parent="winscreen"]
-offset_left = -49.0
-offset_top = -17.0
-offset_right = 1016.0
-offset_bottom = 393.0
+offset_left = -17.0
+offset_top = -16.0
+offset_right = 1048.0
+offset_bottom = 394.0
 scale = Vector2(0.3, 0.3)
 pivot_offset = Vector2(69.9, 42.31)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)

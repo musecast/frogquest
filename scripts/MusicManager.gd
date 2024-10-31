@@ -1,7 +1,7 @@
 extends Node
 
 var MusicPosition = 0
-var froggyCrown = 0
+var froggyCrown = null
 
 # Called when the node enters the scene tree for the first time.
 func _ready():

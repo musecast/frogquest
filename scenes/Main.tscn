@@ -1291,7 +1291,7 @@ script = ExtResource("1_0tpyy")
 scale = Vector2(1.2, 1.2)
 
 [node name="Player" parent="." instance=ExtResource("1_ihkvx")]
-position = Vector2(672.44, 196.994)
+position = Vector2(671.346, 196.789)
 collision_layer = 9
 collision_mask = 9
 has_key = false
@@ -2824,16 +2824,16 @@ horizontal_alignment = 1
 script = ExtResource("129_4thyy")
 
 [node name="tutorial3" type="Label" parent="World Sprites"]
-offset_left = -20.0074
+offset_left = -37.9668
 offset_top = -387.481
-offset_right = 492.993
+offset_right = 475.034
 offset_bottom = -288.481
-pivot_offset = Vector2(181.73, 33.76)
+pivot_offset = Vector2(248.455, 33.76)
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
 theme_override_fonts/font = ExtResource("3_powbi")
 theme_override_font_sizes/font_size = 35
-text = "Try adjusting sensitivity in
-settings if your jump feels off..."
+text = "The game is saved automatically,
+ so just focus on the climb!"
 horizontal_alignment = 1
 script = ExtResource("129_4thyy")
 
@@ -2955,7 +2955,7 @@ scale = Vector2(0.718516, 0.706349)
 texture = ExtResource("140_bm0e5")
 
 [node name="AutosaveTimer" type="Timer" parent="."]
-wait_time = 3.0
+wait_time = 0.5
 
 [connection signal="body_entered" from="finale/finale sprites/Exit-entrance/FINALEEXIT" to="." method="_on_finaleexit_body_entered"]
 [connection signal="body_shape_entered" from="finale/Control/FROG KING2/frogking2" to="." method="_on_frogking_2_body_shape_entered"]

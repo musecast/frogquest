@@ -5,7 +5,7 @@ var mousePosition = Vector2()
 var mousePath = Vector2()
 var cursorLock = false
 var endGame = 1
-var sensitivity = 3.5
+var sensitivity = 4
 
 func _ready():
 

@@ -34,13 +34,11 @@ var currentHeight
 func _ready():
 	
 	
+	
 	currentHeight = (-position.y - 472) /10
 	highScore = currentHeight
 	time_start = Time.get_unix_time_from_system()
 	
-	if MusicManager.froggyCrown != 0:
-		$Froggycrown.visible = true
-
 
 func _physics_process(delta):
 	
@@ -295,6 +293,7 @@ func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, lo
 	print("keyhole attempt")
 	if has_key == true:
 		print("keyhole success")
+		$"..".gateDestroyed = 1
 		$"../World Sprites/Keyhole/Area2Dkeyholeblocker".queue_free()
 		$"../World Sprites/Keyhole".visible = false
 		$"../World Sprites/Keyhole/havekey".play()
@@ -345,10 +344,36 @@ func _on_thanksforplaying_timer_timeout():
 
 
 func _on_thanksforplaying_button_pressed():
-	MusicManager.MusicPosition = $winscreen/goodbyefroggy.get_playback_position()
-	MusicManager.froggyCrown = 1
-	get_tree().reload_current_scene()
+	# Define the path to the save file
+	var save_path = "user://save_game.save"
+	
+	# Check if the save file exists
+	if FileAccess.file_exists(save_path):
+		# Open the directory containing the save file
+		var dir = DirAccess.open("user://")
+		if dir:
+			# Remove the save file
+			var error = dir.remove("save_game.save")
+			if error == OK:
+				print("Save file deleted successfully.")
+			else:
+				print("Error deleting save file: ", error)
+		else:
+			print("Failed to open user directory.")
+	else:
+		print("Save file does not exist.")
+	
+	# Reload the main scene
+	var main_scene_path = "res://scenes/Main.tscn"  # Replace with your main scene's path
+	var error = get_tree().change_scene_to_file(main_scene_path)
+	if error == OK:
+		print("Game restarted.")
+	else:
+		print("Error restarting game: ", error)
+	
+	# Reset any necessary game state variables
 	Engine.time_scale = 1.0
+	MusicManager.froggyCrown = 1
 
 
 func _on_settings_button_pressed():
@@ -388,19 +413,35 @@ func _on_resume_button_pressed():
 #CHANGE SENSITIVITY
 #CHANGE SENSITIVITY
 func _on_l_pressed():
-	$Trajectory.sensitivity = 3
-
-
-func _on_m_pressed():
 	$Trajectory.sensitivity = 3.5
 
 
-func _on_h_pressed():
+func _on_m_pressed():
 	$Trajectory.sensitivity = 4
 
 
+func _on_h_pressed():
+	$Trajectory.sensitivity = 4.5
+
+
 func _on_restart_yes_pressed():
-	get_tree().reload_current_scene()
+	
+	var save_path = "user://save_game.save"
+	
+	# Attempt to delete the save file directly
+	if FileAccess.file_exists(save_path):
+		if MusicManager.froggyCrown == 1:
+			DirAccess.remove_absolute(save_path)
+			MusicManager.froggyCrown = 1
+		else:
+			DirAccess.remove_absolute(save_path)
+		print("Save data deleted.")
+	else:
+		print("No save data found to delete.")
+
+	# Reload the main scene (replace with the actual path to your main scene)
+	get_tree().change_scene_to_file("res://scenes/Main.tscn")
+	print("Game restarted.")
 	Engine.time_scale = 1.0
 
 
