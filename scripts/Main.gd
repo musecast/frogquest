@@ -10,13 +10,49 @@ var finaledamage = -2
 var jokeCheck = 0
 var foreshadowBool = 0
 
+#var position = Vector2()
+var has_key = null
+var has_lantern = null
+var hours = null
+var minutes = null
+var seconds = null
+var SpeedrunMode = null
+var froggyCrown = null
+var map_variables = null
+var jumpCount = null
+
+const RESTRICTED_HEIGHT = 513
+
 #top of script
 @onready var previous_window = DisplayServer.window_get_mode()
 @onready var current_window = DisplayServer.window_get_mode()
 
 
 # Called when the node enters the scene tree for the first time.
-func _ready():
+func _ready():	# Start a timer for autosaving every 60 seconds (or your preferred interval)
+	load_game()
+	has_key = $Player.has_key
+	has_lantern = $Player.has_lantern
+	jokeCheck = $".".jokeCheck
+	foreshadowBool = $".".foreshadowBool
+	hours = $Player.hours
+	minutes = $Player.minutes
+	seconds = $Player.seconds
+	SpeedrunMode = $Player.SpeedrunMode
+	froggyCrown = MusicManager.froggyCrown
+	jumpCount = $Player.jumpCount
+	
+	$Player/Trajectory.endGame = 1
+	
+	
+	#Save Capabilities
+
+	print(OS.get_user_data_dir())
+	var autosave_timer = $AutosaveTimer  # The Timer node you added
+	autosave_timer.start(3)  # Interval in seconds
+	
+	
+	
 	print($TileMap.get_layer_name(1))
 	Engine.time_scale=1.0
 		
@@ -27,18 +63,7 @@ func _ready():
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
-	
-	#DELETE THIS IN FINAL PRODUCT
-	#DELETE THIS IN FINAL PRODUCT
-	#DELETE THIS IN FINAL PRODUCT
-	#if Input.is_action_pressed("ui_fastforward"):
-	#	Engine.time_scale = 8.0
-	#else:
-	#	Engine.time_scale = 1.0
-	#DELETE THIS IN FINAL PRODUCT
-	#DELETE THIS IN FINAL PRODUCT
-	#DELETE THIS IN FINAL PRODUCT
-	
+	#print($Player.currentHeight)
 	
 	if Input.is_action_just_pressed("pause") and $Player/Trajectory.endGame == 0:
 		if Engine.time_scale != 1.0:
@@ -86,11 +111,36 @@ func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_sh
 		$frogNPC1/npc1speechbubble.text = "so... you came \nfrom below?"
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "maybe you'll be the \none to reach the top"
+		$frogNPC1/npc1speechbubble.text = "maybe you'll be the \none to reach the top..."
 		await get_tree().create_timer(3.0).timeout
+		
+		
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1talk.position.x = -82.842
+		$frogNPC1/npc1speechbubble.text = "by the way, have you \nnoticed the white petals?"
+		$frogNPC1/npc1talk.position.x = -71.031
+		await get_tree().create_timer(4.0).timeout	
+			
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "some say they are \nsigns of the gods"
+		await get_tree().create_timer(3.0).timeout
+			
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "whether you believe \nthat, is up to you"
+		await get_tree().create_timer(3.0).timeout
+			
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1talk.position.x = -82.842
+		$frogNPC1/npc1speechbubble.text = "never had the courage \n for a leap of faith myself"
+		await get_tree().create_timer(4.0).timeout
+		
+		$frogNPC1/npc1talk.position.x = -71.031
+		
+		
 		$frogNPC1/npc1talk.play()
 		$frogNPC1/npc1speechbubble.text = "keep it up \nlil froggy..."
 		await get_tree().create_timer(3.0).timeout
+		
 		$frogNPC1/npc1speechbubble.visible = false
 		npc1 = 1
 		
@@ -106,7 +156,7 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		if npc2 == 1:
 			$frogNPC2/npc2talk.play()
 			$frogNPC2/npc2speechbubble.visible = true
-			$frogNPC2/npc2speechbubble.text = "heheheheheh\nhehehehe"
+			$frogNPC2/npc2speechbubble.text = "don't forget to jump full \npower if you see the petals..."
 			
 		if npc2 == 0:
 			npc2 = 3
@@ -137,7 +187,29 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC2/npc2talk.play()
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC2.play("wiz")
-			await get_tree().create_timer(0.3).timeout
+			await get_tree().create_timer(1.0).timeout
+
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "thank you for listening \nto my joke young froggy"
+			await get_tree().create_timer(3.0).timeout
+			
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "now i shall give you wisdom \nhanded to me from the gods..."
+			await get_tree().create_timer(5.0).timeout
+			
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "the white petals indicate \nguaranteed safety for a jump..."
+			await get_tree().create_timer(5.0).timeout
+			
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "...but only if you take that \njump at your full strength."
+			await get_tree().create_timer(5.0).timeout
+			
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "now hop along young froggy \nand let the petals guide you..."
+			await get_tree().create_timer(4.0).timeout
+			
+			
 			$frogNPC2/npc2speechbubble.visible = false
 			npc2 = 1
 			jokeCheck = 1
@@ -153,7 +225,10 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 	if npc3 == 1:
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.visible = true
-		$frogNPC3/npc3speechbubble.text = "press 'f' to\nuse the lantern"
+		$frogNPC3/npc3speechbubble.text = "may the gods protect \nyou on your ascent..."
+		await get_tree().create_timer(2.0).timeout
+		$frogNPC3/npc3speechbubble.text = "godspeed \nlil froggy..."
+		$frogNPC3/npc3talk.play()
 		
 	if npc3 == 0:
 		npc3 = 3
@@ -169,7 +244,10 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		$frogNPC3/npc3itemspawn.play()
 		await get_tree().create_timer(2.0).timeout
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "press 'f' to\nuse the lantern"
+		$frogNPC3/npc3speechbubble.text = "with this lantern, \ndarkness fears you..."
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC3/npc3talk.play()
+		$frogNPC3/npc3speechbubble.text = "it shall light your \nway automatically"
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.text = "godspeed lil\nfroggy..."
@@ -430,7 +508,14 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(3.0).timeout
 			$frogNPC5/npc5talk.play()
 			$frogNPC5/npc5speechbubble.text = "the way forward is a\nleap of faith to your right..."
-			await get_tree().create_timer(10.0).timeout
+			await get_tree().create_timer(5.0).timeout
+			
+			if jokeCheck == 1:
+				$frogNPC5/npc5talk.play()
+				$frogNPC5/npc5speechbubble.text = "although you probably \nknew that already heheh..."
+				await get_tree().create_timer(4.0).timeout
+			else:
+				pass
 			$frogNPC5/npc5speechbubble.visible = false
 			npc5 = 1
 
@@ -464,6 +549,13 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.text = "your final test\nawaits you..."
 			await get_tree().create_timer(3.0).timeout
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "as you can see, these\n petals have fallen..."
+			await get_tree().create_timer(4.0).timeout
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.position.x = -101.658
+			$frogNPC6/npc6speechbubble.text = "there is no god to guide you,\n you must succeed on your own..."
+			await get_tree().create_timer(5.0).timeout
 			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.text = "allow me to\nopen the path..."
 			await get_tree().create_timer(3.0).timeout
@@ -501,3 +593,55 @@ func _on_castleaudiocue_body_entered(body):
 	if foreshadowBool == 0:
 		$"Environmental Audio/castleaudiocue/froggodglimpse".play()
 		foreshadowBool = 1
+
+
+func _on_autosave_timer_timeout():
+	autosave($Player.currentHeight)
+
+
+
+func autosave(current_height):
+	if current_height > RESTRICTED_HEIGHT:
+		print("Autosave skipped.")
+		return
+
+	var save_data = {
+		"position": $Player.position,
+		"has_key": $Player.has_key,
+		"has_lantern": $Player.has_lantern,
+		"jokeCheck": jokeCheck,
+		"foreshadowBool": foreshadowBool,
+		"hours": $Player.hours,
+		"minutes": $Player.minutes,
+		"seconds": $Player.seconds,
+		"SpeedrunMode": $Player.SpeedrunMode,
+		"froggyCrown": MusicManager.froggyCrown,
+		"map_variables": map_variables,
+		"jumpCount": $Player.jumpCount,
+	}
+	
+	var file = FileAccess.open("user://save_game.save", FileAccess.WRITE)
+	file.store_var(save_data)
+	file.close()
+	print("Game saved.")
+
+func load_game():
+	var file = FileAccess.open("user://save_game.save", FileAccess.READ)
+	if file:
+		var save_data = file.get_var()
+		file.close()
+		
+		$Player.position = save_data["position"]
+		$Player.has_key = save_data["has_key"]
+		$Player.has_lantern = save_data["has_lantern"]
+		jokeCheck = save_data["jokeCheck"]
+		foreshadowBool = save_data["foreshadowBool"]
+		$Player.hours = save_data["hours"]
+		$Player.minutes = save_data["minutes"]
+		$Player.seconds = save_data["seconds"]
+		$Player.time_start = $Player.time_start - save_data["seconds"]
+		$Player.SpeedrunMode = save_data["SpeedrunMode"]
+		MusicManager.froggyCrown = save_data["froggyCrown"]
+		map_variables = save_data["map_variables"]
+		$Player.jumpCount = save_data.get("jumpCount", 0) 
+		print("Game loaded.")

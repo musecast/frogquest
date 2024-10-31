@@ -1,4 +1,4 @@
-[gd_scene load_steps=99 format=3 uid="uid://ni4rfdtergc8"]
+[gd_scene load_steps=103 format=3 uid="uid://ni4rfdtergc8"]
 
 [ext_resource type="Script" path="res://scripts/player.gd" id="1_o2au2"]
 [ext_resource type="Script" path="res://scripts/Trajectory.gd" id="2_1o20b"]
@@ -15,6 +15,7 @@
 [ext_resource type="FontFile" uid="uid://b86kug8tw1x7w" path="res://assets/fibberish.ttf" id="12_rif3d"]
 [ext_resource type="Shader" path="res://scripts/crt.gdshader" id="13_2frmi"]
 [ext_resource type="Shader" path="res://scripts/shadow.gdshader" id="14_6ufw2"]
+[ext_resource type="Texture2D" uid="uid://cr52k3ys08dm1" path="res://assets/lantern.png" id="14_dou13"]
 [ext_resource type="Texture2D" uid="uid://dcpabw2a7gkq0" path="res://assets/light.png" id="15_5wlej"]
 [ext_resource type="AudioStream" uid="uid://c1ntg4rtgymh6" path="res://assets/lanternigniting.mp3" id="16_7leay"]
 [ext_resource type="Script" path="res://scenes/FrogLantern.gd" id="16_hvn0b"]
@@ -167,6 +168,10 @@ animations = [{
 "name": &"sad",
 "speed": 5.0
 }]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_r3gnm"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_t6aox"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_21w3e"]
 shader = ExtResource("13_2frmi")
@@ -619,6 +624,8 @@ animations = [{
 "speed": 30.0
 }]
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_fywky"]
+
 [node name="Player" type="CharacterBody2D"]
 z_index = 1
 texture_filter = 1
@@ -673,9 +680,9 @@ sprite_frames = SubResource("SpriteFrames_n5hox")
 
 [node name="current height" type="Label" parent="CanvasLayer"]
 visible = false
-offset_left = 141.0
+offset_left = 174.0
 offset_top = 4.0
-offset_right = 181.0
+offset_right = 214.0
 offset_bottom = 27.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 7
@@ -696,23 +703,90 @@ horizontal_alignment = 1
 
 [node name="time" type="Label" parent="CanvasLayer"]
 visible = false
-offset_left = 252.0
-offset_top = 4.0
-offset_right = 291.999
-offset_bottom = 27.0
+offset_left = 4.0
+offset_top = 145.0
+offset_right = 43.999
+offset_bottom = 168.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
 
 [node name="jumpcount" type="Label" parent="CanvasLayer"]
 visible = false
-offset_left = 251.0
-offset_top = 18.0
-offset_right = 291.0
-offset_bottom = 41.0
+offset_left = 5.0
+offset_top = 161.0
+offset_right = 45.0
+offset_bottom = 184.0
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
+
+[node name="TouchScreenButtonPause" type="TouchScreenButton" parent="CanvasLayer"]
+position = Vector2(10, 10)
+scale = Vector2(2.32869, 2.11698)
+shape = SubResource("RectangleShape2D_r3gnm")
+action = "pause"
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer/TouchScreenButtonPause"]
+z_index = 1
+offset_left = 1.99503
+offset_top = 4.17954
+offset_right = 467.995
+offset_bottom = 448.18
+scale = Vector2(-0.00440281, -0.0128911)
+color = Color(0, 0, 0, 1)
+
+[node name="ColorRect2" type="ColorRect" parent="CanvasLayer/TouchScreenButtonPause"]
+z_index = 1
+offset_left = 6.3847
+offset_top = 4.12433
+offset_right = 472.385
+offset_bottom = 448.124
+scale = Vector2(-0.00440281, -0.0128911)
+color = Color(0, 0, 0, 1)
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="CanvasLayer/TouchScreenButtonPause"]
+position = Vector2(2.9493, 1.29012)
+scale = Vector2(9.334, 9.19341)
+mesh = SubResource("BoxMesh_t6aox")
+
+[node name="TouchScreenButtonLantern" type="TouchScreenButton" parent="CanvasLayer"]
+visible = false
+position = Vector2(9, 176)
+scale = Vector2(2.32869, 2.11698)
+shape = SubResource("RectangleShape2D_r3gnm")
+action = "pause"
+
+[node name="Lantern" type="Sprite2D" parent="CanvasLayer/TouchScreenButtonLantern"]
+z_index = 3
+position = Vector2(3.00598, -5.66844)
+scale = Vector2(0.025, 0.025)
+texture = ExtResource("14_dou13")
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer/TouchScreenButtonLantern"]
+visible = false
+z_index = 1
+offset_left = 1.99503
+offset_top = -1.01653
+offset_right = 467.995
+offset_bottom = 442.983
+scale = Vector2(-0.00440281, -0.0128911)
+color = Color(0, 0, 0, 1)
+
+[node name="ColorRect2" type="ColorRect" parent="CanvasLayer/TouchScreenButtonLantern"]
+visible = false
+z_index = 1
+offset_left = 6.3847
+offset_top = -1.07173
+offset_right = 472.385
+offset_bottom = 442.928
+scale = Vector2(-0.00440281, -0.0128911)
+color = Color(0, 0, 0, 1)
+
+[node name="MeshInstance2D" type="MeshInstance2D" parent="CanvasLayer/TouchScreenButtonLantern"]
+position = Vector2(2.9493, -3.90595)
+scale = Vector2(9.334, 9.19341)
+mesh = SubResource("BoxMesh_t6aox")
 
 [node name="sadTimer" type="Timer" parent="."]
 wait_time = 20.0
@@ -724,9 +798,9 @@ one_shot = true
 
 [node name="ColorRect" type="ColorRect" parent="CRT Shader"]
 material = SubResource("ShaderMaterial_21w3e")
-offset_right = 40.0
+offset_right = 49.0
 offset_bottom = 40.0
-scale = Vector2(8, 4.52)
+scale = Vector2(7.95939, 4.50237)
 
 [node name="Shadow" type="AnimatedSprite2D" parent="."]
 light_mask = 0
@@ -758,7 +832,7 @@ bus = &"FX"
 
 [node name="ColorRect" type="ColorRect" parent="SCANLINES"]
 material = SubResource("ShaderMaterial_d1h6k")
-offset_right = 320.0
+offset_right = 392.0
 offset_bottom = 179.0
 
 [node name="PauseScreen" type="CanvasLayer" parent="."]
@@ -767,74 +841,80 @@ visible = false
 [node name="MeshInstance2D" type="MeshInstance2D" parent="PauseScreen"]
 modulate = Color(0, 0, 0, 0.607843)
 z_index = -2
-position = Vector2(167.5, 95)
-scale = Vector2(359, 202)
+position = Vector2(195.5, 94.84)
+scale = Vector2(481, 202)
 mesh = SubResource("BoxMesh_nays2")
 
 [node name="Paused" type="Label" parent="PauseScreen"]
 texture_filter = 1
-offset_left = 90.0
-offset_top = 19.0
-offset_right = 228.0
-offset_bottom = 64.0
+offset_left = 129.0
+offset_top = 18.84
+offset_right = 267.0
+offset_bottom = 63.84
 pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "PAUSED"
 script = ExtResource("20_nk8tl")
+metadata/_edit_use_anchors_ = true
 
 [node name="ResumeButton" type="Button" parent="PauseScreen"]
 texture_filter = 1
 clip_contents = true
-offset_left = 106.0
-offset_top = 62.0
-offset_right = 211.0
-offset_bottom = 98.0
-theme_override_colors/font_color = Color(0.730985, 0.86972, 0.74616, 1)
+offset_left = 145.0
+offset_top = 61.84
+offset_right = 250.0
+offset_bottom = 97.84
 theme_override_colors/font_hover_color = Color(0.642355, 0.746837, 0.813178, 1)
+theme_override_colors/font_color = Color(0.730985, 0.86972, 0.74616, 1)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 31
 text = "RESUME"
+metadata/_edit_use_anchors_ = true
 
 [node name="SettingsButton" type="Button" parent="PauseScreen"]
 texture_filter = 1
-offset_left = 104.0
-offset_top = 100.0
-offset_right = 214.0
-offset_bottom = 138.0
+offset_left = 143.0
+offset_top = 99.84
+offset_right = 253.0
+offset_bottom = 137.84
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "⚙️SETTINGS"
+metadata/_edit_use_anchors_ = true
 
 [node name="RestartButton" type="Button" parent="PauseScreen"]
 texture_filter = 1
-offset_left = 122.0
-offset_top = 140.0
-offset_right = 195.0
-offset_bottom = 166.0
+offset_left = 161.0
+offset_top = 139.84
+offset_right = 234.0
+offset_bottom = 167.84
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "❌EXIT"
+metadata/_edit_use_anchors_ = true
 
 [node name="BackfromSettingsButton" type="Button" parent="PauseScreen"]
 visible = false
 texture_filter = 1
-offset_left = 122.0
-offset_top = 67.0
-offset_right = 195.0
-offset_bottom = 93.0
+offset_left = 158.0
+offset_top = 61.0
+offset_right = 231.0
+offset_bottom = 87.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "BACK"
+metadata/_edit_use_anchors_ = true
 
 [node name="settingsContainer" type="Control" parent="PauseScreen"]
 visible = false
 layout_mode = 3
 anchors_preset = 0
-offset_left = 118.0
+offset_left = 147.0
 offset_top = 102.0
-offset_right = 158.0
+offset_right = 187.0
 offset_bottom = 142.0
+metadata/_edit_use_anchors_ = true
 
 [node name="MuteButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
 texture_filter = 1
@@ -843,6 +923,7 @@ offset_left = -100.0
 offset_top = -1.0
 offset_right = -56.0
 offset_bottom = 23.0
+metadata/_edit_use_anchors_ = true
 
 [node name="MuteMusic" type="Label" parent="PauseScreen/settingsContainer/MuteButton"]
 layout_mode = 0
@@ -858,6 +939,7 @@ theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Mute Music"
+metadata/_edit_use_anchors_ = true
 
 [node name="SpeedrunModeButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
 texture_filter = 1
@@ -866,6 +948,7 @@ offset_left = 41.0
 offset_top = -1.0
 offset_right = 85.0
 offset_bottom = 23.0
+metadata/_edit_use_anchors_ = true
 
 [node name="Paused3" type="Label" parent="PauseScreen/settingsContainer/SpeedrunModeButton"]
 texture_filter = 1
@@ -882,6 +965,7 @@ theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Enable Timer"
+metadata/_edit_use_anchors_ = true
 
 [node name="CursorLockButton" type="CheckButton" parent="PauseScreen/settingsContainer"]
 visible = false
@@ -891,6 +975,7 @@ offset_left = -117.0
 offset_top = 41.0
 offset_right = -73.0
 offset_bottom = 65.0
+metadata/_edit_use_anchors_ = true
 
 [node name="Paused4" type="Label" parent="PauseScreen/settingsContainer/CursorLockButton"]
 texture_filter = 1
@@ -904,6 +989,7 @@ pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Cursor Lock"
+metadata/_edit_use_anchors_ = true
 
 [node name="MuteButton2" type="CheckButton" parent="PauseScreen/settingsContainer"]
 texture_filter = 1
@@ -912,6 +998,7 @@ offset_left = -101.0
 offset_top = 24.0
 offset_right = -57.0
 offset_bottom = 48.0
+metadata/_edit_use_anchors_ = true
 
 [node name="MuteFX" type="Label" parent="PauseScreen/settingsContainer/MuteButton2"]
 layout_mode = 0
@@ -927,13 +1014,13 @@ theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Mute FX"
+metadata/_edit_use_anchors_ = true
 
 [node name="Sensitivity" type="Label" parent="PauseScreen/settingsContainer"]
-texture_filter = 1
 layout_mode = 0
 offset_left = 65.0
-offset_top = 2.00001
-offset_right = 375.0
+offset_top = 2.0
+offset_right = 271.0
 offset_bottom = 47.0
 scale = Vector2(0.36, 0.36)
 pivot_offset = Vector2(68.49, 43.4)
@@ -943,41 +1030,45 @@ theme_override_constants/shadow_offset_y = 3
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Sensitivity"
+metadata/_edit_use_anchors_ = true
 
 [node name="L" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
 texture_filter = 1
 layout_mode = 0
 offset_left = -244.0
-offset_top = -8.0
+offset_top = -7.99997
 offset_right = -166.0
 offset_bottom = 46.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 52
 text = "L"
+metadata/_edit_use_anchors_ = true
 
 [node name="M" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
 texture_filter = 1
 layout_mode = 0
 offset_left = -161.0
-offset_top = -8.0
+offset_top = -7.99997
 offset_right = -88.0
 offset_bottom = 46.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 52
 text = "M
 "
+metadata/_edit_use_anchors_ = true
 
 [node name="H" type="Button" parent="PauseScreen/settingsContainer/Sensitivity"]
 texture_filter = 1
 layout_mode = 0
 offset_left = -83.0
-offset_top = -8.0
+offset_top = -7.99997
 offset_right = -8.0
 offset_bottom = 46.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 52
 text = "H
 "
+metadata/_edit_use_anchors_ = true
 
 [node name="CursorLockButton2" type="CheckButton" parent="PauseScreen/settingsContainer"]
 visible = false
@@ -987,6 +1078,7 @@ offset_left = 44.0
 offset_top = 20.0
 offset_right = 88.0
 offset_bottom = 44.0
+metadata/_edit_use_anchors_ = true
 
 [node name="Paused4" type="Label" parent="PauseScreen/settingsContainer/CursorLockButton2"]
 texture_filter = 1
@@ -1000,6 +1092,7 @@ pivot_offset = Vector2(68.49, 43.4)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "Put on Bow"
+metadata/_edit_use_anchors_ = true
 
 [node name="ColorRect" type="ColorRect" parent="PauseScreen/settingsContainer"]
 z_index = -2
@@ -1011,13 +1104,14 @@ offset_bottom = 54.0
 mouse_filter = 2
 mouse_force_pass_scroll_events = false
 color = Color(0.568627, 0.533333, 0.847059, 0.807843)
+metadata/_edit_use_anchors_ = true
 
 [node name="earthboundbattleFX2" type="AnimatedSprite2D" parent="PauseScreen"]
 modulate = Color(0.576352, 0.881429, 1, 1)
 self_modulate = Color(1, 1, 1, 0.235294)
 z_index = -1
 texture_filter = 5
-position = Vector2(181, 83)
+position = Vector2(220, 82.84)
 scale = Vector2(1.3, 1.18)
 sprite_frames = SubResource("SpriteFrames_hcvjt")
 autoplay = "default"
@@ -1029,8 +1123,10 @@ flip_v = true
 visible = false
 layout_mode = 3
 anchors_preset = 0
-offset_right = 40.0
+offset_left = 28.0
+offset_right = 68.0
 offset_bottom = 40.0
+metadata/_edit_use_anchors_ = true
 
 [node name="Paused2" type="Label" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
@@ -1045,6 +1141,7 @@ theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "ARE YOU SURE YOU
 WANT TO RESTART?"
+metadata/_edit_use_anchors_ = true
 
 [node name="RestartYES" type="Button" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
@@ -1056,6 +1153,7 @@ offset_bottom = 151.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "YES"
+metadata/_edit_use_anchors_ = true
 
 [node name="RestartNO" type="Button" parent="PauseScreen/RestartConfirmContainer"]
 texture_filter = 1
@@ -1067,6 +1165,7 @@ offset_bottom = 152.0
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
 text = "NO"
+metadata/_edit_use_anchors_ = true
 
 [node name="winscreen" type="CanvasLayer" parent="."]
 visible = false
@@ -1080,8 +1179,8 @@ scale = Vector2(0.3, 0.3)
 pivot_offset = Vector2(69.9, 42.31)
 size_flags_horizontal = 4
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 12
 theme_override_constants/line_spacing = -2
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "made by muse"
@@ -1101,8 +1200,8 @@ offset_bottom = 393.0
 scale = Vector2(0.3, 0.3)
 pivot_offset = Vector2(69.9, 42.31)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 12
 theme_override_constants/line_spacing = -2
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 65
 text = "Congratulations... 
@@ -1178,9 +1277,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -38.0
-offset_top = 9.0
+offset_top = 19.0
 offset_right = 27.0
-offset_bottom = 47.0
+offset_bottom = 57.0
 grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(1.135, 1.135)
@@ -1194,8 +1293,8 @@ text = "BEGIN"
 icon_alignment = 1
 
 [node name="Title" type="Sprite2D" parent="titlescreen"]
-position = Vector2(163, 56)
-scale = Vector2(0.195, 0.195)
+position = Vector2(203, 58)
+scale = Vector2(0.25, 0.25)
 texture = ExtResource("81_ory1h")
 script = ExtResource("82_06nya")
 
@@ -1213,19 +1312,25 @@ flip_h = true
 flip_v = true
 
 [node name="by muse" type="Label" parent="titlescreen"]
-offset_left = 45.0
+offset_left = 80.0
 offset_top = 136.0
-offset_right = 481.0
+offset_right = 516.0
 offset_bottom = 229.0
 scale = Vector2(0.3, 0.3)
 pivot_offset = Vector2(69.9, 42.31)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 12
 theme_override_constants/line_spacing = -2
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 50
 text = "made by muse"
 horizontal_alignment = 1
+
+[node name="TouchScreenButton" type="TouchScreenButton" parent="."]
+position = Vector2(125.833, 74.1667)
+scale = Vector2(-24.9847, 19.5541)
+shape = SubResource("RectangleShape2D_fywky")
+action = "ui_mouse"
 
 [connection signal="pressed" from="PauseScreen/ResumeButton" to="." method="_on_resume_button_pressed"]
 [connection signal="pressed" from="PauseScreen/SettingsButton" to="." method="_on_settings_button_pressed"]

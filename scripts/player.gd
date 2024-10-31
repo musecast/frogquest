@@ -9,6 +9,7 @@ var time_elapsed
 var time_now
 var time_start
 var tempVelocityx = 0.0
+var hours = 0
 var minutes = 0
 var seconds = 0
 @export var max_y_position: float = 500.0 # The Y position at which the opacity should be 100%
@@ -21,7 +22,8 @@ var music_bus = AudioServer.get_bus_index("Master")
 var SpeedrunMode = false
 var finalTime
 var finalTimeBool = 0
-var finalbuttonBool = 0
+var finalbuttonBool = 0			
+var lanternbool = 0
 
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
@@ -30,6 +32,7 @@ var highScore
 var currentHeight
 
 func _ready():
+	
 	
 	currentHeight = (-position.y - 472) /10
 	highScore = currentHeight
@@ -40,6 +43,14 @@ func _ready():
 
 
 func _physics_process(delta):
+	
+	
+	if SpeedrunMode == true:
+		$CanvasLayer/time.visible = true
+		$CanvasLayer/jumpcount.visible = true
+	else:
+		$CanvasLayer/time.visible = false
+		$CanvasLayer/jumpcount.visible = false
 	
 	if Input.is_action_just_pressed("mute_music"):
 		pass
@@ -53,7 +64,7 @@ func _physics_process(delta):
 	
 	currentHeight = (-position.y - 472) /10
 	
-	if Engine.time_scale != 0.05:
+	if Engine.time_scale != 0.05 and $Trajectory.endGame == 0:
 		time_now = Time.get_unix_time_from_system()
 		var time_elapsed = time_now - time_start
 		
@@ -64,6 +75,11 @@ func _physics_process(delta):
 			time_elapsed = 0
 			seconds = 0
 			time_start = Time.get_unix_time_from_system()
+			
+			
+		if minutes >= 60:
+			hours += 1
+			minutes = 0
 	else:
 		time_start = Time.get_unix_time_from_system() - seconds
 	
@@ -199,13 +215,21 @@ func _physics_process(delta):
 	$CanvasLayer/jumpcount.text = ("jumps: " + str(int(jumpCount)))
 	
 	if Engine.time_scale != 0.05:
-		$CanvasLayer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
+		if hours == 0:
+			$CanvasLayer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
+		else:
+			if minutes < 10:
+				$CanvasLayer/time.text = ("time: "+ str(int(hours)) + ":0" + str(int(minutes))+ ":"+str("%02d" % seconds) )
+			else:
+				$CanvasLayer/time.text = ("time: "+ str(int(hours)) + ":" + str(int(minutes))+ ":"+str("%02d" % seconds) )
 	
 	if minutes > 18:
-		$CanvasLayer/time.position = Vector2(245, 4)
+		pass
+		#$CanvasLayer/time.position = Vector2(245, 4)
 	
 	if jumpCount> 1000:
-		$CanvasLayer/jumpcount.position.x = 245
+		pass
+		#$CanvasLayer/jumpcount.position.x = 245
 		
 	
 	fade_darkness()
@@ -250,6 +274,21 @@ func fade_darkness():
 	else:
 		$FrogLantern.visible = false
 		$"../Darkness".visible = false
+		
+	#MOBILE LANTERN CODE
+	if has_lantern == true and currentHeight > 174 and currentHeight < 313:
+		if $FrogLantern.visible == false:
+			$FrogLantern/lanternignite.play()
+			$FrogLantern.visible = true
+			lanternbool = 1
+	else:
+		if lanternbool == 1:
+			$FrogLantern.visible = false
+			$FrogLantern/lanternout.play()
+			lanternbool = 0
+		else:
+			$FrogLantern.visible = false
+
 
 
 func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
@@ -281,12 +320,7 @@ func _on_mute_button_pressed():
 
 func _on_speedrun_mode_button_pressed():
 	SpeedrunMode = !SpeedrunMode
-	if SpeedrunMode == true:
-		$CanvasLayer/time.visible = true
-		$CanvasLayer/jumpcount.visible = true
-	else:
-		$CanvasLayer/time.visible = false
-		$CanvasLayer/jumpcount.visible = false
+
 
 
 
