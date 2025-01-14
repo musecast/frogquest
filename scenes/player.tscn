@@ -52,7 +52,7 @@
 [ext_resource type="Texture2D" uid="uid://dgchr8bwvgfnd" path="res://assets/ebsquiggle/frame_27_delay-s.png" id="48_fi0cx"]
 [ext_resource type="Texture2D" uid="uid://coobgaydttejp" path="res://assets/ebsquiggle/frame_28_delay-s.png" id="49_xujjv"]
 [ext_resource type="Texture2D" uid="uid://c4yvy123jqvci" path="res://assets/ebsquiggle/frame_29_delay-s.png" id="50_hiv1m"]
-[ext_resource type="Texture2D" uid="uid://bktfguklxdvyk" path="res://assets/ebsquiggle/frame_30_delay-s.png" id="51_q5vng"]
+[ext_resource type="Texture2D" uid="uid://cuo8hia1o6nkv" path="res://assets/ebsquiggle/frame_30_delay-s.png" id="51_q5vng"]
 [ext_resource type="Texture2D" uid="uid://lci46k2ipbd0" path="res://assets/ebsquiggle/frame_31_delay-s.png" id="52_klr5u"]
 [ext_resource type="Texture2D" uid="uid://w33wjtvwd74x" path="res://assets/ebsquiggle/frame_32_delay-s.png" id="53_seywh"]
 [ext_resource type="Texture2D" uid="uid://cmma5nwoyovmw" path="res://assets/ebsquiggle/frame_33_delay-s.png" id="54_86678"]
@@ -722,7 +722,7 @@ theme_override_constants/outline_size = 4
 theme_override_fonts/font = ExtResource("12_rif3d")
 
 [node name="TouchScreenButtonPause" type="TouchScreenButton" parent="CanvasLayer"]
-position = Vector2(10, 10)
+position = Vector2(14, 14)
 scale = Vector2(2.32869, 2.11698)
 shape = SubResource("RectangleShape2D_r3gnm")
 action = "pause"
@@ -879,8 +879,8 @@ offset_top = 99.84
 offset_right = 253.0
 offset_bottom = 137.84
 theme_override_fonts/font = ExtResource("12_rif3d")
-theme_override_font_sizes/font_size = 20
-text = "⚙️SETTINGS"
+theme_override_font_sizes/font_size = 23
+text = "SETTINGS"
 metadata/_edit_use_anchors_ = true
 
 [node name="RestartButton" type="Button" parent="PauseScreen"]
@@ -889,9 +889,10 @@ offset_left = 161.0
 offset_top = 139.84
 offset_right = 234.0
 offset_bottom = 167.84
+theme_override_colors/font_color = Color(1, 0.27451, 0.211765, 1)
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 20
-text = "❌RESET"
+text = "RESET"
 metadata/_edit_use_anchors_ = true
 
 [node name="BackfromSettingsButton" type="Button" parent="PauseScreen"]
@@ -1333,7 +1334,7 @@ horizontal_alignment = 1
 
 [node name="TouchScreenButton" type="TouchScreenButton" parent="."]
 position = Vector2(125.833, 74.1667)
-scale = Vector2(-24.9847, 19.5541)
+scale = Vector2(-59.5847, 39.4541)
 shape = SubResource("RectangleShape2D_fywky")
 action = "ui_mouse"
 
