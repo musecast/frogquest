@@ -47,11 +47,13 @@ func _generate_platforms_if_needed() -> void:
 		_generate_one_platform_above()
 
 func _generate_one_platform_above() -> void:
+
 	var gap: float = randf_range(min_vertical_gap, max_vertical_gap)
 	var next_y: float = highest_generated_y - gap
 
 	var x_step: float = randf_range(-max_horizontal_step, max_horizontal_step)
 	var next_x: float = clampf(last_generated_x + x_step, min_x, max_x)
+
 
 	_create_platform(Vector2(next_x, next_y))
 	highest_generated_y = next_y
@@ -63,6 +65,7 @@ func _create_platform(platform_position: Vector2) -> void:
 		return
 
 	var platform: StaticBody2D = platform_scene.instantiate() as StaticBody2D
+
 	platform.global_position = platform_position
 	platform.set_meta("platform_id", next_platform_id)
 	next_platform_id += 1
