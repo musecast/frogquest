@@ -46,4 +46,4 @@ Frog Quest is a Godot 4.2 2D platformer where you launch a frog upward with mous
 There is now an additional scene at `scenes/EndlessMode.tscn` where the frog jumps through endlessly generated platforms.
 
 - Score increases by **+1** each time you land on a new generated platform.
-- Controls: move with **A/D** (or arrow keys) and jump with **Space/Enter**.
+- Controls: use the same main-game launch scheme (**click + drag + release**).

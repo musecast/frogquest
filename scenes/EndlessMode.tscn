@@ -50,4 +50,6 @@ offset_left = 12.0
 offset_top = 34.0
 offset_right = 290.0
 offset_bottom = 58.0
+
 text = "Move: A/D or arrows   Jump: Space/Enter"
+
