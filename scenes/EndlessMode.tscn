@@ -1,55 +1,37 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://rnbr121kq4qb"]
 
-[ext_resource type="Script" path="res://scripts/EndlessMode.gd" id="1_mode"]
-[ext_resource type="Script" path="res://scripts/EndlessPlayer.gd" id="2_player"]
+[ext_resource type="Script" uid="uid://c34dy7kcp3hnr" path="res://scripts/EndlessMode.gd" id="1_mode"]
+[ext_resource type="PackedScene" uid="uid://ni4rfdtergc8" path="res://scenes/player.tscn" id="3_ht5ey"]
 [ext_resource type="PackedScene" path="res://scenes/EndlessPlatform.tscn" id="3_platform"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_player"]
-size = Vector2(18, 18)
-
-[node name="EndlessMode" type="Node2D"]
+[node name="EndlessMode" type="Node2D" unique_id=2028464712]
 script = ExtResource("1_mode")
 platform_scene = ExtResource("3_platform")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=735491364]
 offset_left = -2000.0
 offset_top = -2000.0
 offset_right = 2000.0
 offset_bottom = 2000.0
 color = Color(0.0745098, 0.113725, 0.188235, 1)
 
-[node name="Platforms" type="Node2D" parent="."]
+[node name="Platforms" type="Node2D" parent="." unique_id=1490092558]
 
-[node name="Player" type="CharacterBody2D" parent="."]
-position = Vector2(0, -40)
-script = ExtResource("2_player")
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=932040166]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
-shape = SubResource("RectangleShape2D_player")
-
-[node name="Polygon2D" type="Polygon2D" parent="Player"]
-color = Color(0.392157, 0.862745, 0.509804, 1)
-polygon = PackedVector2Array(-9, -9, 9, -9, 9, 9, -9, 9)
-
-[node name="Camera2D" type="Camera2D" parent="Player"]
-position_smoothing_enabled = true
-position_smoothing_speed = 6.0
-limit_bottom = 1000000
-
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
-
-[node name="ScoreLabel" type="Label" parent="CanvasLayer"]
+[node name="ScoreLabel" type="Label" parent="CanvasLayer" unique_id=997706887]
 offset_left = 12.0
 offset_top = 10.0
 offset_right = 180.0
 offset_bottom = 38.0
 text = "Score: 0"
 
-[node name="HintLabel" type="Label" parent="CanvasLayer"]
+[node name="HintLabel" type="Label" parent="CanvasLayer" unique_id=1900565155]
 offset_left = 12.0
 offset_top = 34.0
 offset_right = 290.0
 offset_bottom = 58.0
-
 text = "Move: A/D or arrows   Jump: Space/Enter"
 
+[node name="Player2" parent="." unique_id=1107326233 instance=ExtResource("3_ht5ey")]
+position = Vector2(1, -40)
