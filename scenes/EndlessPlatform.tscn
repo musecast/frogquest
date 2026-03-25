@@ -1,13 +1,28 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://dv5nawkxev1rs"]
+
+[ext_resource type="Script" uid="uid://dcqa6k4me6p4r" path="res://scenes/polygoncolorswitch.gd" id="1_11qgq"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(92, 14)
 
-[node name="EndlessPlatform" type="StaticBody2D"]
+[node name="EndlessPlatform" type="StaticBody2D" unique_id=1182169729]
+z_index = 1
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1545711247]
 shape = SubResource("RectangleShape2D_1")
 
-[node name="Polygon2D" type="Polygon2D" parent="."]
-color = Color(0.219608, 0.705882, 0.388235, 1)
+[node name="Polygon2D" type="Polygon2D" parent="." unique_id=610307942]
+color = Color(1, 0.12409397, 0.36753714, 1)
+polygon = PackedVector2Array(-46, -7, 46, -7, 46, 7, -46, 7)
+script = ExtResource("1_11qgq")
+
+[node name="Polygon2D3" type="Polygon2D" parent="." unique_id=1097000228]
+position = Vector2(5, 5)
+color = Color(0, 0, 0, 0.2901961)
+polygon = PackedVector2Array(-46, -7, 46, -7, 46, 7, -46, 7)
+
+[node name="Polygon2D2" type="Polygon2D" parent="." unique_id=633439559]
+position = Vector2(0, 2)
+scale = Vector2(1, 0.71428573)
+color = Color(0.20784314, 0.16862746, 0.1882353, 1)
 polygon = PackedVector2Array(-46, -7, 46, -7, 46, 7, -46, 7)

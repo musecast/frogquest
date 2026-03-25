@@ -3,6 +3,10 @@ shader_type canvas_item;
 
 
 uniform float scanline_count : hint_range(0, 1800) = 50.0;
+uniform float opacity : hint_range(0.0, 1.0) = 1.0;
+uniform float center_transparency : hint_range(0.0, 1.0) = 1.0; // how transparent the center is
+uniform float edge_opacity : hint_range(0.0, 1.0) = 1.0; // how opaque the edges are
+uniform float gradient_radius : hint_range(0.0, 2.0) = 1.0; // size of the gradient falloff
 uniform sampler2D SCREEN_TEXTURE: hint_screen_texture, filter_linear_mipmap;
 
 vec2 uv_curve(vec2 uv)
@@ -36,5 +40,7 @@ void fragment()
 	vec4 scan_line = vec4(vec3(pow(s, 0.25)), 0.3);
 	
 	
-	COLOR = vec4(r, g, b, 1.0) * scan_line;
+	float dist = length((uv_curve(SCREEN_UV) - 0.5) * 2.0) / gradient_radius;
+	float radial_opacity = mix(1.0 - center_transparency, edge_opacity, clamp(dist, 0.0, 1.0));
+	COLOR = vec4(r, g, b, opacity * radial_opacity) * scan_line;
 }

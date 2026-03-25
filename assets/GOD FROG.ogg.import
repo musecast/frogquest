@@ -1,0 +1,19 @@
+[remap]
+
+importer="oggvorbisstr"
+type="AudioStreamOggVorbis"
+uid="uid://dsnobma0hh1bc"
+path="res://.godot/imported/GOD FROG.ogg-b1ae54fd4db162809244314d370ff7a7.oggvorbisstr"
+
+[deps]
+
+source_file="res://assets/GOD FROG.ogg"
+dest_files=["res://.godot/imported/GOD FROG.ogg-b1ae54fd4db162809244314d370ff7a7.oggvorbisstr"]
+
+[params]
+
+loop=true
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

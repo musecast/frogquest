@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find 'c:/Github Repositories/frogquestFOREVER' -type f \\\\\\(-name *pause* -o -name *settings* -o -name *menu* \\\\\\))",
+      "Bash(grep -r \"crown\\\\|Crown\\\\|froggyCrown\" 'c:\\\\Github Repositories\\\\frogquestFOREVER' --include=*.gd --include=*.tscn)",
+      "Bash(grep -r \"Froggycrown\\\\|FroggyCrown\" 'c:\\\\Github Repositories\\\\frogquestFOREVER' --include=*.tscn)",
+      "Bash(grep -n \"_process\\\\|_physics_process\\\\|_draw\" scenes/*.gd scripts/*.gd)",
+      "Bash(node -e \":*)",
+      "Bash(python -:*)"
+    ]
+  }
+}

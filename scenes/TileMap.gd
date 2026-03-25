@@ -52,3 +52,9 @@ func _process(delta):
 				$"../Environmental Audio/jumpPad".play()
 				print("Jump Pad Activated")
 				player.velocity.y = jump_velocity
+				
+		if tile_idright == Vector2i(16, 0) or tile_idleft == Vector2i(16, 0) or tile_id == Vector2i(16, 0): # The ID of the jump pad tile
+			if player.velocity.x != 0: # Only apply if the player is moving downward
+				$"../Environmental Audio/jumpPad".play()
+				print("Bed Jump Pad Activated")
+				player.velocity.y = jump_velocity / 2

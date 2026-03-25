@@ -9,6 +9,7 @@ var npc6 = 0
 var finaledamage = -2
 var jokeCheck = 0
 var foreshadowBool = 0
+var gateDestroyed = 0
 
 #top of script
 @onready var previous_window = DisplayServer.window_get_mode()
@@ -17,13 +18,39 @@ var foreshadowBool = 0
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
+	
+	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
+	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
+	get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	
 	print($TileMap.get_layer_name(1))
 	Engine.time_scale=1.0
-		
+
+	if $Player.has_key:
+		var area = $"World Sprites/Key".get_node_or_null("Area2DKEY")
+		if area:
+			area.queue_free()
+		$Player.setup_key_trail()
+	if gateDestroyed == 1:
+		$"World Sprites/Key".queue_free()
+		$"World Sprites/Keyhole".queue_free()
+
+	# If the player skipped picking up the lantern from npc3, reset npc3 so
+	# the lantern offer replays on the next visit — prevents a softlock.
+	if npc3 != 0 and not $Player.has_lantern:
+		npc3 = 0
+
 	$frogNPC1.play("farmer")
-	
+
 	if MusicManager.MusicPosition != 0:
 		$Player/winscreen/goodbyefroggy.play(MusicManager.MusicPosition)
+		MusicManager.MusicPosition = 0
+
+	_loop_cave_audio($"Environmental Audio/caveaudio")
+	_loop_cave_audio($"Environmental Audio/darktreeAudio")
+
+	AdsManager.show_banner_bottom()
+	AdsManager.preload_interstitial()
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
@@ -41,22 +68,26 @@ func _process(delta):
 	
 	
 	if Input.is_action_just_pressed("pause") and $Player/Trajectory.endGame == 0:
+		if $Player._active_wardrobe and is_instance_valid($Player._active_wardrobe):
+			$Player._active_wardrobe.closed.emit()
+			return
 		if Engine.time_scale != 1.0:
 			#GAME IS UNPAUSED HERE
-					
+
 			$Player/PauseScreen/RestartButton.visible = true
 			$Player/PauseScreen/ResumeButton.visible = true
 			$Player/PauseScreen/SettingsButton.visible = true
 			$Player/PauseScreen/RestartConfirmContainer.visible = false
 			$Player/PauseScreen/settingsContainer.visible = false
 			$Player/PauseScreen/BackfromSettingsButton.visible = false
-			
+
 			$Player/PauseScreen.visible=false
 			Engine.time_scale = 1.0
 		else:
 			#GAME IS PAUSED HERE
 			Input.mouse_mode = 0
 			$Player/PauseScreen.visible=true
+			$Player/frogaim.play()
 			Engine.time_scale = 0.05
 
 #body of script
@@ -86,8 +117,23 @@ func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_sh
 		$frogNPC1/npc1speechbubble.text = "so... you came \nfrom below?"
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "maybe you'll be the \none to reach the top"
+		$frogNPC1/npc1speechbubble.text = "maybe you'll be the \none to reach the top..."
 		await get_tree().create_timer(3.0).timeout
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "by the way, have you \nnoticed the white petals?"
+		await get_tree().create_timer(4.0).timeout
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "some say they are \nsigns of the gods"
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "signs to jump as \nas hard as you can"
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "whether you believe \nthat, is up to you"
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC1/npc1talk.play()
+		$frogNPC1/npc1speechbubble.text = "never had the courage \nfor a leap of faith myself"
+		await get_tree().create_timer(4.0).timeout
 		$frogNPC1/npc1talk.play()
 		$frogNPC1/npc1speechbubble.text = "keep it up \nlil froggy..."
 		await get_tree().create_timer(3.0).timeout
@@ -106,8 +152,8 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		if npc2 == 1:
 			$frogNPC2/npc2talk.play()
 			$frogNPC2/npc2speechbubble.visible = true
-			$frogNPC2/npc2speechbubble.text = "heheheheheh\nhehehehe"
-			
+			$frogNPC2/npc2speechbubble.text = "don't forget to jump full \npower if you see the petals..."
+
 		if npc2 == 0:
 			npc2 = 3
 			print("npc croak")
@@ -137,7 +183,22 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC2/npc2talk.play()
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC2.play("wiz")
-			await get_tree().create_timer(0.3).timeout
+			await get_tree().create_timer(1.0).timeout
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "thank you for listening \nto my joke young froggy"
+			await get_tree().create_timer(3.0).timeout
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "now i shall give you wisdom \nhanded to me from the gods..."
+			await get_tree().create_timer(5.0).timeout
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "the white petals indicate \nguaranteed safety for a jump..."
+			await get_tree().create_timer(5.0).timeout
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "...but only if you take that \njump at your full strength."
+			await get_tree().create_timer(5.0).timeout
+			$frogNPC2/npc2talk.play()
+			$frogNPC2/npc2speechbubble.text = "now hop along young froggy \nand let the petals guide you..."
+			await get_tree().create_timer(4.0).timeout
 			$frogNPC2/npc2speechbubble.visible = false
 			npc2 = 1
 			jokeCheck = 1
@@ -153,8 +214,11 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 	if npc3 == 1:
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.visible = true
-		$frogNPC3/npc3speechbubble.text = "press 'f' to\nuse the lantern"
-		
+		$frogNPC3/npc3speechbubble.text = "may the gods protect \nyou on your ascent..."
+		await get_tree().create_timer(2.0).timeout
+		$frogNPC3/npc3talk.play()
+		$frogNPC3/npc3speechbubble.text = "godspeed \nlil froggy..."
+
 	if npc3 == 0:
 		npc3 = 3
 		$frogNPC3/npc3talk.play()
@@ -169,7 +233,10 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		$frogNPC3/npc3itemspawn.play()
 		await get_tree().create_timer(2.0).timeout
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "press 'f' to\nuse the lantern"
+		$frogNPC3/npc3speechbubble.text = "with this lantern, \ndarkness fears you..."
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC3/npc3talk.play()
+		$frogNPC3/npc3speechbubble.text = "it shall light your \nway automatically"
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC3/npc3talk.play()
 		$frogNPC3/npc3speechbubble.text = "godspeed lil\nfroggy..."
@@ -217,8 +284,8 @@ func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_sha
 func _on_area_2dkey_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
 	$"World Sprites/Key/Area2DKEY".queue_free()
 	$Player.has_key = true
-	$"World Sprites/Key".visible = false
 	$"World Sprites/Key/keypickup".play()
+	$Player.setup_key_trail()
 
 
 
@@ -430,7 +497,11 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(3.0).timeout
 			$frogNPC5/npc5talk.play()
 			$frogNPC5/npc5speechbubble.text = "the way forward is a\nleap of faith to your right..."
-			await get_tree().create_timer(10.0).timeout
+			await get_tree().create_timer(5.0).timeout
+			if jokeCheck == 1:
+				$frogNPC5/npc5talk.play()
+				$frogNPC5/npc5speechbubble.text = "although you probably \nknew that already heheh..."
+				await get_tree().create_timer(4.0).timeout
 			$frogNPC5/npc5speechbubble.visible = false
 			npc5 = 1
 
@@ -465,6 +536,12 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC6/npc6speechbubble.text = "your final test\nawaits you..."
 			await get_tree().create_timer(3.0).timeout
 			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "as you can see, these\n petals have fallen..."
+			await get_tree().create_timer(4.0).timeout
+			$frogNPC6/npc6talk.play()
+			$frogNPC6/npc6speechbubble.text = "there is no god to guide you,\n you must succeed on your own..."
+			await get_tree().create_timer(5.0).timeout
+			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.text = "allow me to\nopen the path..."
 			await get_tree().create_timer(3.0).timeout
 			#OPEN PATH NOISE AND HIDE OUTSIDE (SHOW OUTSIDE SPRITES)
@@ -495,6 +572,33 @@ func _on_area_2d_6_body_shape_exited(body_rid, body, body_shape_index, local_sha
 
 
 
+
+
+func _loop_cave_audio(player: AudioStreamPlayer2D) -> void:
+	var length: float = player.stream.get_length()
+	if length <= 0.0:
+		return
+	const XFADE: float = 3.0
+	var delay: float = max(0.0, length - player.get_playback_position() - XFADE)
+	await get_tree().create_timer(delay).timeout
+	if not is_instance_valid(player) or not player.playing:
+		return
+	var p2 := AudioStreamPlayer2D.new()
+	p2.stream = player.stream
+	p2.volume_db = -80.0
+	p2.max_distance = player.max_distance
+	p2.bus = player.bus
+	p2.position = player.position
+	player.get_parent().add_child(p2)
+	p2.play()
+	var target_vol: float = player.volume_db
+	var t := create_tween().set_parallel(true)
+	t.tween_property(player, "volume_db", -80.0, XFADE)
+	t.tween_property(p2, "volume_db", target_vol, XFADE)
+	await t.finished
+	player.stop()
+	player.queue_free()
+	_loop_cave_audio(p2)
 
 
 func _on_castleaudiocue_body_entered(body):

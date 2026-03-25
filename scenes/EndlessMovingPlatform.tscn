@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://cmovplatfrm00"]
+
+[ext_resource type="Script" path="res://scenes/EndlessMovingPlatform.gd" id="1_movscr"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
+size = Vector2(92, 14)
+
+[node name="EndlessMovingPlatform" type="StaticBody2D"]
+script = ExtResource("1_movscr")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_1")
+
+[node name="Polygon2D" type="Polygon2D" parent="."]
+color = Color(0.1, 0.78, 0.9, 1)
+polygon = PackedVector2Array(-46, -7, 46, -7, 46, 7, -46, 7)
+
+[node name="Polygon2D3" type="Polygon2D" parent="."]
+position = Vector2(5, 5)
+color = Color(0, 0, 0, 0.2901961)
+polygon = PackedVector2Array(-46, -7, 46, -7, 46, 7, -46, 7)
+
+[node name="Polygon2D2" type="Polygon2D" parent="."]
+position = Vector2(0, 2)
+scale = Vector2(1, 0.71428573)
+color = Color(0.20784314, 0.16862746, 0.1882353, 1)
+polygon = PackedVector2Array(-46, -7, 46, -7, 46, 7, -46, 7)
