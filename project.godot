@@ -21,6 +21,7 @@ config/features=PackedStringArray("4.6", "Forward Plus")
 boot_splash/stretch_mode=2
 boot_splash/image="uid://ck2sqdfuk6fuh"
 config/icon="uid://bujdssuyriq2h"
+config/tags=PackedStringArray("frog_quest+")
 
 [autoload]
 
