@@ -28,6 +28,13 @@ func _apply_layout() -> void:
 	# Apply horizontal margins so the container doesn't bleed to screen edges
 	var margin := 32.0 if is_portrait else 24.0
 	var half_w := vp.x * 0.5 - margin
+	# Zero out minimum sizes on text nodes so their natural text width cannot
+	# force the VBoxContainer to expand beyond the margins we set below.
+	# This is especially important when NewBadge is visible (new-high-score path).
+	$MarginContainer/ScoreDisplay.custom_minimum_size = Vector2(0, 0)
+	$MarginContainer/HighScoreRow.custom_minimum_size = Vector2(0, 0)
+	$MarginContainer/HighScoreRow/HighScoreDisplay.custom_minimum_size = Vector2(0, 0)
+	$MarginContainer/HighScoreRow/NewBadge.custom_minimum_size = Vector2(0, 0)
 	$MarginContainer.offset_left = -half_w
 	$MarginContainer.offset_right = half_w
 	$MarginContainer/ScoreDisplay.add_theme_font_size_override("font_size", score_size)
@@ -87,6 +94,9 @@ func show_scores(score: int, high_score: int, is_new_record: bool) -> void:
 	# fade the whole screen in
 	$MarginContainer.modulate.a = 0.0
 	visible = true
+	# Re-apply layout after visibility change in case Godot's layout pass
+	# runs after the earlier deferred call and resets the container rect.
+	_apply_layout.call_deferred()
 	var fade := create_tween()
 	fade.tween_property($MarginContainer, "modulate:a", 1.0, 0.5) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
@@ -190,7 +200,7 @@ func _ensure_remove_ads_button() -> void:
 		return
 	var btn := Button.new()
 	btn.name = "RemoveAdsButton"
-	btn.text = "REMOVE ADS"
+	btn.text = "Remove Ads"
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	$MarginContainer.add_child(btn)
 	# Place it just after BottomRow

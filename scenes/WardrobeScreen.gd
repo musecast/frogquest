@@ -75,7 +75,7 @@ func _build_ui() -> void:
 	var font_size_body:  int = 22 if is_portrait else 11
 	# Scale button and info sizes proportionally to viewport width so they
 	# never exceed available space on any phone resolution / pixel density.
-	var btn_min := Vector2(vp.x * 0.23, vp.y * 0.037) if is_portrait else Vector2(70, 18)
+	var btn_min := Vector2(vp.x * 0.30, vp.y * 0.052) if is_portrait else Vector2(70, 18)
 	var info_btn_size: float = vp.x * 0.058 if is_portrait else 18.0
 	var pad: float = 10.0 if is_portrait else 5.0
 

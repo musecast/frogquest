@@ -7,6 +7,7 @@ var _passcode_panel: VBoxContainer
 var _code_input: LineEdit
 var _status_label: Label
 var _resize_timer: SceneTreeTimer = null
+var _panel: PanelContainer = null
 
 const BTN_HEIGHT   := 38
 const BTN_FONT_SZ  := 16
@@ -18,6 +19,7 @@ const BLACK        := Color(0.0,  0.0,  0.0,  1.0)
 func _ready() -> void:
 	layer = 20
 	_build_ui()
+	_apply_scale()
 	get_viewport().size_changed.connect(_on_viewport_resized)
 
 
@@ -49,6 +51,7 @@ func _build_ui() -> void:
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", panel_style)
 	panel.custom_minimum_size = Vector2(280, 0)
+	_panel = panel
 	center.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -201,11 +204,39 @@ func _make_button(label_text: String, fibberish: Font) -> Button:
 	return btn
 
 
+func _apply_scale() -> void:
+	if _panel == null or not is_inside_tree():
+		return
+	var vp := get_viewport().get_visible_rect().size
+	var is_portrait: bool = vp.y > vp.x * 1.3
+	if is_portrait:
+		_panel.scale = Vector2(1.0, 1.0)
+		_panel.custom_minimum_size = Vector2(vp.x * 0.82, 0)
+	else:
+		_panel.scale = Vector2(1.0, 1.0)
+		_panel.custom_minimum_size = Vector2(vp.x * 0.38, 0)
+		call_deferred("_fit_landscape_height", vp)
+
+
+func _fit_landscape_height(vp: Vector2) -> void:
+	if _panel == null or not is_inside_tree():
+		return
+	var panel_h: float = _panel.size.y
+	if panel_h <= 0.0:
+		return
+	var max_h: float = vp.y * 0.88
+	if panel_h > max_h:
+		var sc: float = max_h / panel_h
+		_panel.pivot_offset = _panel.size / 2.0
+		_panel.scale = Vector2(sc, sc)
+
+
 func _on_viewport_resized() -> void:
 	if not is_inside_tree():
 		return
 	_resize_timer = get_tree().create_timer(0.15)
 	await _resize_timer.timeout
+	_apply_scale()
 
 
 func _on_buy_pressed() -> void:

@@ -110,13 +110,13 @@ func _fit_to_viewport() -> void:
 	cleanup_distance_below_player = viewport_size.y * 1.25
 	var is_portrait: bool = viewport_size.y > viewport_size.x * 1.3
 	if is_portrait:
-		score_label.add_theme_font_size_override("font_size", 52)
-		score_label.offset_top = viewport_size.y * 0.09
-		score_label.offset_bottom = score_label.offset_top + 64.0
+		score_label.add_theme_font_size_override("font_size", 48)
+		score_label.offset_top = viewport_size.y * 0.1
+		score_label.offset_bottom = score_label.offset_top + 24.0
 	else:
 		score_label.add_theme_font_size_override("font_size", 24)
 		score_label.offset_top = 10.0
-		score_label.offset_bottom = 34.0
+		score_label.offset_bottom = 21.0
 
 	var cam := player.get_node_or_null("Camera2D")
 	if cam:

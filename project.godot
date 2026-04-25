@@ -16,12 +16,13 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Frog Quest FOREVER"
 config/description="CLIMB THE TREE"
+config/tags=PackedStringArray("frog_quest+")
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
-boot_splash/stretch_mode=2
-boot_splash/image="uid://ck2sqdfuk6fuh"
+boot_splash/stretch_mode=0
+boot_splash/use_filter=false
+boot_splash/image="uid://cqtw1lsseoik5"
 config/icon="uid://bujdssuyriq2h"
-config/tags=PackedStringArray("frog_quest+")
 
 [autoload]
 
@@ -38,6 +39,7 @@ window/size/window_height_override=720
 window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 window/handheld/orientation=6
+window/vsync/vsync_mode=2
 
 [editor_plugins]
 
@@ -81,6 +83,10 @@ ui_fastforward={
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
+
+[physics]
+
+common/physics_interpolation=true
 
 [rendering]
 

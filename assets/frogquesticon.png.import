@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bujdssuyriq2h"
-path="res://.godot/imported/frogquesticon.png-b30fca2ef9513e11b2453cbf532b60ce.ctex"
+path.s3tc="res://.godot/imported/frogquesticon.png-b30fca2ef9513e11b2453cbf532b60ce.s3tc.ctex"
+path.etc2="res://.godot/imported/frogquesticon.png-b30fca2ef9513e11b2453cbf532b60ce.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/frogquesticon.png"
-dest_files=["res://.godot/imported/frogquesticon.png-b30fca2ef9513e11b2453cbf532b60ce.ctex"]
+dest_files=["res://.godot/imported/frogquesticon.png-b30fca2ef9513e11b2453cbf532b60ce.s3tc.ctex", "res://.godot/imported/frogquesticon.png-b30fca2ef9513e11b2453cbf532b60ce.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

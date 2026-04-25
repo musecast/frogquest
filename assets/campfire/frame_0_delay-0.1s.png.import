@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://da741bmygbblg"
-path="res://.godot/imported/frame_0_delay-0.1s.png-da41e71571f8a7e9fab8eb6e80bd6781.ctex"
+path.s3tc="res://.godot/imported/frame_0_delay-0.1s.png-da41e71571f8a7e9fab8eb6e80bd6781.s3tc.ctex"
+path.etc2="res://.godot/imported/frame_0_delay-0.1s.png-da41e71571f8a7e9fab8eb6e80bd6781.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/campfire/frame_0_delay-0.1s.png"
-dest_files=["res://.godot/imported/frame_0_delay-0.1s.png-da41e71571f8a7e9fab8eb6e80bd6781.ctex"]
+dest_files=["res://.godot/imported/frame_0_delay-0.1s.png-da41e71571f8a7e9fab8eb6e80bd6781.s3tc.ctex", "res://.godot/imported/frame_0_delay-0.1s.png-da41e71571f8a7e9fab8eb6e80bd6781.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

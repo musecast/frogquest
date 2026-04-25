@@ -6,7 +6,10 @@
       "Bash(grep -r \"Froggycrown\\\\|FroggyCrown\" 'c:\\\\Github Repositories\\\\frogquestFOREVER' --include=*.tscn)",
       "Bash(grep -n \"_process\\\\|_physics_process\\\\|_draw\" scenes/*.gd scripts/*.gd)",
       "Bash(node -e \":*)",
-      "Bash(python -:*)"
+      "Bash(python -:*)",
+      "Bash(find scenes:*)",
+      "Read(//c/Github Repositories/frogquestFOREVER/**)",
+      "Bash(find scripts:*)"
     ]
   }
 }

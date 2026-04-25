@@ -1,7 +1,7 @@
 extends Node
 
-const BANNER_ID          := "ca-app-pub-3776793413956253/3241038986"
-const INTERSTITIAL_ID    := "ca-app-pub-3776793413956253/1504317887"
+const BANNER_ID          := "ca-app-pub-3940256099942544/2934735716"  # TEST
+const INTERSTITIAL_ID    := "ca-app-pub-3940256099942544/4411468910"  # TEST
 const IAP_ID             := "com.muse.frogquest.removeads"
 const SECRET_CODE        := "3125"
 const INTERSTITIAL_EVERY := 3

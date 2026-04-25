@@ -623,9 +623,9 @@ z_index = 2
 z_as_relative = false
 y_sort_enabled = true
 texture_filter = 1
+position = Vector2(52.151306, -183.66628)
 scale = Vector2(1.2, 1.2)
 script = ExtResource("1_o2au2")
-has_lantern = true
 
 [node name="Froggycrown" type="Sprite2D" parent="." unique_id=1060501851]
 visible = false
@@ -701,26 +701,25 @@ layout_mode = 2
 visible = false
 layout_mode = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 16
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = ExtResource("12_rif3d")
-theme_override_font_sizes/font_size = 32
 horizontal_alignment = 2
 
 [node name="current height" type="Label" parent="CanvasLayer/MarginContainer/VBoxContainer" unique_id=1987517560]
 visible = false
 layout_mode = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 16
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = ExtResource("12_rif3d")
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 16
 
 [node name="jumpcount" type="Label" parent="CanvasLayer/MarginContainer/VBoxContainer" unique_id=329228557]
 visible = false
 layout_mode = 2
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 16
+theme_override_constants/outline_size = 12
 theme_override_fonts/font = ExtResource("12_rif3d")
-theme_override_font_sizes/font_size = 32
+theme_override_font_sizes/font_size = 16
 horizontal_alignment = 2
 
 [node name="high score" type="Label" parent="CanvasLayer" unique_id=232382379]
@@ -1022,7 +1021,7 @@ offset_left = -244.0
 offset_top = -8.0
 offset_right = -166.0
 offset_bottom = 46.0
-theme_override_constants/outline_size = 8
+theme_override_constants/outline_size = 16
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 52
 text = "L"
@@ -1034,7 +1033,7 @@ offset_left = -161.0
 offset_top = -8.0
 offset_right = -88.0
 offset_bottom = 46.0
-theme_override_constants/outline_size = 8
+theme_override_constants/outline_size = 16
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 52
 text = "M
@@ -1047,7 +1046,7 @@ offset_left = -83.0
 offset_top = -8.0
 offset_right = -8.0
 offset_bottom = 46.0
-theme_override_constants/outline_size = 8
+theme_override_constants/outline_size = 16
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 52
 text = "H
@@ -1306,7 +1305,7 @@ theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
 theme_override_constants/outline_size = 8
 theme_override_fonts/font = ExtResource("12_rif3d")
 theme_override_font_sizes/font_size = 24
-text = "Adventure"
+text = "Continue"
 icon_alignment = 1
 
 [node name="endlessmodebutton" type="Button" parent="titlescreen/HBoxContainer" unique_id=578911985]

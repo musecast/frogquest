@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cw2b8c21jaj5n"
-path="res://.godot/imported/beanbag-top.png-99151f9ad43ab3df3b7434634690ddbe.ctex"
+path.s3tc="res://.godot/imported/beanbag-top.png-99151f9ad43ab3df3b7434634690ddbe.s3tc.ctex"
+path.etc2="res://.godot/imported/beanbag-top.png-99151f9ad43ab3df3b7434634690ddbe.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/beanbag-top.png"
-dest_files=["res://.godot/imported/beanbag-top.png-99151f9ad43ab3df3b7434634690ddbe.ctex"]
+dest_files=["res://.godot/imported/beanbag-top.png-99151f9ad43ab3df3b7434634690ddbe.s3tc.ctex", "res://.godot/imported/beanbag-top.png-99151f9ad43ab3df3b7434634690ddbe.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -2,9 +2,9 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cxkrei6nqqeq5"
-path.s3tc="res://.godot/imported/Pineapple_Upside-Down_Cake.png-02d1bb13bb4ad44a2b4aa9740f10723e.s3tc.ctex"
-path.etc2="res://.godot/imported/Pineapple_Upside-Down_Cake.png-02d1bb13bb4ad44a2b4aa9740f10723e.etc2.ctex"
+uid="uid://cqtw1lsseoik5"
+path.s3tc="res://.godot/imported/frogsplashicon.png-84a5a57735668c31157bc478d28f2023.s3tc.ctex"
+path.etc2="res://.godot/imported/frogsplashicon.png-84a5a57735668c31157bc478d28f2023.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -12,8 +12,8 @@ metadata={
 
 [deps]
 
-source_file="res://Pineapple_Upside-Down_Cake.png"
-dest_files=["res://.godot/imported/Pineapple_Upside-Down_Cake.png-02d1bb13bb4ad44a2b4aa9740f10723e.s3tc.ctex", "res://.godot/imported/Pineapple_Upside-Down_Cake.png-02d1bb13bb4ad44a2b4aa9740f10723e.etc2.ctex"]
+source_file="res://assets/frogsplashicon.png"
+dest_files=["res://.godot/imported/frogsplashicon.png-84a5a57735668c31157bc478d28f2023.s3tc.ctex", "res://.godot/imported/frogsplashicon.png-84a5a57735668c31157bc478d28f2023.etc2.ctex"]
 
 [params]
 

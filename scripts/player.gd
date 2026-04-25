@@ -1,4 +1,12 @@
+@tool
 extends CharacterBody2D
+
+@export_tool_button("Test Hat Notification", "Notification") var _dbg_hat_notif: Callable
+@export_tool_button("Test Skin Notification", "Notification") var _dbg_skin_notif: Callable
+
+func _init() -> void:
+	_dbg_hat_notif = Callable(self, &"_test_hat_notif")
+	_dbg_skin_notif = Callable(self, &"_test_skin_notif")
 
 @export var debug_unlock_crown: bool = false
 @export var debug_unlock_golden_skin: bool = false
@@ -46,6 +54,7 @@ var key_trail_pos = Vector2.ZERO
 var key_last_dir = -1.0
 var _resize_timer: SceneTreeTimer = null
 var _just_loaded: bool = false
+var _end_triggered: bool = false
 var _active_wardrobe: CanvasLayer = null
 var _wiz_tween: Tween = null
 var _wiz_sprite_base_y: float = 0.0
@@ -156,6 +165,8 @@ func _ready():
 
 
 func _physics_process(delta):
+	if Engine.is_editor_hint():
+		return
 	# Hold backspace to run end credits at 8x speed.
 	if ($Camera2D/AnimationPlayer.current_animation == "end" or finalbuttonBool == 1) \
 			and not $PauseScreen.visible:
@@ -219,6 +230,7 @@ func _physics_process(delta):
 		$Trajectory.endGame = 1
 		position.y = -8382
 		position.x = 2804
+		reset_physics_interpolation()
 		velocity = Vector2(0,0)
 		$"../finale/finale walls/toshow".visible = false
 		$"../Blackfaderect".visible = false
@@ -226,30 +238,33 @@ func _physics_process(delta):
 		$"../World Sprites/tutorial2".visible = false
 		$"../World Sprites/tutorial3".visible = false
 		$"../World Sprites/tutorial4".visible = false
-		await get_tree().create_timer(1.0).timeout
-		$Camera2D/AnimationPlayer.play("end")
-		if finalTimeBool == 0:
-			# THIS HAPPENS ONCE WHEN GAME ENDS
-			finalTime = str(int(minutes))+ ":"+str("%02d" % seconds)
-			finalTimeBool =1
-			
-			$"../frogNPC1".position = Vector2(3038, -1236)
-			$"../frogNPC1/Jonathan-dodd-hut-wo-details".visible = false
-			
-			$"../frogNPC2".position = Vector2(2541, -1750)
-			$"../frogNPC2/wiztheme".queue_free()
-			
-			$"../frogNPC5".position = Vector2(3096, -4573)
-			$"../frogNPC5/wiztheme2".queue_free()
-			
-			await get_tree().create_timer(3.0).timeout
-			$winscreen/goodbyefroggy.play()
+		if not _end_triggered:
+			_end_triggered = true
+			await get_tree().create_timer(1.0).timeout
+			$Camera2D/AnimationPlayer.play("end")
+			if finalTimeBool == 0:
+				# THIS HAPPENS ONCE WHEN GAME ENDS
+				finalTime = str(int(minutes))+ ":"+str("%02d" % seconds)
+				finalTimeBool =1
+
+				$"../frogNPC1".position = Vector2(3038, -1236)
+				$"../frogNPC1/Jonathan-dodd-hut-wo-details".visible = false
+
+				$"../frogNPC2".position = Vector2(2541, -1750)
+				$"../frogNPC2/wiztheme".queue_free()
+
+				$"../frogNPC5".position = Vector2(3096, -4573)
+				$"../frogNPC5/wiztheme2".queue_free()
+
+				await get_tree().create_timer(3.0).timeout
+				$winscreen/goodbyefroggy.play()
 
 		
 	if ($Camera2D/AnimationPlayer.is_playing and $Camera2D/AnimationPlayer.current_animation) \
 			or finalbuttonBool == 1:
 		position.y = -8382
 		position.x = 2804
+		reset_physics_interpolation()
 	
 
 		
@@ -354,7 +369,8 @@ func _physics_process(delta):
 		key_trail_pos = lerp(key_trail_pos, position + trail_offset, delta * 5.0)
 		key_node.position = key_trail_pos
 
-	var _hat_y := -11.16667 if MusicManager.equipped_skin == "negative_skin" else -9.16667
+	var _is_negative := MusicManager.equipped_skin == "negative_skin"
+	var _hat_y := (-9.16667 if $Sprite2D.animation == "prejump" else -10.66667) if _is_negative else -9.1667
 	if $Froggycrown.visible:
 		$Froggycrown.rotation = $Sprite2D.rotation
 		$Froggycrown.position = Vector2(0, _hat_y).rotated($Sprite2D.rotation)
@@ -371,6 +387,8 @@ func _physics_process(delta):
 
 
 func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
+	if body != self:
+		return
 	velocity = Vector2(-500, -400)
 	$"../frogNPC3/campfire/Area2D/burnSound".play()
 	
@@ -475,6 +493,8 @@ func _apply_speedrun_visibility() -> void:
 
 
 func _on_blockedpath_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+	if body != self:
+		return
 	velocity = Vector2(500, -300)
 	$"../Environmental Audio/pathBreaking".play()
 	$"../World Sprites/Blockedpath".queue_free()
@@ -672,6 +692,9 @@ func save_game():
 		"npc6": get_parent().npc6,
 	}
 	var file = FileAccess.open(save_path, FileAccess.WRITE)
+	if not file:
+		push_warning("save_game: could not open save file for writing")
+		return
 	file.store_var(save_data)
 	file.close()
 	print("Game saved.")
@@ -685,6 +708,10 @@ func load_game():
 		return
 	var save_data = file.get_var()
 	file.close()
+
+	if not save_data is Dictionary:
+		push_warning("load_game: save file is corrupt or empty, starting fresh")
+		return
 
 	position = save_data.get("position", position)
 	has_key = save_data.get("has_key", has_key)
@@ -1020,13 +1047,13 @@ func _apply_ui_layout() -> void:
 			hbox.offset_left   = -(cx - 10.0)
 			hbox.offset_top    = vp.y * 0.50 - cy
 			hbox.offset_right  = cx - 10.0
-			hbox.offset_bottom = hbox.offset_top + 60.0
+			hbox.offset_bottom = hbox.offset_top + 80.0
 			$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			$titlescreen/HBoxContainer/Button.add_theme_font_size_override("font_size", 46)
 			row2.offset_left   = -(cx - 10.0)
 			row2.offset_top    = hbox.offset_bottom + 8.0
 			row2.offset_right  = cx - 10.0
-			row2.offset_bottom = row2.offset_top + 60.0
+			row2.offset_bottom = row2.offset_top + 80.0
 			var eb_p = row2.get_node_or_null("endlessmodebutton")
 			if eb_p:
 				eb_p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1137,24 +1164,24 @@ func _apply_ui_layout() -> void:
 		paused_lbl.pivot_offset  = Vector2((vp.x - 20.0) / 2.0, 30.0)
 		paused_lbl.add_theme_font_size_override("font_size", 56)
 
-		var bl: float = cx - 82.0
-		var br: float = cx + 82.0
-		var bh: float = 52.0
+		var bl: float = cx - 110.0
+		var br: float = cx + 110.0
+		var bh: float = 65.0
 		# Anchor buttons just below PAUSED text rather than at a fixed percentage
 		var bs: float = vp.y * 0.20 + 72.0
 
 		resume_btn.offset_left   = bl;  resume_btn.offset_top    = bs
 		resume_btn.offset_right  = br;  resume_btn.offset_bottom = bs + bh
-		resume_btn.add_theme_font_size_override("font_size", 36)
+		resume_btn.add_theme_font_size_override("font_size", 42)
 		settings_btn.offset_left  = bl;  settings_btn.offset_top    = bs + bh + 8.0
 		settings_btn.offset_right = br;  settings_btn.offset_bottom = bs + bh * 2.0 + 8.0
-		settings_btn.add_theme_font_size_override("font_size", 32)
+		settings_btn.add_theme_font_size_override("font_size", 38)
 		restart_btn.offset_left  = bl;  restart_btn.offset_top    = bs + (bh + 8.0) * 2.0
 		restart_btn.offset_right = br;  restart_btn.offset_bottom = bs + (bh + 8.0) * 2.0 + bh
-		restart_btn.add_theme_font_size_override("font_size", 32)
+		restart_btn.add_theme_font_size_override("font_size", 38)
 		back_btn.offset_left  = bl;  back_btn.offset_top    = bs
 		back_btn.offset_right = br;  back_btn.offset_bottom = bs + bh
-		back_btn.add_theme_font_size_override("font_size", 32)
+		back_btn.add_theme_font_size_override("font_size", 38)
 
 		# Scale settings: fit width AND ensure reset buttons (local y=102) stay on screen.
 		# settingsContainer content spans local y -7..102 (total height 109).
@@ -1261,7 +1288,7 @@ func _apply_ui_layout() -> void:
 	# ── HUD LABELS ───────────────────────────────────────────────────────
 	var ratio_hud: float = vp.y / vp.x
 	var t_hud: float = inverse_lerp(0.65, 1.3, clamp(ratio_hud, 0.65, 1.3))
-	var hud_font_size: int = int(round(lerp(24.0, 36.0, t_hud)))
+	var hud_font_size: int = int(round(lerp(20.0, 32.0, t_hud)))
 	var vbox := $CanvasLayer.get_node_or_null("MarginContainer/VBoxContainer")
 	if vbox:
 		for child in vbox.get_children():
@@ -1518,3 +1545,10 @@ func _on_pineapple_upsidedown_cake_area_2d_body_shape_entered(body_rid: RID, bod
 			MusicManager.save_wardrobe()
 			MusicManager.show_unlock_notification("hat")
 			_refresh_all_wardrobe_badges()
+
+
+func _test_hat_notif() -> void:
+	MusicManager.show_unlock_notification("hat")
+
+func _test_skin_notif() -> void:
+	MusicManager.show_unlock_notification("skin")

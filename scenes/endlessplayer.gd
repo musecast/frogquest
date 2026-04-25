@@ -55,6 +55,7 @@ func _apply_equipped_cosmetics() -> void:
 			sprite.material = mat
 		_:
 			sprite.material = null
+	shadow.visible = MusicManager.equipped_skin != "negative_skin"
 
 func _physics_process(delta):
 	var was_on_floor := is_on_floor()
@@ -100,15 +101,17 @@ func _physics_process(delta):
 
 	tempVelocityx = velocity.x / 2.5
 
+	var _is_negative := MusicManager.equipped_skin == "negative_skin"
+	var _hat_y := (-9.16667 if sprite.animation == "prejump" else -10.66667) if _is_negative else -9.1667
 	if has_node("Froggycrown") and $Froggycrown.visible:
 		$Froggycrown.rotation = sprite.rotation
-		$Froggycrown.position = Vector2(0, -9.1667).rotated(sprite.rotation)
+		$Froggycrown.position = Vector2(0, _hat_y).rotated(sprite.rotation)
 	if has_node("FroggyWizHat") and $FroggyWizHat.visible:
 		$FroggyWizHat.rotation = sprite.rotation
-		$FroggyWizHat.position = Vector2(0, -9.1667).rotated(sprite.rotation)
+		$FroggyWizHat.position = Vector2(0, _hat_y).rotated(sprite.rotation)
 	if has_node("FroggyCakeHat") and $FroggyCakeHat.visible:
 		$FroggyCakeHat.rotation = sprite.rotation
-		$FroggyCakeHat.position = Vector2(0, -9.1667).rotated(sprite.rotation)
+		$FroggyCakeHat.position = Vector2(0, _hat_y).rotated(sprite.rotation)
 
 	move_and_slide()
 

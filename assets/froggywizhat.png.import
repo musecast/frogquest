@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bmr3a5h73vrvw"
-path="res://.godot/imported/froggywizhat.png-9b9bf45500f58df5d73d3b0f1816ce74.ctex"
+path.s3tc="res://.godot/imported/froggywizhat.png-9b9bf45500f58df5d73d3b0f1816ce74.s3tc.ctex"
+path.etc2="res://.godot/imported/froggywizhat.png-9b9bf45500f58df5d73d3b0f1816ce74.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/froggywizhat.png"
-dest_files=["res://.godot/imported/froggywizhat.png-9b9bf45500f58df5d73d3b0f1816ce74.ctex"]
+dest_files=["res://.godot/imported/froggywizhat.png-9b9bf45500f58df5d73d3b0f1816ce74.s3tc.ctex", "res://.godot/imported/froggywizhat.png-9b9bf45500f58df5d73d3b0f1816ce74.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

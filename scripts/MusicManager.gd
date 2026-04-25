@@ -68,12 +68,12 @@ func show_unlock_notification(item_type: String) -> void:
 	var vp_size := get_viewport().get_visible_rect().size
 	var is_portrait: bool = vp_size.y > vp_size.x * 1.3
 
-	var pw: float = vp_size.x * (0.72 if is_portrait else 0.58)
-	var ph: float = vp_size.y * (0.07 if is_portrait else 0.10)
+	var pw: float = vp_size.x * (0.90 if is_portrait else 0.58)
+	var ph: float = vp_size.y * (0.09 if is_portrait else 0.10)
 	var px: float = (vp_size.x - pw) * 0.5
 	var start_y: float = -ph - 4.0
 	var end_y: float = vp_size.y * (0.1 if is_portrait else 0.04)
-	var font_size: int = int(vp_size.y * (0.038 if is_portrait else 0.048))
+	var font_size: int = int(min(vp_size.y * 0.028, vp_size.x * 0.050)) if is_portrait else int(vp_size.y * 0.048)
 
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.18, 0.14, 0.11, 0.96)
@@ -95,7 +95,7 @@ func show_unlock_notification(item_type: String) -> void:
 
 	var type_str := "Hat" if item_type == "hat" else "Skin"
 
-	var h_pad: float = pw * 0.07
+	var h_pad: float = 8.0
 
 	var lbl := Label.new()
 	lbl.text = "New %s Unlocked!" % type_str
