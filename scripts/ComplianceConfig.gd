@@ -5,7 +5,7 @@ const _LEGAL_POPUP := preload("res://scripts/PrivacyTermsPopup.gd")
 ## Apple App Store Connect still expects a public HTTPS “Privacy Policy URL”. Host a copy of
 ## `res://legal/privacy_policy.txt` (same wording) on any static site, then paste that link here.
 ## The game always shows the bundled in-app version via Privacy Policy / Terms buttons.
-const APP_STORE_PRIVACY_POLICY_URL := ""
+const APP_STORE_PRIVACY_POLICY_URL := "https://musecast.github.io/frogquest/privacy_policy.html"
 
 
 func open_privacy_policy() -> void:

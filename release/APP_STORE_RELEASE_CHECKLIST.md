@@ -9,7 +9,7 @@ Things **already wired in the project**:
 
 ## You complete in App Store Connect (cannot be scripted from Godot)
 
-1. **Privacy Policy URL** — App Store Connect still requires an HTTPS URL. Paste the hosted copy of **`legal/privacy_policy.txt`** (matching wording); store the URL in **`ComplianceConfig.APP_STORE_PRIVACY_POLICY_URL`** if you ever need to open it from tooling. Players always read policy in-app from the bundled file.
+1. **Privacy Policy URL** — App Store Connect still requires an HTTPS URL. Paste the hosted copy of **`legal/privacy_policy.txt`** (matching wording): **https://musecast.github.io/frogquest/privacy_policy.html**. Players can also read the bundled policy in-app.
 
 2. **App Privacy questionnaire** — answer truthfully for your build (ads, IAP, analytics, Firebase/AdMob, crash tools, etc.). Match what SDKs collect; adjust if you add/remove SDKs.
 
@@ -19,9 +19,24 @@ Things **already wired in the project**:
 
 ## Production ad & IAP identifiers
 
-Replace Google **demo** AdMob IDs in **`scripts/AdsManager.gd`** and **`export_presets.cfg`** (`plugins_plist/GADApplicationIdentifier`) with **your live** app ID and ad units before shipping.
+Live iOS AdMob identifiers are wired in **`scripts/AdsManager.gd`**, **`export_presets.cfg`** (`plugins_plist/GADApplicationIdentifier`), and the bundled iOS AdMob plugin plist.
 
 Ensure **Remove Ads** product id `com.muse.frogquest.removeads` matches App Store Connect and is cleared for sale.
+
+## Remove Ads IAP submission
+
+App Store Connect status **Missing Metadata** usually means the product still needs review metadata, most commonly the **Review Information → Screenshot** field. For `com.muse.frogquest.removeads`:
+
+- Product ID: `com.muse.frogquest.removeads`
+- Reference Name: `Remove Ads`
+- Localization display name: `Remove Ads`
+- Localization description: `Remove Ads!`
+- Review screenshot: upload a screenshot that shows the in-game Remove Ads screen / buy button. This is for Apple's review, not the optional App Store Promotion image.
+- Review notes suggestion: `Non-consumable Remove Ads purchase. Launch the app, open the pause/settings menu, then tap Remove Ads. The product ID is com.muse.frogquest.removeads. Purchase removes integrated banner and interstitial ads. Restore Purchases is available on the same screen. No login is required.`
+
+For the first in-app purchase, Apple requires it to be submitted with a new app version: after the binary is uploaded, go to the app version page and add `Remove Ads` in **In-App Purchases and Subscriptions** before submitting the version to App Review.
+
+The Godot code expects the iOS StoreKit singleton `InAppStore` (or a compatible `InAppPurchase` singleton). Before the final iPhone build, make sure an iOS IAP plugin is installed and enabled in the iOS export preset; otherwise the Remove Ads buttons stay disabled in-game even though App Store Connect has the product.
 
 Before uploading, run this from the project root on the machine that has Godot:
 
@@ -29,13 +44,9 @@ Before uploading, run this from the project root on the machine that has Godot:
 Godot --headless --path . --script res://tools/validate_app_store_release.gd
 ```
 
-Do not upload while it reports any **BLOCKER**. As of the current repo state, the expected blockers are:
+Do not upload while it reports any **BLOCKER**. The current repo has the live iOS AdMob app ID, banner unit, interstitial unit, and hosted privacy policy URL wired.
 
-- `plugins_plist/GADApplicationIdentifier` is still Google's sample AdMob app ID.
-- `scripts/AdsManager.gd` still uses Google's sample banner ad unit.
-- `scripts/AdsManager.gd` still uses Google's sample interstitial ad unit.
-
-The validator also warns if `ComplianceConfig.APP_STORE_PRIVACY_POLICY_URL` is blank. App Store Connect requires a public HTTPS privacy policy URL even though the policy is also bundled in-game.
+`ComplianceConfig.APP_STORE_PRIVACY_POLICY_URL` is set to the hosted policy URL above. App Store Connect still needs that same public HTTPS URL pasted into the app metadata.
 
 For the App Privacy answers, include the data collected by Google AdMob and Apple purchases. Apple says third-party partner data must be included in App Store Connect privacy answers, and Google's current AdMob iOS disclosure says the Mobile Ads SDK may collect device IDs, advertising data, IP address/general location signals, diagnostics, and ad interaction/performance data. Recheck the final answers against your exact enabled SDKs and consent settings.
 
