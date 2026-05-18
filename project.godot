@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Frog Quest FOREVER"
+config/name="Frog Quest+"
 config/description="CLIMB THE TREE"
 config/tags=PackedStringArray("frog_quest+")
 run/main_scene="res://scenes/BootLoader.tscn"
@@ -28,6 +28,7 @@ config/icon="uid://bujdssuyriq2h"
 
 MusicManager="*res://scripts/MusicManager.gd"
 AdsManager="*res://scripts/AdsManager.gd"
+ComplianceConfig="*res://scripts/ComplianceConfig.gd"
 
 [display]
 

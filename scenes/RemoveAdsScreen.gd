@@ -130,6 +130,17 @@ func _build_ui() -> void:
 
 	var close_btn := _make_button("Close", fibberish)
 	close_btn.pressed.connect(_on_close_pressed)
+
+	var privacy_btn := _make_button("Privacy Policy", fibberish)
+	privacy_btn.name = "PrivacyPolicyButton"
+	privacy_btn.pressed.connect(_on_privacy_policy_pressed)
+	_main_panel.add_child(privacy_btn)
+
+	var terms_btn := _make_button("Terms of Use", fibberish)
+	terms_btn.name = "TermsButton"
+	terms_btn.pressed.connect(_on_terms_pressed)
+	_main_panel.add_child(terms_btn)
+
 	_main_panel.add_child(close_btn)
 
 	_passcode_panel = VBoxContainer.new()
@@ -251,6 +262,14 @@ func _on_buy_pressed() -> void:
 
 func _on_restore_pressed() -> void:
 	AdsManager.restore_purchases()
+
+
+func _on_privacy_policy_pressed() -> void:
+	ComplianceConfig.open_privacy_policy()
+
+
+func _on_terms_pressed() -> void:
+	ComplianceConfig.open_terms_of_use()
 
 
 func _on_close_pressed() -> void:

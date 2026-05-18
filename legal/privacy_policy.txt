@@ -1,0 +1,55 @@
+FROG QUEST+ — PRIVACY POLICY
+
+Effective date: 11 May 2026
+
+This Privacy Policy describes how MUSE (“we”, “us”, “our”) handles information when you use the mobile application Frog Quest+ (the “App”). By using the App, you agree to this policy alongside our Terms of Use.
+
+1. WHO THIS APPLIES TO
+The App is published for phones and tablets. If you use the App, this policy applies to you. If you do not agree, please discontinue use.
+
+2. INFORMATION THE APP PROCESSES
+We do not operate a Frog Quest+ account server for normal gameplay. Data is processed mainly on your device and by service providers integrated into the App.
+
+• Gameplay and preferences: progression, high scores where applicable, settings (sound, cosmetics, unlocked items where relevant), and similar data may be saved locally on your device (for example via Godot/OS user storage).
+• Advertising: we use Google AdMob to show advertisements. AdMob may use identifiers permitted by your device and platform settings (such as privacy‑friendly signals on newer OS versions where available, advertising identifiers subject to consent, IP address, coarse location, diagnostics, fraud prevention signals, interaction with ads).
+• Payments: purchases (such as “Remove Ads”) are processed by Apple. We do not receive your full payment card number. Apple may provide minimal purchase‑related identifiers and status so we can deliver your entitlement.
+• Consent tools: in regions where Google’s consent framework applies, Google’s User Messaging Platform (UMP) may present choices about ads and cookies or similar mechanisms as required locally.
+
+We do not request contacts, microphone, camera, precise GPS, SMS, calendar, photo library browsing, Bluetooth, nor health sensors for Frog Quest+. If OS permission prompts unrelated to ads or payments appeared, those would originate from dependent libraries—in that rare case discontinue use until we ship an update.
+
+3. HOW WE USE INFORMATION
+• Operate gameplay, cosmetics, backups on device where applicable.
+• Display and personalize advertising where allowed after consent and regional rules.
+• Process and validate in‑app purchases, prevent fraud, obey law.
+• Measure ad performance subject to SDK and consent settings.
+
+4. ANALYTICS
+The App itself is not centred on invasive analytics. Measurement related to advertisements may still occur via the ad SDK consistent with consent and vendor policies.
+
+5. CHILDREN AND TEENS
+Frog Quest+ is aimed at general audiences. It is not designed as primarily child‑directed. Guardians supervise minors’ device use.
+
+6. STORAGE AND SECURITY
+Industry‑standard safeguards at the SDK and platform level reduce risk but no method is 100% secure. Local save corruption or device loss affects only that device unless you rely on backups.
+
+7. SHARING WITH THIRD PARTIES
+We integrate third‑party processors. Key categories:
+• Advertising: Google LLC (Google AdMob) — google.com/privacy
+• Store & payments / platform services: Apple Inc. — apple.com/legal/privacy/en‑ww/
+
+Those parties process data pursuant to their own policies and contractual terms with publishers.
+
+8. INTERNATIONAL USERS AND RIGHTS
+European Economic Area / UK users may have GDPR rights (legal basis often legitimate interests for ads where permitted plus consent flows; contract for IAP). Californian users may exercise CCPA/CPRA rights where applicable via platform tools and our contact below. Responses may require verifying you are affected.
+
+You can reset or adjust ad choices inside the consent surface when offered, revisit iOS Tracking settings if prompted, reduce ad personalization platform‑wide via device settings where available, purchase Remove Ads where offered, or delete the App to stop future collection initiated by our code paths.
+
+We may retain aggregated or de‑identified data that cannot reasonably identify you.
+
+9. POLICY UPDATES
+We may revise this document. Updates appear in‑app alongside a new effective date. Continued play after revision constitutes acceptance unless law requires renewed consent steps.
+
+10. CONTACT
+Privacy questions concerning Frog Quest+ may be routed through the Developer contact options shown on our App Store product page (“Developer Website”, “Privacy Policy Link”, Support). If those fields are insufficient, cite “Frog Quest+ privacy enquiry” plus your locale.
+
+END OF DOCUMENT

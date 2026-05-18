@@ -5,6 +5,7 @@ var _resize_timer: SceneTreeTimer = null
 
 
 func _ready() -> void:
+	layer = AdsManager.canvas_layer_above_banner_placeholder()
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	_ensure_wardrobe_button()
 
@@ -55,6 +56,11 @@ func _apply_layout() -> void:
 	var rab := $MarginContainer.get_node_or_null("RemoveAdsButton")
 	if rab:
 		rab.add_theme_font_size_override("font_size", int(label_size * 0.6))
+	# Keep score / buttons inside the playable column when twin banner strips show (dual ads).
+	var top_pad_i := int(round(AdsManager.get_viewport_top_banner_clearance()))
+	var bottom_pad_i := int(round(AdsManager.get_viewport_bottom_banner_clearance()))
+	$MarginContainer.add_theme_constant_override("margin_top", top_pad_i)
+	$MarginContainer.add_theme_constant_override("margin_bottom", bottom_pad_i)
 
 
 func show_scores(score: int, high_score: int, is_new_record: bool) -> void:
@@ -62,7 +68,7 @@ func show_scores(score: int, high_score: int, is_new_record: bool) -> void:
 	$MarginContainer/HighScoreRow/HighScoreDisplay.text = "Best: %d" % high_score
 	_ensure_wardrobe_button()
 	_ensure_remove_ads_button()
-	AdsManager.show_banner_top()
+	AdsManager.show_banners_top_and_bottom()
 	AdsManager.connect("ads_removed_changed", _on_ads_removed, CONNECT_ONE_SHOT)
 
 	for t in _rock_tweens:

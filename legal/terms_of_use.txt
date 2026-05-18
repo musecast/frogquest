@@ -1,0 +1,69 @@
+FROG QUEST+ — TERMS OF USE (END USER LICENCE AGREEMENT)
+
+Effective date: 11 May 2026
+
+PLEASE READ THESE TERMS BEFORE USING THE APPLICATION.
+
+By downloading, installing, or using Frog Quest+ (the “App”), you agree to these Terms. If you supervise a minor who uses the App, you accept these Terms on their behalf. If you do not agree, do not use the App.
+
+1. Who we are and the platform
+These Terms are between you and MUSE (“we”, “us”). Apple Inc. distributes the App and operates the App Store and in‑app purchases. Apple’s applicable terms and privacy policies also apply to your use of Apple services.
+
+2. Licence
+We grant you a personal, worldwide, revocable, non‑exclusive, non‑transferable, non‑sublicensable licence to install and use the App on devices you own or control, for private, non‑commercial entertainment, in accordance with these Terms and Apple’s rules.
+
+You must not: copy, rent, sell, or redistribute the App except as Apple’s rules allow; reverse engineer the App except where mandatory law permits; interfere with security or entitlement checks; automate the App to cheat, harm other users, or attack our or third‑party systems; or use the App unlawfully.
+
+All rights not expressly granted remain with us and our licensors.
+
+3. Changes
+We may modify the App or these Terms. We will show an updated effective date for material changes where practicable (for example in‑app or via store release notes). Continued use after changes means you accept the revised Terms, unless applicable law requires a different process. If you disagree, stop using the App and uninstall it.
+
+4. Age
+You must meet the minimum age and store rating requirements that apply in your region. If you allow a minor to use the App, you are responsible for their use and for these Terms.
+
+5. Accounts and saved data
+Most progress and settings are stored locally on your device unless we add online features in a future update. You are responsible for device backups. We are not obligated to restore lost local data.
+
+6. In‑app purchases
+Optional purchases (including “Remove Ads” where available) are processed by Apple. Pricing, taxes, receipts, and refunds are handled under Apple’s policies. We deliver digital entitlements based on information Apple provides. If a purchase fails or does not apply, use Apple’s restore and support tools first.
+
+Purchases are licences to content or features, not sales of Apple intellectual property.
+
+7. Advertising
+The free version may show ads through Google AdMob. Ad personalisation depends on your choices, platform settings, consent tools, and regional law. See the in‑app Privacy Policy for details. A “Remove Ads” purchase aims to remove advertisements we integrate through our ad code; some Apple or system promotions outside our integrations may still appear.
+
+8. Disclaimer of warranties
+To the fullest extent permitted by law, the App is provided “as is” and “as available”, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non‑infringement.
+
+We do not warrant that the App will be uninterrupted, error‑free, or free of harmful components, or that your device will retain saved data after damage, reset, uninstall, or platform changes.
+
+9. Limitation of liability
+To the fullest extent permitted by law, our total liability arising out of these Terms or the App will not exceed the greater of (a) the amount you paid us for in‑app purchases in the twelve (12) months before the claim, or (b) twenty‑five United States dollars (USD 25).
+
+We are not liable for indirect, incidental, special, consequential, or punitive damages, or for loss of data, goodwill, profits, or revenue, except where liability cannot legally be excluded (for example, in cases of wilful misconduct, gross negligence, or injury where applicable law forbids exclusions).
+
+Some jurisdictions do not allow certain limitations; in those jurisdictions our liability is limited to the maximum permitted amount.
+
+10. Third‑party services
+The App integrates third‑party services (such as advertisements and storefront processing). Those providers handle information under their own terms and privacy notices.
+
+11. Termination and suspension
+You may terminate these Terms by uninstalling the App. We may suspend or revoke your licence where required to comply with law, to stop misuse, fraud, cheating, illegal content, severe security risk, where Apple directs us to, or for repeated breach of these Terms after notice when reasonable.
+
+Sections that should survive termination (including licences ending, disclaimers, limitations, governing law where applicable, and miscellaneous terms) survive where permitted.
+
+12. Governing law and disputes
+Unless mandatory consumer protections in your country require otherwise, these Terms are governed by the laws shown on our App Store seller page (or otherwise communicated in store metadata) without regard to conflict‑of‑laws principles, and courts there have jurisdiction subject to consumer venue rules where they apply.
+
+You may use informal dispute pathways Apple offers App Store purchasers where available. Try resolving issues informally via the developer contact routes on our App Store product page before starting formal disputes.
+
+13. Export and sanctions
+You must comply with export control and sanctions laws. You represent that you are not prohibited from using the App under those laws.
+
+14. Miscellaneous
+If any part of these Terms is invalid or unenforceable, the remainder stays in effect. You may not assign these Terms without our consent; we may assign them in connection with a merger or sale involving the App. Failure to enforce a provision is not a waiver.
+
+The in‑app Privacy Policy supplements these Terms regarding personal information.
+
+Note: Laws vary by region. Independent legal advice is prudent before scaling revenue or partnering with publishers.

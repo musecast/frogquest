@@ -80,6 +80,9 @@ func _ready() -> void:
 	_fade(1.0, 0.0, 0.6)
 	AdsManager.show_banner_bottom()
 	AdsManager.preload_interstitial()
+	await get_tree().process_frame
+	if is_inside_tree():
+		AdsManager.sync_banner_with_viewport()
 
 func _create_ui() -> void:
 	canvas_layer = CanvasLayer.new()
@@ -130,6 +133,9 @@ func _fit_to_viewport() -> void:
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 		_zoom_tween.finished.connect(func(): _zoom_tween = null)
 
+	# Match anchored banner size to current viewport/orientation (same logic as Main menu).
+	AdsManager.sync_banner_with_viewport()
+
 func _process(delta: float) -> void:
 	if is_resetting:
 		return
@@ -159,7 +165,7 @@ func _trigger_reset() -> void:
 	var label_fade := create_tween()
 	label_fade.tween_property(score_label, "modulate:a", 0.0, 0.5) \
 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-	AdsManager.hide_banner()
+	# Inline ads: preserve bottom stripe and add top banner via GameOverScreen (no interim hide_banner).
 	AdsManager.on_game_over()
 	$GameOverScreen.show_scores(score, high_score, is_new_record)
 	if _pending_notification.size() > 0:

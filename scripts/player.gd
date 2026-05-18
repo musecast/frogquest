@@ -60,6 +60,8 @@ var _wiz_tween: Tween = null
 var _wiz_sprite_base_y: float = 0.0
 var _zoom_tween: Tween = null
 var _crt_normal_volume: float = -20.0
+## Tracks bottom banner suppressed while paused in horizontal mode (restore on unpause).
+var _banner_hidden_for_landscape_pause: bool = false
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
@@ -153,6 +155,7 @@ func _ready():
 	_setup_crt_state()
 	if MusicManager.game_beaten:
 		_activate_beaten_crt()
+	add_to_group("banner_reserve_ui")
 	# Hide title screen immediately so buttons never appear at their .tscn default sizes.
 	# _initial_title_layout() fires before the first rendered frame and shows the
 	# title screen only after layout is already correct.
@@ -865,6 +868,29 @@ func _on_viewport_resized() -> void:
 	if t != _resize_timer or not is_inside_tree():
 		return
 	_apply_ui_layout()
+	_sync_banner_visibility_with_pause_orientation()
+
+
+func _sync_banner_visibility_with_pause_orientation() -> void:
+	if MusicManager.ads_removed:
+		_banner_hidden_for_landscape_pause = false
+		return
+
+	if not $PauseScreen.visible:
+		if _banner_hidden_for_landscape_pause:
+			_banner_hidden_for_landscape_pause = false
+			AdsManager.show_banner_bottom()
+		return
+
+	var vp := get_viewport().get_visible_rect().size
+	var horizontal := vp.x >= vp.y
+	if horizontal:
+		if not _banner_hidden_for_landscape_pause:
+			AdsManager.hide_banner()
+			_banner_hidden_for_landscape_pause = true
+	elif _banner_hidden_for_landscape_pause:
+		AdsManager.show_banner_bottom()
+		_banner_hidden_for_landscape_pause = false
 
 
 func _on_pause_screen_visibility_changed() -> void:
@@ -872,6 +898,7 @@ func _on_pause_screen_visibility_changed() -> void:
 		if _active_wardrobe and is_instance_valid(_active_wardrobe):
 			_active_wardrobe.closed.emit()
 		_apply_ui_layout()
+	_sync_banner_visibility_with_pause_orientation()
 
 
 func _on_end_animation_finished() -> void:
@@ -1023,16 +1050,21 @@ func _apply_ui_layout() -> void:
 	var by_muse  := $"titlescreen/by muse"
 	var hbox     := $titlescreen/HBoxContainer
 
+	$titlescreen.layer = AdsManager.canvas_layer_above_banner_placeholder()
+	var muse_lift: float = AdsManager.get_viewport_bottom_banner_clearance()
+	by_muse.z_index = 8
+	by_muse.z_as_relative = false
+
 	var row2 = $titlescreen.get_node_or_null("TitleRow2")
 	if is_portrait:
 		title.position    = Vector2(cx, vp.y * 0.25)
 		title.scale       = Vector2(0.5, 0.5)
 		fx3.position      = Vector2(cx, vp.y * 0.75)
-		# "by muse" pinned near bottom — anchor_top=1.0 so negative offset = above bottom
+		# "by muse" pinned near bottom — lift by Y when a bottom banner is active; layer above ad placeholder
 		by_muse.offset_left   = 0.0
-		by_muse.offset_top    = -36.0
+		by_muse.offset_bottom = -muse_lift
+		by_muse.offset_top    = -(36.0 + muse_lift)
 		by_muse.offset_right  = 0.0
-		by_muse.offset_bottom = 0.0
 		by_muse.scale         = Vector2(1.0, 1.0)
 		by_muse.add_theme_font_size_override("font_size", 32)
 		by_muse.add_theme_constant_override("outline_size", 5)
@@ -1076,14 +1108,16 @@ func _apply_ui_layout() -> void:
 		title.position    = Vector2(cx, 85.0)
 		title.scale       = Vector2(0.3, 0.3)
 		fx3.position      = Vector2(cx, 238.0)
-		# "by muse" pinned near bottom — same trick as portrait
+		# "by muse" — landscape: smaller type, sits a touch lower toward the banner strip
+		var muse_ls_strip_h := 17.0
+		var muse_ls_nudge_dn := 6.0
 		by_muse.offset_left   = 0.0
-		by_muse.offset_top    = -22.0
+		by_muse.offset_bottom = -muse_lift + muse_ls_nudge_dn
+		by_muse.offset_top    = -(muse_ls_strip_h + muse_lift) + muse_ls_nudge_dn
 		by_muse.offset_right  = 0.0
-		by_muse.offset_bottom = 0.0
 		by_muse.scale         = Vector2(1.0, 1.0)
-		by_muse.add_theme_font_size_override("font_size", 32)
-		by_muse.add_theme_constant_override("outline_size", 8)
+		by_muse.add_theme_font_size_override("font_size", 22)
+		by_muse.add_theme_constant_override("outline_size", 5)
 		# All title buttons in one hbox for uniform gaps in landscape
 		var ls_half: float = vp.x * 0.34
 		if row2:

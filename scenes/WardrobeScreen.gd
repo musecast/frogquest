@@ -28,6 +28,17 @@ var _item_buttons: Dictionary = {}  # item_id -> Button
 var _hint_label: Label = null
 var _resize_timer: SceneTreeTimer = null
 
+func _compute_action_button_size(base_size: Vector2, font_size: int) -> Vector2:
+	var button_font := load("res://assets/fibberish.ttf") as Font
+	if button_font == null:
+		return base_size
+
+	var text_width: float = button_font.get_string_size("UNEQUIP", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	# Account for the button style's horizontal padding and a little extra
+	# headroom so the longest label never clips on scaled layouts.
+	var padded_width: float = ceil(text_width + 28.0)
+	return Vector2(max(base_size.x, padded_width), base_size.y)
+
 func _ready() -> void:
 	layer = 10
 	_mark_all_seen()
@@ -76,6 +87,7 @@ func _build_ui() -> void:
 	# Scale button and info sizes proportionally to viewport width so they
 	# never exceed available space on any phone resolution / pixel density.
 	var btn_min := Vector2(vp.x * 0.30, vp.y * 0.052) if is_portrait else Vector2(70, 18)
+	var action_btn_min := _compute_action_button_size(btn_min, font_size_body)
 	var info_btn_size: float = vp.x * 0.058 if is_portrait else 18.0
 	var pad: float = 10.0 if is_portrait else 5.0
 
@@ -150,7 +162,7 @@ func _build_ui() -> void:
 		if not _is_unlocked(id):
 			continue
 		any_hat = true
-		vbox.add_child(_make_item_row(id, btn_min, font_size_body, info_btn_size))
+		vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size))
 
 	if not any_hat:
 		var none_lbl := Label.new()
@@ -176,7 +188,7 @@ func _build_ui() -> void:
 		if not _is_unlocked(id):
 			continue
 		any_skin = true
-		vbox.add_child(_make_item_row(id, btn_min, font_size_body, info_btn_size))
+		vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size))
 
 	if not any_skin:
 		var none_lbl2 := Label.new()
@@ -283,7 +295,7 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	# width never changes when toggling between EQUIP / UNEQUIP.
 	btn.custom_minimum_size = btn_min
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	btn.clip_text = true
+	btn.clip_text = false
 	btn.add_theme_font_size_override("font_size", font_size)
 	_update_button_label(btn, id)
 	btn.pressed.connect(_on_item_button_pressed.bind(id, btn))
