@@ -4,7 +4,9 @@
 # - Says what a wrong value looks like (a Key ID, an Issuer ID, a file name...) without ever printing it.
 # - Signs in to the App Store Connect API with it, so a bad key fails in seconds, not after a 20 minute build.
 # - Writes BUILD (one above anything already uploaded, and at least 2 + the run number) to $GITHUB_ENV.
-import base64, json, os, re, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+import base64, os, re, subprocess, sys
+
+from asc_api import Api, ApiError
 
 BUNDLE_ID = "com.muse.frogquest"
 UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
@@ -24,10 +26,6 @@ def looks_like(value):
     if v.lower().endswith(".p8") or re.match(r"^[A-Za-z]:[\\/]", v):
         return "a file name or path, not the file's contents"
     return "%d characters on %d line(s)" % (len(v), v.count("\n") + 1)
-
-
-def b64url(data):
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
 key_id = os.environ.get("ASC_KEY_ID", "").strip()
@@ -71,43 +69,21 @@ if subprocess.run(["openssl", "pkey", "-in", key_path, "-noout"], capture_output
 if not match:
     print("ASC_PRIVATE_KEY had no BEGIN/END lines; added them.")
 
-# Sign a token for the App Store Connect API (ES256: openssl gives a DER signature, JWT wants raw r||s).
-now = int(time.time())
-header = b64url(json.dumps({"alg": "ES256", "kid": key_id, "typ": "JWT"}).encode())
-claims = b64url(json.dumps({"iss": issuer, "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"}).encode())
-signing_input = (header + "." + claims).encode()
-sig = subprocess.run(["openssl", "dgst", "-sha256", "-sign", key_path], input=signing_input,
-                     capture_output=True, check=True).stdout
-i = 2 if sig[1] < 0x80 else 2 + (sig[1] & 0x7F)
-parts = []
-for _ in range(2):
-    n = sig[i + 1]
-    parts.append(int.from_bytes(sig[i + 2:i + 2 + n], "big").to_bytes(32, "big"))
-    i += 2 + n
-token = header + "." + claims + "." + b64url(b"".join(parts))
-
-
-def api(path, query):
-    url = "https://api.appstoreconnect.apple.com" + path + "?" + urllib.parse.urlencode(query)
-    request = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return json.load(response)
-
-
+api = Api(key_path, key_id, issuer)
 try:
-    apps = api("/v1/apps", {"filter[bundleId]": BUNDLE_ID, "fields[apps]": "name,bundleId"})["data"]
-except urllib.error.HTTPError as e:
-    if e.code == 401:
+    apps = api.get("/v1/apps", **{"filter[bundleId]": BUNDLE_ID, "fields[apps]": "name,bundleId"})["data"]
+except ApiError as e:
+    if e.status == 401:
         fail("Apple rejected the key (401): ASC_KEY_ID, ASC_ISSUER_ID and ASC_PRIVATE_KEY must all come from "
              "the same key, and the key must not be revoked.")
-    if e.code == 403:
+    if e.status == 403:
         fail("Apple accepted the key but it can't see apps (403): give the key Admin access.")
-    fail("App Store Connect API error %d." % e.code)
+    fail(str(e))
 if not apps:
     fail("The key works, but no app with bundle ID %s is visible to it." % BUNDLE_ID)
 app = apps[0]
 
-builds = api("/v1/builds", {"filter[app]": app["id"], "fields[builds]": "version", "limit": 200})["data"]
+builds = api.get("/v1/builds", **{"filter[app]": app["id"], "fields[builds]": "version", "limit": 200})["data"]
 uploaded = [int(b["attributes"]["version"]) for b in builds if str(b["attributes"].get("version", "")).isdigit()]
 highest = max(uploaded, default=0)
 build = max(2 + int(os.environ.get("GITHUB_RUN_NUMBER", "1")), highest + 1)

@@ -86,7 +86,7 @@ jobs:
         run: |
           echo "Frog Quest+ $VERSION ($BUILD)"
           xcodebuild -version
-          # Unsigned here; Xcode's cloud signing signs it for the App Store in the next step.
+          # Unsigned here; "Sign the app" signs it for the App Store.
           xcodebuild archive -quiet \
             -project "$PROJECT.xcodeproj" \
             -scheme "$PROJECT" \
@@ -96,37 +96,55 @@ jobs:
             CURRENT_PROJECT_VERSION="$BUILD" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Sign and upload to TestFlight
+      # Xcode's own App Store Connect sign-in rejects API keys here ("Cannot verify client's JWT headers"),
+      # so the certificate and profile come straight from the App Store Connect API and Xcode signs offline.
+      - name: Get a signing certificate and profile
+        run: python3 tools/ci/asc_signing.py setup
+
+      - name: Sign the app
         run: |
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'EOF'
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+            <key>signingStyle</key><string>manual</string>
             <key>teamID</key><string>ABNG89SP95</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.muse.frogquest</key><string>$PROFILE_UUID</string>
+            </dict>
             <key>uploadSymbols</key><true/>
             <key>manageAppVersionAndBuildNumber</key><false/>
           </dict>
           </plist>
           EOF
-          # A pasted secret can carry a trailing line break, which breaks the token Xcode signs.
-          key_id=$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')
-          issuer_id=$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/FrogQuest.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$key_id" \
-            -authenticationKeyIssuerID "$issuer_id"
+            -exportPath "$RUNNER_TEMP/export"
+          ipa=$(find "$RUNNER_TEMP/export" -name '*.ipa' | head -1)
+          ls -la "$ipa"
+          echo "IPA=$ipa" >> "$GITHUB_ENV"
 
-      - name: Remove the key file
+      - name: Upload to TestFlight
+        run: |
+          key_id=$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')
+          issuer_id=$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')
+          # altool looks for AuthKey_<key id>.p8 in a few fixed folders.
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp "$ASC_KEY_PATH" ~/.appstoreconnect/private_keys/
+          xcrun altool --upload-app --type ios --file "$IPA" --apiKey "$key_id" --apiIssuer "$issuer_id"
+          echo "UPLOADED=1" >> "$GITHUB_ENV"
+
+      - name: Clean up signing
         if: always()
-        run: rm -rf "$RUNNER_TEMP/private_keys"
+        run: |
+          [ -z "$ASC_KEY_PATH" ] || python3 tools/ci/asc_signing.py cleanup || true
+          rm -rf "$RUNNER_TEMP/private_keys" ~/.appstoreconnect/private_keys "$RUNNER_TEMP/signing"
 
       - name: Summary
         run: |
