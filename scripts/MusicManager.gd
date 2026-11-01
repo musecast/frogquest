@@ -11,8 +11,10 @@ var equipped_hat: String = ""
 var equipped_skin: String = ""
 var unlocked_skins: Array = []
 var seen_cosmetics: Array = []
+var flies_caught: Array = []  # the hidden flies you've caught (FlyHunt.gd): ids like "fly_3"
 
 const WARDROBE_PATH := "user://wardrobe.save"
+var wardrobe_path := WARDROBE_PATH  # (the tests point this somewhere else, so they never touch your save)
 
 func _trace(label: String) -> void:
 	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
@@ -30,13 +32,14 @@ func has_unseen_cosmetics() -> bool:
 
 func save_wardrobe() -> void:
 	_trace("MusicManager save_wardrobe start")
-	var f = FileAccess.open(WARDROBE_PATH, FileAccess.WRITE)
+	var f = FileAccess.open(wardrobe_path, FileAccess.WRITE)
 	f.store_var({
 		"froggyCrown": froggyCrown,
 		"equipped_hat": equipped_hat,
 		"equipped_skin": equipped_skin,
 		"unlocked_skins": unlocked_skins,
 		"seen_cosmetics": seen_cosmetics,
+		"flies_caught": flies_caught,
 		"game_beaten": game_beaten,
 		"desktop_frog_unlocked": desktop_frog_unlocked,
 		"ads_removed": ads_removed,
@@ -47,15 +50,16 @@ func save_wardrobe() -> void:
 
 func load_wardrobe() -> void:
 	_trace("MusicManager load_wardrobe start")
-	if not FileAccess.file_exists(WARDROBE_PATH):
+	if not FileAccess.file_exists(wardrobe_path):
 		froggyCrown    = 0
 		equipped_hat   = ""
 		equipped_skin  = ""
 		unlocked_skins = []
 		seen_cosmetics = []
+		flies_caught   = []
 		_trace("MusicManager load_wardrobe end missing file")
 		return
-	var f = FileAccess.open(WARDROBE_PATH, FileAccess.READ)
+	var f = FileAccess.open(wardrobe_path, FileAccess.READ)
 	if not f:
 		_trace("MusicManager load_wardrobe end open failed")
 		return
@@ -66,6 +70,7 @@ func load_wardrobe() -> void:
 	equipped_skin  = d.get("equipped_skin",  "")
 	unlocked_skins = d.get("unlocked_skins", [])
 	seen_cosmetics = d.get("seen_cosmetics", [])
+	flies_caught   = d.get("flies_caught", [])
 	game_beaten         = d.get("game_beaten",          false)
 	desktop_frog_unlocked = d.get("desktop_frog_unlocked", false)
 	ads_removed         = d.get("ads_removed",          false)
@@ -73,6 +78,11 @@ func load_wardrobe() -> void:
 	_trace("MusicManager load_wardrobe end")
 
 func show_unlock_notification(item_type: String) -> void:
+	show_toast("New %s Unlocked!" % ("Hat" if item_type == "hat" else "Skin"))
+
+
+## A little panel that drops in from the top for a few seconds (unlocks, flies caught...).
+func show_toast(text: String) -> void:
 	var cl := CanvasLayer.new()
 	cl.layer = 100
 	add_child(cl)
@@ -105,12 +115,10 @@ func show_unlock_notification(item_type: String) -> void:
 	panel.size = Vector2(pw, ph)
 	cl.add_child(panel)
 
-	var type_str := "Hat" if item_type == "hat" else "Skin"
-
 	var h_pad: float = 8.0
 
 	var lbl := Label.new()
-	lbl.text = "New %s Unlocked!" % type_str
+	lbl.text = text
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

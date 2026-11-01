@@ -60,6 +60,8 @@ func _ready():
 	_loop_cave_audio($"Environmental Audio/caveaudio")
 	_loop_cave_audio($"Environmental Audio/darktreeAudio")
 
+	load("res://scripts/FlyHunt.gd").spawn_into(self)  # the little flies hiding around the tree (catch them all: the Golden Frog)
+
 	_trace("Main ready end")
 	_request_ads_after_first_frames()
 

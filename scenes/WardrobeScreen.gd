@@ -15,7 +15,7 @@ const ITEMS: Dictionary = {
 					  "how": "Find it in the world"},
 	"golden_skin":    {"label": "Golden Frog",   "type": "skin",
 					  "tint": Color(1.0, 0.75, 0.0), "strength": 1.0,
-					  "how": "Secret"},
+					  "how": "Catch every fly hiding in the World Tree"},
 	"grayscale_skin": {"label": "Grayscale",     "type": "skin",
 					  "shader": "res://assets/grayscale.gdshader",
 					  "how": "Score 25 in Endless"},
@@ -351,6 +351,9 @@ func _on_info_pressed(id: String) -> void:
 	if not _hint_label:
 		return
 	var how: String = ITEMS[id].get("how", "")
+	var flies: GDScript = load("res://scripts/FlyHunt.gd")
+	if id == flies.REWARD:
+		how += " (%d/%d)" % [flies.count_caught(), flies.total()]
 	var label_text: String = ITEMS[id]["label"]
 	var new_text := how
 	# Toggle off if already showing the same hint

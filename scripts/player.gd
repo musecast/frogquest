@@ -602,8 +602,8 @@ func _on_restart_yes_pressed():
 	if FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(save_path)
 	if _pending_reset_type == "all":
-		if FileAccess.file_exists(MusicManager.WARDROBE_PATH):
-			DirAccess.remove_absolute(MusicManager.WARDROBE_PATH)
+		if FileAccess.file_exists(MusicManager.wardrobe_path):
+			DirAccess.remove_absolute(MusicManager.wardrobe_path)
 		const ENDLESS_SCORE_PATH := "user://endless_highscore.dat"
 		if FileAccess.file_exists(ENDLESS_SCORE_PATH):
 			DirAccess.remove_absolute(ENDLESS_SCORE_PATH)
