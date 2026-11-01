@@ -47,7 +47,16 @@ App Store Connect status **Missing Metadata** usually means the product still ne
 - Review screenshot: upload a screenshot that shows the in-game Remove Ads screen / buy button. This is for Apple's review, not the optional App Store Promotion image.
 - Review notes suggestion: `Non-consumable Remove Ads purchase. Launch the app, open the pause/settings menu, then tap Remove Ads. The product ID is com.muse.frogquest.removeads. Purchase removes integrated banner and interstitial ads. Restore Purchases is available on the same screen. No login is required.`
 
-**Version**: 1.0 is live, so the next upload is **1.1 (build 3)**. Version 1.1 exists in App Store Connect (Prepare for Submission), and the iOS export preset matches. The Godot 4.7 template already sets `ITSAppUsesNonExemptEncryption = NO`, so TestFlight builds skip the export-compliance question.
+**Version**: 1.0 is live. **1.1 (build 6)** was uploaded to TestFlight on Nov 1, 2026 by the GitHub workflow below. Version 1.1 exists in App Store Connect (Prepare for Submission). The Godot 4.7 template already sets `ITSAppUsesNonExemptEncryption = NO`, so TestFlight builds skip the export-compliance question.
+
+## Uploading to TestFlight without a Mac (GitHub Actions)
+
+GitHub builds on its own Mac machines (free, because the repo is public): **github.com/musecast/frogquest → Actions → TestFlight → Run workflow**. It takes about 3 minutes: Godot 4.7.1 exports the Xcode project, Xcode 26 archives it, and it's signed and uploaded. Apple then needs 5–30 minutes to process the build before it appears in TestFlight.
+
+- **Build numbers** are automatic: one above the highest build already in App Store Connect. The version (1.1) comes from the iOS export preset, so bump `application/short_version` there for 1.2. If you ever upload from a Mac instead, use a build number above the last one the workflow uploaded.
+- **Secrets** (repo Settings → Secrets and variables → Actions): `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`, from the App Store Connect API key **"Github Testflight"** (Team key, Admin). The workflow's first step checks them with Apple before building and says which one is wrong.
+- **Signing**: Xcode's own App Store Connect sign-in rejects API keys on GitHub's Macs ("Cannot verify client's JWT headers"). So `tools/ci/asc_signing.py` makes an Apple Distribution certificate and an App Store profile named **"Frog Quest CI cert …"** through the API, signs with them in a throwaway keychain, and `altool` uploads. A failed run revokes its certificate at once; a successful run's certificate is revoked at the start of the next run. If a run says the team is at its certificate limit, revoke an unused distribution certificate at developer.apple.com.
+- **Testers**: the internal TestFlight group **"Muse"** has automatic distribution on, so every processed build goes straight to the TestFlight app for the people in it.
 
 For the first in-app purchase, Apple requires it to be submitted with a new app version: after the binary is uploaded, go to the app version page and add `Remove Ads` in **In-App Purchases and Subscriptions** before submitting the version to App Review.
 
