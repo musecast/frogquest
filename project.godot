@@ -14,7 +14,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Frog Quest+"
+config/name="Frog Quest"
 config/description="CLIMB THE TREE"
 config/tags=PackedStringArray("frog_quest+")
 run/main_scene="res://scenes/BootLoader.tscn"
@@ -25,10 +25,13 @@ boot_splash/stretch_mode=0
 boot_splash/use_filter=false
 boot_splash/image="uid://cqtw1lsseoik5"
 config/icon="uid://bujdssuyriq2h"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Godot/app_userdata/Frog Quest+"
 
 [autoload]
 
 MusicManager="*res://scripts/MusicManager.gd"
+MuseAccount="*res://scripts/MuseAccount.gd"
 AdsManager="*res://scripts/AdsManager.gd"
 ComplianceConfig="*res://scripts/ComplianceConfig.gd"
 

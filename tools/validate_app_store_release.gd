@@ -115,7 +115,7 @@ func _check_export_preset() -> bool:
 		_blocker("iOS Remove Ads purchase plugin is not enabled in the export preset.")
 		failed = true
 
-	# Frog Quest+ asks for tracking (ATT) through Google's consent flow, which shows Apple's prompt
+	# Frog Quest asks for tracking (ATT) through Google's consent flow, which shows Apple's prompt
 	# after the IDFA explainer message published in AdMob (see release/APP_STORE_RELEASE_CHECKLIST.md).
 	var plist := str(cfg.get_value(options, "application/additional_plist_content", ""))
 	if not plist.contains("NSUserTrackingUsageDescription"):
@@ -130,7 +130,7 @@ func _check_export_preset() -> bool:
 			failed = true
 
 	if not bool(cfg.get_value(options, "privacy/tracking_enabled", false)):
-		_blocker("iOS export privacy does not declare tracking, but Frog Quest+ asks for ATT so ads can be targeted. Enable privacy/tracking_enabled.")
+		_blocker("iOS export privacy does not declare tracking, but Frog Quest asks for ATT so ads can be targeted. Enable privacy/tracking_enabled.")
 		failed = true
 
 	for data_type in ["device_id", "advertising_data"]:

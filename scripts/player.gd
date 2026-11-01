@@ -140,25 +140,14 @@ func _ready():
 	$titlescreen.add_child(_row2)
 	$titlescreen/HBoxContainer/endlessmodebutton.reparent(_row2)
 
-	if MusicManager.has_any_cosmetic():
-		var wb := Button.new()
-		wb.name = "WardrobeButton"
-		var ref_btn := _row2.get_node("endlessmodebutton")
-		wb.theme = ref_btn.theme
-		wb.add_theme_font_override("font", ref_btn.get_theme_font("font"))
-		wb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-		wb.add_theme_constant_override("outline_size", 5)
-		wb.text = "   "
-		wb.icon = load("res://assets/crownicon.png")
-		wb.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		wb.expand_icon = true
-		_row2.add_child(wb)
-		wb.pressed.connect(_on_wardrobe_button_pressed)
-		_attach_new_badge(wb)
+	_ensure_title_wardrobe_button()
+	_ensure_muse_button()
+	_show_logo()
 
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	$PauseScreen.visibility_changed.connect(_on_pause_screen_visibility_changed)
 	AdsManager.connect("ads_removed_changed", _apply_ui_layout)
+	MuseAccount.changed.connect(_on_muse_account_changed)
 
 	_setup_crt_state()
 	if MusicManager.game_beaten:
@@ -879,6 +868,104 @@ func _on_wardrobe_button_pressed() -> void:
 	)
 
 
+## The crown (wardrobe) button next to ENDLESS, once there's something in the wardrobe. It can turn
+## up mid-game too: Muse Pro brings Lil Froggy on a computer.
+func _ensure_title_wardrobe_button() -> void:
+	if not MusicManager.has_any_cosmetic() or _find_title_button("WardrobeButton"):
+		return
+	var ref_btn := _find_title_button("endlessmodebutton")
+	var wb := Button.new()
+	wb.name = "WardrobeButton"
+	wb.theme = ref_btn.theme
+	wb.add_theme_font_override("font", ref_btn.get_theme_font("font"))
+	wb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	wb.add_theme_constant_override("outline_size", 5)
+	wb.text = "   "
+	wb.icon = load("res://assets/crownicon.png")
+	wb.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wb.expand_icon = true
+	ref_btn.get_parent().add_child(wb)  # (row 2 in portrait, the one row in landscape)
+	wb.pressed.connect(_on_wardrobe_button_pressed)
+	_attach_new_badge(wb)
+
+
+func _find_title_button(btn_name: String) -> Button:
+	for container in [$titlescreen.get_node_or_null("TitleRow2"), $titlescreen/HBoxContainer]:
+		if container and container.get_node_or_null(btn_name):
+			return container.get_node(btn_name)
+	return null
+
+
+## MUSE ACCOUNT, up in the title screen's corner: sign in with your Muse account (MuseAccount.gd).
+func _ensure_muse_button() -> void:
+	if $titlescreen.get_node_or_null("MuseAccountButton"):
+		return
+	var mb := Button.new()
+	mb.name = "MuseAccountButton"
+	mb.flat = true
+	mb.focus_mode = Control.FOCUS_NONE
+	mb.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
+	mb.add_theme_color_override("font_color", Color("#FFD966"))
+	mb.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
+	mb.add_theme_color_override("font_pressed_color", Color("#FFD966"))
+	mb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	mb.add_theme_constant_override("outline_size", 6)
+	mb.pressed.connect(_on_muse_button_pressed)
+	$titlescreen.add_child(mb)
+	_refresh_muse_button()
+
+
+func _refresh_muse_button() -> void:
+	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
+	if mb:
+		mb.text = "MUSE PRO" if MuseAccount.has_pro() else "MUSE ACCOUNT"
+
+
+## Top right, clear of the notch and the status bar.
+func _place_muse_button(vp: Vector2, is_portrait: bool) -> void:
+	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
+	if mb == null:
+		return
+	mb.add_theme_font_size_override("font_size", 26 if is_portrait else 14)
+	mb.size = mb.get_combined_minimum_size()
+	var inset: Vector4 = AdsManager.get_viewport_safe_insets()
+	mb.position = Vector2(vp.x - inset.z - mb.size.x - 6.0, inset.y + 4.0)
+
+
+func _on_muse_button_pressed() -> void:
+	$frogaim.play()
+	var title_was_visible: bool = $titlescreen.visible
+	$titlescreen.visible = false
+	var screen = load("res://scenes/MuseAccountScreen.gd").new()
+	add_child(screen)
+	screen.closed.connect(func() -> void:
+		screen.queue_free()
+		$titlescreen.visible = title_was_visible
+		if title_was_visible:
+			_apply_ui_layout()
+			_show_logo(true)
+	)
+
+
+func _on_muse_account_changed() -> void:
+	_ensure_title_wardrobe_button()
+	_refresh_muse_button()
+	if $titlescreen.visible:
+		_show_logo(true)
+		_apply_ui_layout()
+
+
+## The title logo: FROG QUEST, or FROG QUEST+ with Muse Pro (it bounces when the + turns up or goes).
+func _show_logo(pop := false) -> void:
+	var title := $titlescreen/Title
+	var path: String = MuseAccount.logo_path()
+	if title.texture and title.texture.resource_path == path:
+		return
+	title.texture = load(path)
+	if pop:
+		title.spring_velocity += 0.5
+
+
 func _on_endlessmodebutton_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/EndlessMode.tscn")
 
@@ -1202,6 +1289,8 @@ func _apply_ui_layout() -> void:
 			wb_l.visible = MusicManager.has_any_cosmetic()
 			wb_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			wb_l.add_theme_font_size_override("font_size", 32)
+
+	_place_muse_button(vp, is_portrait)
 
 	# ── PAUSE SCREEN ──────────────────────────────────────────────────────
 	var overlay      := $PauseScreen/MeshInstance2D

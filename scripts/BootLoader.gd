@@ -62,7 +62,7 @@ func _build_ui() -> void:
 
 	# The title logo the way player.tscn builds it: wobbling logo, swinging glow, faint frog behind.
 	_title = Sprite2D.new()
-	_title.texture = load("res://assets/frogquesttitle.png")
+	_title.texture = load(MuseAccount.logo_path())  # (FROG QUEST+ with Muse Pro)
 	_title.set_script(load("res://scenes/Titlewobble.gd"))
 	add_child(_title)
 	var glow := Sprite2D.new()

@@ -20,7 +20,13 @@ func _trace(label: String) -> void:
 	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
 
 func has_any_cosmetic() -> bool:
-	return froggyCrown != 0 or unlocked_skins.size() > 0
+	return froggyCrown != 0 or unlocked_skins.size() > 0 or _has_lil_froggy()
+
+## Lil Froggy lives in the wardrobe too, once he's yours (on a computer): Muse Pro can bring him
+## before any hat or skin, and he needs the wardrobe button to get out.
+func _has_lil_froggy() -> bool:
+	var link: GDScript = load("res://scripts/DesktopFrogLink.gd")
+	return link.is_supported() and link.is_unlocked()
 
 func has_unseen_cosmetics() -> bool:
 	if froggyCrown != 0 and "froggycrown" not in seen_cosmetics:

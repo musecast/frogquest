@@ -361,15 +361,21 @@ func platform_has_ads() -> bool:
 	return platform == "iOS" or platform == "Android"
 
 
-## True when this player never sees ads: they bought Remove Ads, or this platform has no ads.
-## Ad-gated things (Remove Ads buttons, "watch an ad" offers) key off this.
+## True when this player never sees ads: they bought Remove Ads, have Muse Pro (MuseAccount.gd), or
+## this platform has no ads. Ad-gated things (Remove Ads buttons, "watch an ad" offers) key off this.
 func is_ad_free() -> bool:
-	return MusicManager.ads_removed or not platform_has_ads()
+	return MusicManager.ads_removed or MuseAccount.has_pro() or not platform_has_ads()
 
 
 ## Viewport pixels hidden behind the bottom of the screen (iPhone home indicator); 0 off mobile.
 func get_viewport_bottom_safe_inset() -> float:
 	return _viewport_safe_insets().w
+
+
+## Viewport pixels to keep clear on each side (left, top, right, bottom: notch, status bar, home
+## indicator); all 0 off mobile.
+func get_viewport_safe_insets() -> Vector4:
+	return _viewport_safe_insets()
 
 
 ## Viewport pixels to leave clear above the bottom edge when a bottom banner is active.
@@ -418,9 +424,10 @@ func _notify_banner_dependent_ui() -> void:
 
 func _ready() -> void:
 	_trace("AdsManager ready start")
-	_ads_active = _ads_runtime_enabled() and not MusicManager.ads_removed
+	_ads_active = _ads_runtime_enabled() and not MusicManager.ads_removed and not MuseAccount.has_pro()
 	if not _ads_active:
 		print("AdsManager: ads disabled or already removed; native ad SDK calls will be skipped.")
+	MuseAccount.changed.connect(_on_muse_account_changed)
 	if not Engine.is_editor_hint():
 		get_viewport().size_changed.connect(_on_viewport_for_banner_resize)
 	_trace("AdsManager ready end")
@@ -1389,6 +1396,17 @@ func _on_restore_completed(purchases: Array) -> void:
 func _apply_remove_ads() -> void:
 	MusicManager.ads_removed = true
 	MusicManager.save_wardrobe()
+	_stop_ads()
+
+
+## Muse Pro turned up (signed in just now): the ads go, like Remove Ads, but only while Pro lasts.
+## (If Pro ends, they're back from the next launch.)
+func _on_muse_account_changed() -> void:
+	if MuseAccount.has_pro() and _ads_active:
+		_stop_ads()
+
+
+func _stop_ads() -> void:
 	_ads_active = false
 	hide_banner()
 	_destroy_interstitial()

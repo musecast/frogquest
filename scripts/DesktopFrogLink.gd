@@ -62,9 +62,9 @@ static func escapes_this_time() -> bool:
 	return OS.is_debug_build() or randf() < ESCAPE_CHANCE
 
 
-## Muse Pro doesn't exist yet. When it does, its subscription check goes here.
+## Muse Pro on your Muse account (signed in from the title screen; see MuseAccount.gd) lets him out too.
 static func has_muse_pro() -> bool:
-	return false
+	return MuseAccount.has_pro()
 
 
 ## Is froggy out on the desktop right now?

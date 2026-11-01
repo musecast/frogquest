@@ -113,6 +113,11 @@ func _build_ui() -> void:
 		restore_btn.pressed.connect(_on_restore_pressed)
 		_main_panel.add_child(restore_btn)
 
+		var muse_btn := _make_button("Have Muse Pro? Sign In", fibberish)
+		muse_btn.name = "MuseProButton"
+		muse_btn.pressed.connect(_on_muse_pro_pressed)
+		_main_panel.add_child(muse_btn)
+
 		if not store_ready:
 			var backend_note := Label.new()
 			backend_note.text = "Store purchases are not configured in this build yet.\nRemove Ads product: %s" % AdsManager.get_remove_ads_product_id()
@@ -269,6 +274,13 @@ func _on_restore_pressed() -> void:
 	AdsManager.restore_purchases()
 
 
+## Muse Pro takes the ads away too: sign in with the Muse account (MuseAccountScreen, over this one).
+func _on_muse_pro_pressed() -> void:
+	var screen = load("res://scenes/MuseAccountScreen.gd").new()
+	add_child(screen)
+	screen.closed.connect(screen.queue_free)
+
+
 func _on_privacy_policy_pressed() -> void:
 	ComplianceConfig.open_privacy_policy()
 
@@ -318,7 +330,7 @@ func _on_ads_removed_changed() -> void:
 func _show_success(msg: String) -> void:
 	_passcode_panel.visible = false
 	_main_panel.visible = true
-	for btn_name in ["BuyButton", "RestoreButton"]:
+	for btn_name in ["BuyButton", "RestoreButton", "MuseProButton"]:
 		var button := _main_panel.get_node_or_null(btn_name)
 		if button:
 			button.queue_free()

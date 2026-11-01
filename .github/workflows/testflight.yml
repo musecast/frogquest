@@ -1,4 +1,4 @@
-# Builds Frog Quest+ for iOS on GitHub's Mac machines and uploads it to TestFlight. No Mac needed.
+# Builds Frog Quest for iOS on GitHub's Mac machines and uploads it to TestFlight. No Mac needed.
 # Run it from the Actions tab: TestFlight > Run workflow.
 #
 # Needs three repository secrets (Settings > Secrets and variables > Actions), from an
@@ -94,7 +94,7 @@ jobs:
       - name: Archive
         working-directory: ${{ runner.temp }}/xcode
         run: |
-          echo "Frog Quest+ $VERSION ($BUILD)"
+          echo "Frog Quest $VERSION ($BUILD)"
           xcodebuild -version
           # Unsigned here; "Sign the app" signs it for the App Store.
           xcodebuild archive -quiet \
@@ -164,5 +164,5 @@ jobs:
 
       - name: Summary
         run: |
-          echo "### Frog Quest+ $VERSION ($BUILD) uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Frog Quest $VERSION ($BUILD) uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
           echo "Apple takes 5 to 30 minutes to process it; then it shows up in App Store Connect > TestFlight and in the TestFlight app." >> "$GITHUB_STEP_SUMMARY"
