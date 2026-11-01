@@ -1,6 +1,6 @@
 FROG QUEST+ — PRIVACY POLICY
 
-Effective date: 11 May 2026
+Effective date: 1 November 2026
 
 This Privacy Policy describes how MUSE (“we”, “us”, “our”) handles information when you use the mobile application Frog Quest+ (the “App”). By using the App, you agree to this policy alongside our Terms of Use.
 
@@ -50,6 +50,6 @@ We may retain aggregated or de‑identified data that cannot reasonably identify
 We may revise this document. Updates appear in‑app alongside a new effective date. Continued play after revision constitutes acceptance unless law requires renewed consent steps.
 
 10. CONTACT
-Privacy questions concerning Frog Quest+ may be routed through the Developer contact options shown on our App Store product page (“Developer Website”, “Privacy Policy Link”, Support). If those fields are insufficient, cite “Frog Quest+ privacy enquiry” plus your locale.
+Privacy questions about Frog Quest+ can be sent through our support page, https://jasonmuse.github.io/frog-quest-support/support.html, where you can open a support request. Please mention “Frog Quest+ privacy enquiry” and your locale. Support requests are public, so please do not include personal details in them.
 
 END OF DOCUMENT
