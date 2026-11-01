@@ -293,8 +293,13 @@ func _frame_problem(texture: Texture2D, feet_to_center: float) -> String:
 			if found and first.a > 0.0:
 				solid[Vector2i(bx, by)] = true
 	for b: Vector2i in solid:
-		if not (solid.has(b + Vector2i(2, 0)) or solid.has(b - Vector2i(2, 0)) or solid.has(b + Vector2i(0, 2)) or solid.has(b - Vector2i(0, 2))):
+		var n := 0
+		for d in [Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]:
+			n += 1 if solid.has(b + d) else 0
+		if n == 0:
 			return "a lone speck at %s" % b
+		if n == 1 and b.y < feet_row - 2:
+			return "a one-block nub sticking out at %s" % b  # (his toes, on the feet row, are fine)
 	return "" if not solid.is_empty() else "empty"
 
 

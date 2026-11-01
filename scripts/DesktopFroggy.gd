@@ -1550,8 +1550,8 @@ func _solid_hat(path: String) -> Texture2D:
 ## single pixels sticking out of his outline, a notch under his belly, and different ones as he moved.
 ## So each frame is shrunk onto that grid first, lined up the way _process snaps him (whole game
 ## pixels from his feet): a block is solid when 2 or more of its 4 pixels are, in their commonest
-## colour; a block touching nothing side-on is a speck and goes; and nothing under his feet line is
-## kept. All 4 pixels of a block are then the same, so whichever one the shader picks, he looks right.
+## colour; lone specks and soft one-block nubs go; and nothing under his feet line is kept. All 4
+## pixels of a block are then the same, so whichever one the shader picks, he looks right.
 func _solid_frame(path: String) -> Texture2D:
 	var art := (load(path) as Texture2D).get_image()
 	if art.is_compressed():
@@ -1564,6 +1564,7 @@ func _solid_frame(path: String) -> Texture2D:
 	var start := Vector2i(posmod(w / 2, 2), posmod(feet_row, 2))
 	var corners := [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
 	var blocks := {}  # top-left art pixel -> colour
+	var ties := {}  # the blocks only 2 of whose 4 pixels are solid (the soft edge's)
 	for by in range(start.y - 2, feet_row, 2):
 		for bx in range(start.x - 2, w, 2):
 			var counts := {}
@@ -1585,16 +1586,40 @@ func _solid_frame(path: String) -> Texture2D:
 						most = int(counts[rgb])
 						best = rgb
 				blocks[Vector2i(bx, by)] = best
+				if solid == 2:
+					ties[Vector2i(bx, by)] = true
+	# A block touching nothing side-on is a speck. A soft-edge block (one that only just made it, on
+	# a tie) sticking out on its own, touching one other block, is a nub: the pixel poking up off his
+	# head while he naps, or out of his cheek. His toes stick out like that too, so the feet row's stay.
+	var specks := {}
+	for b: Vector2i in blocks:
+		if _side_neighbours(blocks, b) == 0:
+			specks[b] = true
+	for b: Vector2i in specks:
+		blocks.erase(b)
+	var feet_blocks := feet_row - 2  # the bottom row of blocks
+	var nubs := {}
+	for b: Vector2i in blocks:
+		if ties.has(b) and b.y < feet_blocks and _side_neighbours(blocks, b) == 1:
+			nubs[b] = true
+	for b: Vector2i in nubs:
+		blocks.erase(b)
 	var out := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
 	for b: Vector2i in blocks:
-		if not (blocks.has(b + Vector2i(2, 0)) or blocks.has(b - Vector2i(2, 0)) \
-				or blocks.has(b + Vector2i(0, 2)) or blocks.has(b - Vector2i(0, 2))):
-			continue  # a speck
 		for corner: Vector2i in corners:
 			var p: Vector2i = b + corner
 			if p.x >= 0 and p.y >= 0 and p.x < w and p.y < h:
 				out.set_pixelv(p, blocks[b])
 	return ImageTexture.create_from_image(out)
+
+
+## How many of a block's four side-on neighbours (2 art pixels away) are blocks too.
+static func _side_neighbours(blocks: Dictionary, b: Vector2i) -> int:
+	var n := 0
+	for d: Vector2i in [Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2)]:
+		if blocks.has(b + d):
+			n += 1
+	return n
 
 
 func _tint(color: Color, strength: float) -> ShaderMaterial:
