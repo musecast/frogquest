@@ -24,21 +24,46 @@ func _apply_layout() -> void:
 	if vp.x < 100.0 or vp.y < 100.0:
 		return
 	var is_portrait: bool = vp.y > vp.x * 1.3
-	var score_size := 80 if is_portrait else 34
-	var label_size := 44 if is_portrait else 16
-	var btn_min := Vector2(200, 64) if is_portrait else Vector2(80, 22)
-	# Apply horizontal margins so the container doesn't bleed to screen edges
-	var margin := 32.0 if is_portrait else 24.0
-	var half_w := vp.x * 0.5 - margin
-	# Zero out minimum sizes on text nodes so their natural text width cannot
-	# force the VBoxContainer to expand beyond the margins we set below.
-	# This is especially important when NewBadge is visible (new-high-score path).
+	# The room there is: in from the notch and the home indicator, and between the two banners when
+	# they're up (dual ads), with a little margin. The column fills it, centred.
+	var inset: Vector4 = AdsManager.get_viewport_safe_insets()
+	var top: float = maxf(inset.y, AdsManager.get_viewport_top_banner_clearance())
+	var bottom: float = maxf(inset.w, AdsManager.get_viewport_bottom_banner_clearance())
+	var margin := 16.0 if is_portrait else 10.0
+	var box: VBoxContainer = $MarginContainer
+	box.anchor_left = 0.0
+	box.anchor_top = 0.0
+	box.anchor_right = 1.0
+	box.anchor_bottom = 1.0
+	box.offset_left = inset.x + margin
+	box.offset_right = -(inset.z + margin)
+	box.offset_top = top + margin * 0.5
+	box.offset_bottom = -(bottom + margin * 0.5)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var room := Vector2(vp.x - inset.x - inset.z - margin * 2.0, vp.y - top - bottom - margin)
+	# Full size for the shape of the screen, then everything smaller together until it all fits
+	# the room (Endless is only 320 wide, and a foldable's inner screen is short for its width).
+	var fit := 1.0
+	for _try in 5:
+		_size_column(is_portrait, fit)
+		var need: Vector2 = box.get_combined_minimum_size()
+		var shrink := minf(room.x / maxf(need.x, 1.0), room.y / maxf(need.y, 1.0))
+		if shrink >= 1.0:
+			break
+		fit = maxf(0.2, fit * shrink * 0.97)
+
+
+## The column's sizes for portrait or landscape, times fit (1 is full size).
+func _size_column(is_portrait: bool, fit: float) -> void:
+	var score_size := maxi(8, roundi((80.0 if is_portrait else 34.0) * fit))
+	var label_size := maxi(8, roundi((44.0 if is_portrait else 16.0) * fit))
+	var btn_min := (Vector2(200, 64) if is_portrait else Vector2(80, 22)) * fit
+	# Zero out minimum sizes on text nodes so only their text decides how wide they are (the fit
+	# above measures that; NewBadge, on a new best, makes that row the widest).
 	$MarginContainer/ScoreDisplay.custom_minimum_size = Vector2(0, 0)
 	$MarginContainer/HighScoreRow.custom_minimum_size = Vector2(0, 0)
 	$MarginContainer/HighScoreRow/HighScoreDisplay.custom_minimum_size = Vector2(0, 0)
 	$MarginContainer/HighScoreRow/NewBadge.custom_minimum_size = Vector2(0, 0)
-	$MarginContainer.offset_left = -half_w
-	$MarginContainer.offset_right = half_w
 	$MarginContainer/ScoreDisplay.add_theme_font_size_override("font_size", score_size)
 	for label in [$MarginContainer/HighScoreRow/HighScoreDisplay,
 			$MarginContainer/HighScoreRow/NewBadge]:
@@ -61,11 +86,6 @@ func _apply_layout() -> void:
 	var rab := $MarginContainer.get_node_or_null("RemoveAdsButton")
 	if rab:
 		rab.add_theme_font_size_override("font_size", int(label_size * 0.6))
-	# Keep score / buttons inside the playable column when twin banner strips show (dual ads).
-	var top_pad_i := int(round(AdsManager.get_viewport_top_banner_clearance()))
-	var bottom_pad_i := int(round(AdsManager.get_viewport_bottom_banner_clearance()))
-	$MarginContainer.add_theme_constant_override("margin_top", top_pad_i)
-	$MarginContainer.add_theme_constant_override("margin_bottom", bottom_pad_i)
 
 
 func show_scores(score: int, high_score: int, is_new_record: bool) -> void:

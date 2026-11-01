@@ -1,0 +1,262 @@
+extends SceneTree
+## Headless check that the menus fit every screen shape the game meets (phones, foldables, iPads and
+## computers, upright and sideways): the Endless game over screen with every button it can have,
+## squeezed between both banners; the story's title screen, pause menu, settings and reset question
+## (in the whole world, over the bottom banner); and the Remove Ads, Muse account and wardrobe
+## screens. Nothing may hang off the screen or sit under a banner. Each screen is laid out in a
+## SubViewport the size the game's stretch settings (viewport, expand) would give that window. The
+## story climb saves to scratch files meanwhile, so yours is never touched.
+##   Godot --headless --path . --script res://tools/validate_layout_fit.gd
+
+const ENDLESS_BASE := Vector2(320, 180)  # EndlessMode.gd's content_scale_size
+const STORY_BASE := Vector2(480, 270)  # player.gd's
+const WINDOWS := {  # window sizes, in points
+	"phone upright": Vector2(390, 844),
+	"phone sideways": Vector2(844, 390),
+	"tall phone": Vector2(360, 800),
+	"small phone sideways": Vector2(667, 375),
+	"foldable inner upright": Vector2(1407, 2000),
+	"foldable inner sideways": Vector2(2000, 1407),
+	"iPad upright": Vector2(1024, 1366),
+	"iPad sideways": Vector2(1366, 1024),
+	"square": Vector2(1000, 1000),
+	"computer": Vector2(1280, 720),
+	"ultrawide": Vector2(2560, 1080),
+}
+const LONG_EMAIL := "someone.with.a.really.long.name@example.com"
+const SCRATCH_SAVE := "user://test_layout_save_game.save"
+const SCRATCH_WARDROBE := "user://test_layout_wardrobe.save"
+
+var _failures: Array[String] = []
+var _checked := 0  # buttons, labels and text boxes looked at
+
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+
+func _run() -> void:
+	var mm := root.get_node("MusicManager")
+	var acct := root.get_node("MuseAccount")
+	# Every button there can be: a crown (so the wardrobe button shows), and ads not removed.
+	var real_crown: int = mm.froggyCrown
+	var real_ads_removed: bool = mm.ads_removed
+	mm.froggyCrown = 1
+	mm.ads_removed = false
+	var signed_in := func(_screen: Node) -> void:
+		acct.email = LONG_EMAIL
+		acct._refresh_token = "test"
+		acct._pro = true
+		acct._pro_checked_at = acct._now()
+	var code_sent := func(screen: Node) -> void:
+		screen._sent_to = LONG_EMAIL
+		screen._show_state()
+	var real_session := [acct.email, acct._refresh_token, acct._pro, acct._pro_checked_at]
+
+	for shape in WINDOWS:
+		var window: Vector2 = WINDOWS[shape]
+		var endless_vp := _viewport_for(window, ENDLESS_BASE)
+		var story_vp := _viewport_for(window, STORY_BASE)
+		await _check_game_over(shape, endless_vp, window.y > window.x)
+		await _check_panel("%s, story: Remove Ads" % shape, load("res://scenes/RemoveAdsScreen.gd"), story_vp)
+		await _check_panel("%s, Endless: Remove Ads" % shape, load("res://scenes/RemoveAdsScreen.gd"), endless_vp)
+		await _check_panel("%s, story: wardrobe" % shape, load("res://scenes/WardrobeScreen.gd"), story_vp)
+		await _check_panel("%s, Endless: wardrobe" % shape, load("res://scenes/WardrobeScreen.gd"), endless_vp)
+		var muse: GDScript = load("res://scenes/MuseAccountScreen.gd")
+		await _check_panel("%s: Muse account" % shape, muse, story_vp)
+		await _check_panel("%s, Endless: Muse account" % shape, muse, endless_vp)
+		await _check_panel("%s: Muse account, code sent" % shape, muse, story_vp, code_sent)
+		await _check_panel("%s: Muse account, signed in" % shape, muse, story_vp, signed_in)
+		acct.email = real_session[0]
+		acct._refresh_token = real_session[1]
+		acct._pro = real_session[2]
+		acct._pro_checked_at = real_session[3]
+	await _check_story_menus()
+
+	mm.froggyCrown = real_crown
+	mm.ads_removed = real_ads_removed
+	root.get_node("AdsManager").test_banner_clearance = Vector2(-1.0, -1.0)
+	for _i in 3:
+		await process_frame
+	if _failures.is_empty():
+		print("Layout fit test passed (%d screen shapes, %d buttons and labels)." % [WINDOWS.size(), _checked])
+	else:
+		for failure in _failures:
+			push_warning("FAIL: " + failure)
+		printerr("Layout fit test failed (%d)." % _failures.size())
+	quit(1 if not _failures.is_empty() else 0)
+
+
+## The game over screen as it is at its fullest: a new best with a big score, "keep going (watch
+## ad)", the wardrobe crown and Remove Ads, with a banner at the top and the bottom.
+func _check_game_over(shape: String, vp: Vector2, upright: bool) -> void:
+	var banner := _banner_height(vp, upright)
+	root.get_node("AdsManager").test_banner_clearance = Vector2(banner + 6.0, banner + 6.0)
+	var view := _view(vp)
+	var endless: Node = load("res://scenes/EndlessMode.tscn").instantiate()
+	var screen: CanvasLayer = endless.get_node("GameOverScreen")
+	endless.remove_child(screen)
+	var run := Node.new()  # (stands in for EndlessMode: a run that can be revived)
+	var run_script := GDScript.new()
+	run_script.source_code = "extends Node\nfunc can_revive() -> bool:\n\treturn true\nfunc revive() -> void:\n\tpass\n"
+	run_script.reload()
+	run.set_script(run_script)
+	run.add_child(screen)
+	view.add_child(run)
+	screen.show_scores(12345, 67890, true)
+	var box: VBoxContainer = screen.get_node("MarginContainer")
+	var keep_going: Button = box.get_node_or_null("KeepGoingButton")
+	if keep_going == null:
+		keep_going = Button.new()
+		keep_going.name = "KeepGoingButton"
+		keep_going.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.add_child(keep_going)
+		box.move_child(keep_going, box.get_node("TryAgainButton").get_index())
+	keep_going.text = "KEEP GOING (WATCH AD)"  # (the long one, as on a phone with ads)
+	if box.get_node_or_null("RemoveAdsButton") == null:
+		var remove_ads := Button.new()
+		remove_ads.name = "RemoveAdsButton"
+		remove_ads.text = "Remove Ads"
+		remove_ads.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		box.add_child(remove_ads)
+		box.move_child(remove_ads, box.get_node("BottomRow").get_index() + 1)
+	screen._apply_layout()
+	for _i in 3:
+		await process_frame
+	_check_inside(box, Rect2(0.0, banner, vp.x, vp.y - banner * 2.0), "%s: game over" % shape)
+	view.queue_free()
+	endless.free()
+	await process_frame
+
+
+## The story's menus, in the whole world (Main.tscn) as the game has them, at every shape, with its
+## bottom banner up.
+func _check_story_menus() -> void:
+	var mm := root.get_node("MusicManager")
+	var ads := root.get_node("AdsManager")
+	var real_wardrobe: String = mm.wardrobe_path
+	mm.wardrobe_path = SCRATCH_WARDROBE
+	var view := _view(_viewport_for(WINDOWS["computer"], STORY_BASE))
+	var main: Node = load("res://scenes/Main.tscn").instantiate()
+	var player: Node = main.get_node("Player")
+	player.save_path = SCRATCH_SAVE
+	view.add_child(main)
+	await _frames(45)  # (the title gets laid out after half a second)
+	var title: CanvasLayer = player.get_node("titlescreen")
+	var pause: CanvasLayer = player.get_node("PauseScreen")
+	for shape in WINDOWS:
+		var window: Vector2 = WINDOWS[shape]
+		var vp := _viewport_for(window, STORY_BASE)
+		var banner := _banner_height(vp, window.y > window.x)
+		ads.test_banner_clearance = Vector2(0.0, banner + 6.0)  # (AdsManager adds 6 of breathing room)
+		var room := Rect2(0.0, 0.0, vp.x, vp.y - banner)
+		# (paused with the screen wider than tall, the game takes the banner down)
+		var pause_room := room if vp.x < vp.y else Rect2(Vector2.ZERO, vp)
+		view.size = Vector2i(vp)
+		pause.visible = false
+		title.visible = true
+		player._apply_ui_layout()
+		await _frames(3)
+		_check_inside(title, room, "%s: title screen" % shape)
+		title.visible = false
+		pause.visible = true  # (lays itself out)
+		await _frames(3)
+		_check_inside(pause, pause_room, "%s: pause menu" % shape)
+		player._on_settings_button_pressed()
+		await _frames(3)
+		_check_inside(pause, pause_room, "%s: settings" % shape)
+		player._on_reset_all_data_btn_pressed()  # (only asks; nothing's deleted unless YES)
+		await _frames(3)
+		_check_inside(pause, pause_room, "%s: delete all data?" % shape)
+		player._on_restart_no_pressed()
+		player._on_backfrom_settings_button_pressed()
+	pause.visible = false
+	ads.test_banner_clearance = Vector2(-1.0, -1.0)
+	view.queue_free()
+	await _frames(3)
+	for path in [SCRATCH_SAVE, SCRATCH_WARDROBE]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)
+	mm.wardrobe_path = real_wardrobe
+
+
+func _frames(n: int) -> void:
+	for _i in n:
+		await process_frame
+
+
+func _check_panel(what: String, script: GDScript, vp: Vector2, prepare := Callable()) -> void:
+	root.get_node("AdsManager").test_banner_clearance = Vector2(-1.0, -1.0)  # (these cover the banners)
+	var view := _view(vp)
+	var screen: CanvasLayer = script.new()
+	view.add_child(screen)
+	if prepare.is_valid():
+		prepare.call(screen)
+		if screen.has_method("_show_state"):
+			screen._show_state()
+	for _i in 4:
+		await process_frame
+	_check_inside(screen, Rect2(Vector2.ZERO, vp), what)
+	view.queue_free()
+	await process_frame
+
+
+## _expect_inside, and there was something to check (an empty screen would pass otherwise).
+func _check_inside(node: Node, room: Rect2, what: String) -> void:
+	var before := _checked
+	_expect_inside(node, room, what)
+	if _checked == before:
+		_failures.append("%s: nothing on screen to check" % what)
+
+
+## Every visible button and text box, and every label's words, under node lie inside room (a scroll
+## box counts as one: what scrolls inside it may go past its edges). 2 pixels of give, for the menus
+## that wobble.
+func _expect_inside(node: Node, room: Rect2, what: String) -> void:
+	for child in node.get_children():
+		if child is CanvasItem and not child.visible:
+			continue
+		if child is Control and (child is BaseButton or child is Label or child is LineEdit or child is ScrollContainer):
+			_checked += 1
+			var r: Rect2 = _words_rect(child) if child is Label else child.get_global_rect()
+			if not room.grow(2.0).encloses(r):
+				_failures.append("%s: %s \"%s\" at %s is outside %s" % [what, child.name,
+					str(child.get("text")).left(24).replace("\n", " "), r, room])
+				return
+			if child is ScrollContainer:
+				continue
+		_expect_inside(child, room, what)
+
+
+## Where a label's words are: its box can be far wider than they are, with them anywhere in it.
+func _words_rect(label: Label) -> Rect2:
+	var r := label.get_global_rect()
+	if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		return r
+	var words := label.get_minimum_size() * label.get_global_transform().get_scale()
+	words = Vector2(minf(words.x, r.size.x), minf(words.y, r.size.y))
+	var x: float = r.position.x + (r.size.x - words.x) * [0.0, 0.5, 1.0, 0.0][label.horizontal_alignment]
+	var y: float = r.position.y + (r.size.y - words.y) * [0.0, 0.5, 1.0, 0.0][label.vertical_alignment]
+	return Rect2(x, y, words.x, words.y)
+
+
+## A banner's height in viewport pixels: adaptive banners are about 50 points tall (90 on an iPad).
+static func _banner_height(vp: Vector2, upright: bool) -> float:
+	return vp.y * (0.09 if upright else 0.13)
+
+
+func _view(size: Vector2) -> SubViewport:
+	var view := SubViewport.new()
+	view.size = Vector2i(size)
+	view.disable_3d = true
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	root.add_child(view)
+	return view
+
+
+## The viewport a window gets with stretch mode "viewport" and aspect "expand" on base.
+static func _viewport_for(window: Vector2, base: Vector2) -> Vector2:
+	var aspect := window.x / window.y
+	if aspect >= base.x / base.y:
+		return Vector2(roundf(base.y * aspect), base.y)
+	return Vector2(base.x, roundf(base.x / aspect))

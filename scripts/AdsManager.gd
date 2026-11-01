@@ -349,6 +349,9 @@ var _bottom_placeholder: Control
 
 signal ads_removed_changed
 
+## (tools/validate_layout_fit.gd: pretend banners take this much room, top and bottom; -1 is real.)
+var test_banner_clearance := Vector2(-1.0, -1.0)
+
 
 ## Layer for title / HUD that must draw above the in-engine banner placeholder.
 func canvas_layer_above_banner_placeholder() -> int:
@@ -380,6 +383,8 @@ func get_viewport_safe_insets() -> Vector4:
 
 ## Viewport pixels to leave clear above the bottom edge when a bottom banner is active.
 func get_viewport_bottom_banner_clearance() -> float:
+	if test_banner_clearance.y >= 0.0:
+		return test_banner_clearance.y
 	if not _ads_active or not _banner_show_bottom or not _native_bottom_banner_loaded:
 		return 0.0
 	return _bottom_banner_reserved_height() + 6.0
@@ -387,6 +392,8 @@ func get_viewport_bottom_banner_clearance() -> float:
 
 ## Viewport pixels to reserve below the top edge when a top banner is active (e.g. game over dual ads).
 func get_viewport_top_banner_clearance() -> float:
+	if test_banner_clearance.x >= 0.0:
+		return test_banner_clearance.x
 	if not _ads_active or not _banner_show_top or not _native_top_banner_loaded:
 		return 0.0
 	return _top_banner_reserved_height() + 6.0

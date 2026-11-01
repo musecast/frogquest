@@ -6,7 +6,6 @@ var _main_panel: VBoxContainer
 var _passcode_panel: VBoxContainer
 var _code_input: LineEdit
 var _status_label: Label
-var _resize_timer: SceneTreeTimer = null
 var _panel: PanelContainer = null
 var _secret_tap_count := 0
 
@@ -21,8 +20,7 @@ const BLACK := Color(0.0, 0.0, 0.0, 1.0)
 func _ready() -> void:
 	layer = 20
 	_build_ui()
-	_apply_scale()
-	get_viewport().size_changed.connect(_on_viewport_resized)
+	_fit()
 
 
 func _build_ui() -> void:
@@ -33,10 +31,6 @@ func _build_ui() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
-
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
 
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.13, 0.10, 0.08, 0.97)
@@ -50,9 +44,8 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", panel_style)
-	panel.custom_minimum_size = Vector2(280, 0)
 	_panel = panel
-	center.add_child(panel)
+	add_child(panel)  # (placed by _fit)
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -230,40 +223,24 @@ func _make_button(label_text: String, fibberish: Font) -> Button:
 	return btn
 
 
-func _apply_scale() -> void:
-	if _panel == null or not is_inside_tree():
-		return
+func _process(_delta: float) -> void:
+	_fit()
 
+
+## Centres the panel and shrinks it, all together, when the screen is too short or narrow for it
+## (every frame, since wrapped text settles a frame late).
+func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
-	var is_portrait: bool = vp.y > vp.x * 1.3
-	if is_portrait:
-		_panel.scale = Vector2(1.0, 1.0)
-		_panel.custom_minimum_size = Vector2(vp.x * 0.82, 0)
-	else:
-		_panel.scale = Vector2(1.0, 1.0)
-		_panel.custom_minimum_size = Vector2(vp.x * 0.38, 0)
-		call_deferred("_fit_landscape_height", vp)
-
-
-func _fit_landscape_height(vp: Vector2) -> void:
-	if _panel == null or not is_inside_tree():
+	if _panel == null or vp.x < 50.0 or vp.y < 50.0:
 		return
-	var panel_h: float = _panel.size.y
-	if panel_h <= 0.0:
-		return
-	var max_h: float = vp.y * 0.88
-	if panel_h > max_h:
-		var sc: float = max_h / panel_h
-		_panel.pivot_offset = _panel.size / 2.0
-		_panel.scale = Vector2(sc, sc)
-
-
-func _on_viewport_resized() -> void:
-	if not is_inside_tree():
-		return
-	_resize_timer = get_tree().create_timer(0.15)
-	await _resize_timer.timeout
-	_apply_scale()
+	var portrait := vp.y > vp.x * 1.3
+	var zoom := 1.4 if portrait else 1.0  # (upright on a phone: laid out narrower, shown bigger)
+	_panel.custom_minimum_size = Vector2(vp.x * (0.82 if portrait else 0.38) / zoom, 0)
+	var need := _panel.get_combined_minimum_size()
+	var s := minf(zoom, minf(vp.x * 0.96 / need.x, vp.y * 0.94 / need.y))
+	_panel.size = need
+	_panel.scale = Vector2(s, s)
+	_panel.position = (vp - need * s) / 2.0
 
 
 func _on_buy_pressed() -> void:

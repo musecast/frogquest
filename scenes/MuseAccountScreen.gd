@@ -15,7 +15,6 @@ const RED := Color(1.0, 0.6, 0.5)
 const BLACK := Color(0.0, 0.0, 0.0, 1.0)
 
 var _font: Font
-var _center: CenterContainer
 var _panel: PanelContainer
 var _body: Label
 var _pro_note: Label
@@ -26,15 +25,13 @@ var _status: Label
 var _buttons: Array[Button] = []
 var _sent_to := ""  # where the code went, between "Email Me a Code" and "Sign In"
 var _busy := false
-var _resize_timer: SceneTreeTimer = null
 
 
 func _ready() -> void:
 	layer = 60  # over the title screen (layer 58) and Remove Ads
 	_build_ui()
 	_show_state()
-	_apply_scale()
-	get_viewport().size_changed.connect(_on_viewport_resized)
+	_fit()
 	MuseAccount.changed.connect(_show_state)
 
 
@@ -47,10 +44,6 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
 
-	_center = CenterContainer.new()
-	_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(_center)
-
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.13, 0.10, 0.08, 0.97)
 	panel_style.set_border_width_all(2)
@@ -58,8 +51,7 @@ func _build_ui() -> void:
 	panel_style.set_corner_radius_all(8)
 	_panel = PanelContainer.new()
 	_panel.add_theme_stylebox_override("panel", panel_style)
-	_panel.custom_minimum_size = Vector2(280, 0)
-	_center.add_child(_panel)
+	add_child(_panel)  # (placed by _fit)
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
@@ -214,16 +206,30 @@ func _say(problem: String) -> void:
 
 
 func _process(_delta: float) -> void:
-	# On a phone, lift the panel so what you're typing (and Sign In) stays above the keyboard.
-	var lift := 0.0
+	_fit()
+
+
+## Centres the panel and shrinks it, all together, when the screen is too short or narrow for it
+## (every frame: wrapped text settles a frame late, and the keyboard comes and goes). On a phone it
+## also lifts it so what you're typing, and the button under it, stay above the keyboard.
+func _fit() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	if vp.x < 50.0 or vp.y < 50.0:
+		return
+	var portrait := vp.y > vp.x * 1.3
+	var zoom := 1.4 if portrait else 1.0  # (upright on a phone: laid out narrower, shown bigger)
+	_panel.custom_minimum_size = Vector2(vp.x * (0.82 if portrait else 0.42) / zoom, 0)
+	var need := _panel.get_combined_minimum_size()
+	var s := minf(zoom, minf(vp.x * 0.96 / need.x, vp.y * 0.94 / need.y))
+	_panel.size = need
+	_panel.scale = Vector2(s, s)
+	var pos := (vp - need * s) / 2.0
 	var keyboard := float(DisplayServer.virtual_keyboard_get_height())
 	if keyboard > 0.0 and _input.visible and _input.has_focus():
-		var vp := get_viewport().get_visible_rect().size
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
-		var resting_bottom := _primary.get_global_rect().end.y - _center.position.y
-		lift = maxf(0.0, resting_bottom + 8.0 - keyboard_top)
-	if not is_equal_approx(_center.position.y, -lift):
-		_center.position.y = -lift
+		var primary_bottom := (_panel.get_global_transform().affine_inverse() * _primary.get_global_rect().end).y
+		pos.y -= maxf(0.0, pos.y + primary_bottom * s + 8.0 - keyboard_top)
+	_panel.position = pos
 
 
 func _label(text: String, font_size: int, color: Color, outline: int) -> Label:
@@ -267,32 +273,3 @@ func _button(text: String, on_press: Callable) -> Button:
 	btn.pressed.connect(on_press)
 	_buttons.append(btn)
 	return btn
-
-
-func _apply_scale() -> void:
-	if _panel == null or not is_inside_tree():
-		return
-	var vp := get_viewport().get_visible_rect().size
-	_panel.scale = Vector2.ONE
-	if vp.y > vp.x * 1.3:
-		_panel.custom_minimum_size = Vector2(vp.x * 0.82, 0)
-	else:
-		_panel.custom_minimum_size = Vector2(vp.x * 0.42, 0)
-		_fit_landscape_height.call_deferred(vp)
-
-
-func _fit_landscape_height(vp: Vector2) -> void:
-	if _panel == null or not is_inside_tree() or _panel.size.y <= 0.0:
-		return
-	var max_h: float = vp.y * 0.92
-	if _panel.size.y > max_h:
-		_panel.pivot_offset = _panel.size / 2.0
-		_panel.scale = Vector2.ONE * (max_h / _panel.size.y)
-
-
-func _on_viewport_resized() -> void:
-	if not is_inside_tree():
-		return
-	_resize_timer = get_tree().create_timer(0.15)
-	await _resize_timer.timeout
-	_apply_scale()
