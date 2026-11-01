@@ -10,6 +10,7 @@ const DESKTOP_FROG_SCENE_PATH := "res://scenes/DesktopFrog.tscn"
 const BACKGROUND := Color(0.05, 0.05, 0.08)  # the title screen's dark, same as the boot splash
 const HOPPER_AFTER := 1.2  # seconds of loading before the hopping frog shows up
 const HOP_TIME := 0.55
+const REVEAL_TIME := 0.35  # the world fading in around the logo
 
 var _started_at := 0.0
 var _loading := false
@@ -17,7 +18,9 @@ var _loading_failed := false
 var _swap_queued := false
 var _thread_progress := []
 
+var _bg: ColorRect
 var _title: Sprite2D
+var _glow: Sprite2D
 var _hopper: Sprite2D
 var _status_label: Label
 
@@ -53,25 +56,25 @@ func _process(_delta: float) -> void:
 func _build_ui() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	var bg := ColorRect.new()
-	bg.color = BACKGROUND
-	bg.z_index = -10  # under the logo's glow, which sits a layer behind the logo
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	_bg = ColorRect.new()
+	_bg.color = BACKGROUND
+	_bg.z_index = -10  # under the logo's glow, which sits a layer behind the logo
+	_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(_bg)
 
 	# The title logo the way player.tscn builds it: wobbling logo, swinging glow, faint frog behind.
 	_title = Sprite2D.new()
 	_title.texture = load(MuseAccount.logo_path())  # (FROG QUEST+ with Muse Pro)
 	_title.set_script(load("res://scenes/Titlewobble.gd"))
 	add_child(_title)
-	var glow := Sprite2D.new()
-	glow.texture = load("res://assets/shinelight.png")
-	glow.self_modulate = Color(1.0, 0.6913348, 0.21188655)
-	glow.z_index = -1
-	glow.scale = Vector2(0.927, 0.518)
-	glow.set_script(load("res://scenes/point_light_2d.gd"))
-	_title.add_child(glow)
+	_glow = Sprite2D.new()
+	_glow.texture = load("res://assets/shinelight.png")
+	_glow.self_modulate = Color(1.0, 0.6913348, 0.21188655)
+	_glow.z_index = -1
+	_glow.scale = Vector2(0.927, 0.518)
+	_glow.set_script(load("res://scenes/point_light_2d.gd"))
+	_title.add_child(_glow)
 	var shadow_frog := Sprite2D.new()
 	shadow_frog.texture = load("res://assets/frog.png")
 	shadow_frog.modulate = Color(0.0, 0.0, 0.0, 0.22352941)
@@ -149,9 +152,9 @@ func _poll_threaded_load() -> void:
 		_fail_startup("BootLoader: failed to load %s" % MAIN_SCENE_PATH)
 
 
-## The world goes in underneath while the logo stays on top for a few frames (its very first frame,
-## before the title screen has arranged itself, never shows); then the logo lifts off and the title
-## screen's own logo is sitting in exactly the same spot.
+## The world goes in underneath while the logo stays on top (its very first frame, before the title
+## screen has arranged itself, never shows); then the world fades in around the logo, and the logo
+## lifts off with the title screen's own one under it, in the same spot and wobbling in step.
 func _start_scene(packed: PackedScene) -> void:
 	if _swap_queued or _loading_failed or not is_inside_tree():
 		return
@@ -167,8 +170,17 @@ func _start_scene(packed: PackedScene) -> void:
 	tree.root.add_child(main)
 	tree.current_scene = main
 	_trace("BootLoader scene swap world added")
+	var their_logo := main.get_node_or_null("Player/titlescreen/Title")
+	if their_logo:
+		their_logo.set("heartoffset", _title.get("heartoffset"))
+		var their_glow := their_logo.get_node_or_null("PointLight2D")
+		if their_glow:
+			their_glow.set("heartoffset", _glow.get("heartoffset"))
 	for i in 4:
 		await tree.process_frame
+	var reveal := create_tween()
+	reveal.tween_property(_bg, "modulate:a", 0.0, REVEAL_TIME).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	await reveal.finished
 	cover.queue_free()
 
 

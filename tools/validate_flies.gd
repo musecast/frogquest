@@ -92,9 +92,14 @@ func _solid(tm: TileMap, cell: Vector2i) -> bool:
 		if not tm.is_layer_enabled(layer):
 			continue
 		var td := tm.get_cell_tile_data(layer, cell)
-		if td and td.get_collision_polygons_count(0) > 0:
+		if td and (td.get_collision_polygons_count(0) > 0 or _buried_wall(td)):
 			return true
 	return false
+
+
+## A wall tile buried in the tree (tools/thin_tilemap_collision.gd took its collision: nothing reaches it).
+func _buried_wall(td: TileData) -> bool:
+	return td.has_custom_data("buried_twin_of") and int(td.get_custom_data("buried_twin_of")) > 0
 
 
 func _expect(ok: bool, what: String) -> void:

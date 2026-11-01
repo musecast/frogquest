@@ -73,9 +73,11 @@ Before uploading, run this from the project root on the machine that has Godot:
 
 ```sh
 Godot --headless --path . --script res://tools/validate_app_store_release.gd
+Godot --headless --path . --script res://tools/validate_level.gd
+Godot --headless --path . --script res://tools/validate_layout_fit.gd
 ```
 
-Do not upload while it reports any **BLOCKER**. The current repo has the live iOS AdMob app ID, banner unit, interstitial unit, and hosted privacy policy URL wired.
+Do not upload while it reports any **BLOCKER**. `validate_level` fails after the level's been painted until `tools/thin_tilemap_collision.gd` is run again: buried wall tiles carry no collision, and the drop shadow hidden under solid wall is parked in a switched-off layer, so the world loads fast and light on a phone. `validate_layout_fit` fails if any menu runs off any screen shape or under a banner. The current repo has the live iOS AdMob app ID, banner unit, interstitial unit, and hosted privacy policy URL wired.
 
 `ComplianceConfig.APP_STORE_PRIVACY_POLICY_URL` is set to the hosted policy URL above. App Store Connect still needs that same public HTTPS URL pasted into the app metadata.
 
@@ -83,11 +85,12 @@ For the App Privacy answers, include the data collected by Google AdMob and Appl
 
 ### ATT / tracking (targeted ads)
 
-Frog Quest+ requests App Tracking Transparency permission through Google's UMP SDK so AdMob can serve targeted ads to players who allow it.
+Frog Quest requests App Tracking Transparency permission through Google's UMP SDK so AdMob can serve targeted ads to players who allow it.
 
 1. **Confirm the prompt before every upload**: delete the app (or reset Settings → Privacy & Security → Tracking), install the build, launch it, and check that the IDFA explainer appears followed by Apple's "Allow … to track your activity" alert. No alert means the AdMob IDFA message isn't published yet. Fix that before uploading, or App Review will reject the build again.
 2. **App Privacy answers**: **done and published.** **Device ID** and **Advertising Data** are marked **used for tracking**, so the label now has "Data Used to Track You: Identifiers, Usage Data". The rest was already declared, linked but not tracking: Purchase History, Product Interaction, Coarse Location, Performance Data, Crash Data. Recheck it if you add or remove SDKs. The Godot export privacy settings match: `privacy/tracking_enabled=true`, with `device_id` and `advertising_data` marked `used_for_tracking=true`.
-3. **Review notes**: you can add "Frog Quest+ shows Apple's App Tracking Transparency prompt on first launch, after a short explainer, before any ads load."
+3. **Review notes**: you can add "Frog Quest shows Apple's App Tracking Transparency prompt on first launch, after a short explainer, before any ads load."
+4. **Muse account (to do before the next App Store submission)**: the optional sign-in sends the player's email to the Muse account service. In App Privacy add **Contact Info → Email Address**: App Functionality, linked to the user, not used for tracking (the export preset already declares it: `privacy/collected_data/email_address`). In the review notes say sign-in is optional, uses an existing Muse account (made in Muse Shelf), and only adds Frog Quest+ for Muse Pro members (the + on the logo, no ads); the whole game plays without it, and Remove Ads is sold in the app.
 
 Players who tap **Ask App Not to Track** still get ads, just not targeted ones. The privacy policy already covers advertising identifiers "subject to consent" and the iOS Tracking setting.
 
