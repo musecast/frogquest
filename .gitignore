@@ -5,3 +5,6 @@
 web/
 windowsbuild/
 itch/
+
+# Python bytecode from the CI scripts
+__pycache__/
