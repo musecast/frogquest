@@ -9,6 +9,9 @@
 #
 # The version (1.1) comes from the iOS export preset. The build number is one above the highest build already
 # in App Store Connect (and at least 2 + this workflow's run number), so every run uploads a new, higher build.
+#
+# Built with Xcode 27.1: only apps linked against the iOS 27.1 SDK use the whole inner display on iPhone Duo
+# (older SDKs run in a smaller window, or leave a strip by the status bar).
 
 name: TestFlight
 
@@ -20,15 +23,22 @@ concurrency:
 
 jobs:
   ios:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     env:
       GODOT_VERSION: "4.7.1"
+      XCODE_APP: /Applications/Xcode_27.1.app
       PROJECT: Frog Quest FOREVER
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Use Xcode 27.1
+        run: |
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
 
       - name: Check the App Store Connect key
         env:
@@ -137,7 +147,13 @@ jobs:
           # altool looks for AuthKey_<key id>.p8 in a few fixed folders.
           mkdir -p ~/.appstoreconnect/private_keys
           cp "$ASC_KEY_PATH" ~/.appstoreconnect/private_keys/
-          xcrun altool --upload-app --type ios --file "$IPA" --apiKey "$key_id" --apiIssuer "$issuer_id"
+          # --upload-app is the deprecated form; --upload-package is the newer one, in case a new Xcode drops the old.
+          if ! xcrun altool --upload-app --type ios --file "$IPA" --apiKey "$key_id" --apiIssuer "$issuer_id"; then
+            echo "::warning::altool --upload-app failed; trying --upload-package"
+            xcrun altool --upload-package "$IPA" --type ios --apple-id "$APP_APPLE_ID" \
+              --bundle-id com.muse.frogquest --bundle-version "$BUILD" --bundle-short-version-string "$VERSION" \
+              --apiKey "$key_id" --apiIssuer "$issuer_id"
+          fi
           echo "UPLOADED=1" >> "$GITHUB_ENV"
 
       - name: Clean up signing

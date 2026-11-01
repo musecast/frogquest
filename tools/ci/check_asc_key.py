@@ -3,7 +3,7 @@
 #   $RUNNER_TEMP/private_keys/AuthKey_<KEY_ID>.p8 (the name Apple's tools look for), path in $ASC_KEY_PATH.
 # - Says what a wrong value looks like (a Key ID, an Issuer ID, a file name...) without ever printing it.
 # - Signs in to the App Store Connect API with it, so a bad key fails in seconds, not after a 20 minute build.
-# - Writes BUILD (one above anything already uploaded, and at least 2 + the run number) to $GITHUB_ENV.
+# - Writes BUILD (one above anything already uploaded, and at least 2 + the run number) and APP_APPLE_ID to $GITHUB_ENV.
 import base64, os, re, subprocess, sys
 
 from asc_api import Api, ApiError
@@ -88,6 +88,6 @@ uploaded = [int(b["attributes"]["version"]) for b in builds if str(b["attributes
 highest = max(uploaded, default=0)
 build = max(2 + int(os.environ.get("GITHUB_RUN_NUMBER", "1")), highest + 1)
 with open(os.environ["GITHUB_ENV"], "a") as f:
-    f.write("BUILD=%d\nASC_KEY_PATH=%s\n" % (build, key_path))
+    f.write("BUILD=%d\nASC_KEY_PATH=%s\nAPP_APPLE_ID=%s\n" % (build, key_path, app["id"]))
 print("Key works: %s (%s). Highest build already uploaded: %d. This run uploads build %d."
       % (app["attributes"]["name"], BUNDLE_ID, highest, build))

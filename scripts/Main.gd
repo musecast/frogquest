@@ -29,7 +29,8 @@ func _supports_desktop_mouse() -> bool:
 func _ready():
 	_trace("Main ready start")
 	
-	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
+	# Any orientation: portrait on a phone (or a closed iPhone Duo) gets the portrait layouts and camera.
+	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR)
 	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
 	get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
 	
