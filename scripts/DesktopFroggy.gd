@@ -47,8 +47,8 @@ const HEART := [".##.##.", "#######", "#######", ".#####.", "..###..", "...#..."
 const GAME_UNITS_PER_PX := 0.912
 const GRAVITY := 980.0 / GAME_UNITS_PER_PX
 # From his middle down to the bottom of his feet row, the lowest row the game's chunky pixels show
-# (PIXEL_BLOCK keeps the even rows of his art, so his face looks the way it does in the game; the
-# odd row under the feet, and the faint shading under that, never get drawn: see _solid_frame).
+# (his frames are redrawn on the PIXEL_BLOCK grid lined up with this, and nothing under it is drawn:
+# see _solid_frame).
 const FEET_TO_CENTER := 13.0
 const HALF_W := 15.0
 const HEIGHT := 30.0
@@ -57,6 +57,7 @@ const MOUTH_Y := -5.0
 const TONGUE_REACH := 48.0
 const AIM_SENSITIVITY := 3.5  # the game's (Trajectory.gd): jump speed per pixel pulled back
 const AIM_ROOM := Vector2(170.0, 132.0)  # pull room for a full-strength game jump, sideways and down (sprite px)
+const AIM_GAIN_MOST := 5.0  # by a screen edge, each pixel of pull counts for up to this many (see _start_aim)
 
 const HOLD_TO_GRAB_MSEC := 450  # holding still on him picks him up (pulling back is a jump)
 const HAT_CHANCE := 0.05  # your hat's a rare find in the game, and rarer still out here
@@ -71,6 +72,7 @@ var flies_eaten := 0
 # Muse Penguin's penguins out on this screen with him (DesktopFrog.gd hears where they are): x is a
 # penguin's middle and y its feet, in window pixels; {id, name, x, y, w, h, state}.
 var penguins: Array = []
+var tucked_away := false  # hiding after a hard mouse shake (or with the penguins): he comes back out
 
 var feet := Vector2.ZERO  # bottom-centre of froggy
 var vel := Vector2.ZERO
@@ -80,7 +82,9 @@ var _seq := 0  # bumped whenever whatever he was doing gets cut short
 var _busy := false  # an action is running, so the brain waits
 var _aim := Vector2.ZERO  # how far you've pulled him back, sprite pixels
 var _aim_from := Vector2.ZERO  # where the pull is measured from (window pixels)
-var _aim_shift := Vector2.ZERO  # how far the pointer was moved up out of the way for this pull
+var _gain_left := 1.0  # how much each pixel of pull counts, pulling left / right / down (see _start_aim)
+var _gain_right := 1.0
+var _gain_down := 1.0
 var _yours_until := 0  # after you've made him jump, his own ideas wait a moment (msec)
 var _idle_left := 0.0
 var _state_left := 0.0
@@ -236,17 +240,58 @@ func take_musiverse_events() -> Array:
 	return events
 
 
-## Something a penguin did to him: so far, waving hello.
+## Something a penguin did to him: waved hello (greet), came over to visit, or brought him a fish.
 func musiverse_event(ev: Dictionary) -> void:
-	if str(ev.get("type", "")) != "greet" or state in [State.HIDDEN, State.NAP]:
+	var type := str(ev.get("type", ""))
+	if not (type in ["greet", "visit", "fish"]) or state == State.HIDDEN:
 		return
 	var pal := _penguin(str(ev.get("from", "")))
 	if pal.is_empty():
 		return
+	if type == "fish":
+		# (a fish wakes him right up, and beats whatever he was about to do)
+		if state in [State.IDLE, State.LAND, State.NAP] and not _pressing:
+			_run(&"take_fish", pal)
+		else:
+			_add_heart()
+		return
+	if state == State.NAP:
+		return  # (let him sleep)
 	if state == State.IDLE and not _busy and Time.get_ticks_msec() >= _yours_until:
 		_run(&"wave_back", pal)
 	else:
 		_add_heart()  # (busy, but he saw)
+
+
+## A hard mouse shake (or the penguins hiding): he's blown off the screen the way you shook (dir
+## -1 left, 1 right, 0: whichever edge is nearer). He stays hidden until come_back_out().
+func shake_away(dir: float) -> void:
+	if tucked_away or state == State.HELD:
+		return  # (already gone; or you've got hold of him, and the shake is you shaking HIM)
+	tucked_away = true
+	if state == State.HIDDEN:
+		return
+	_interrupt()  # (aiming, napping, half way through a hop: everything stops)
+	if dir == 0.0:
+		dir = -1.0 if feet.x < room.x * 0.5 else 1.0
+	_walls = false
+	_floor_override = room.y * 100.0  # (nothing to land on until he's off the screen)
+	vel = Vector2(dir * 1500.0, -620.0) * px
+	_spin_left = dir * TAU * 1.5
+	_spin_speed = dir * TAU * 4.0  # (same sign as _spin_left, see _step_air)
+	_sfx("hop", -10.0, 1.6)
+	_set_air()
+
+
+## Out of hiding again (another shake, the penguins coming out, or "Come here!"): he drops back in
+## from the top, at x (or anywhere, for -1), after a moment to make sure the coast is clear.
+func come_back_out(x := -1.0) -> void:
+	if not tucked_away:
+		return
+	tucked_away = false
+	await get_tree().create_timer(randf_range(0.35, 0.9)).timeout
+	if not tucked_away:
+		drop_in(x)
 
 
 ## Froggy doesn't talk (he doesn't in Frog Quest either), so there's never a bubble.
@@ -402,8 +447,8 @@ func _step_air(delta: float) -> void:
 		if vel.y < 0.0 and feet.y < HEIGHT * px:
 			feet.y = HEIGHT * px
 			vel.y = -vel.y * 0.35
-	elif feet.x < -40.0 * px or feet.x > room.x + 40.0 * px:
-		_vanish()  # hopped off the edge of the screen
+	elif feet.x < -40.0 * px or feet.x > room.x + 40.0 * px or feet.y > room.y + 160.0 * px:
+		_vanish()  # hopped (or got blown) off the edge of the screen
 		return
 	if vel.y > 0.0 and feet.y >= _floor():
 		feet.y = _floor()
@@ -558,6 +603,7 @@ func _run(action: StringName, arg: Variant = null) -> void:
 		&"see_penguin": await _act_see_penguin(s, arg)
 		&"leapfrog": await _act_leapfrog(s, arg)
 		&"wave_back": await _act_wave_back(s)
+		&"take_fish": await _act_take_fish(s, arg)
 	if s == _seq:
 		_busy = false
 		_settle()
@@ -565,7 +611,7 @@ func _run(action: StringName, arg: Variant = null) -> void:
 
 func _interrupt() -> void:
 	if state == State.AIM:
-		_end_aim_pointer()  # (never leave the pointer hidden)
+		_end_aim_pointer()  # (the normal pointer back)
 	_seq += 1
 	_busy = false
 	_exit_edge = INF
@@ -885,7 +931,8 @@ func _vanish() -> void:
 	vel = Vector2.ZERO
 	_rig.visible = false
 	_sfx("pop", -14.0)
-	left.emit()
+	if not tucked_away:
+		left.emit()  # (gone for good: home, or bye; hiding after a shake, he's still around)
 
 
 # ── Muse Penguin's penguins (the musiverse) ───────────────────────────────
@@ -927,6 +974,34 @@ func _act_leapfrog(s: int, pal: Dictionary) -> void:
 	var land := clampf(2.0 * float(pal.x) - feet.x, HALF_W * px, room.x - HALF_W * px)
 	if await _leap_to(Vector2(land, _floor()), clampf(up, 300.0, 700.0), s, 700.0):
 		await _wait(randf_range(0.4, 0.9))
+
+
+## A penguin held out a fish: he turns to it and snaps it up with his tongue, like a fly (but much
+## bigger, so: a happy hop after).
+func _act_take_fish(s: int, pal: Dictionary) -> void:
+	# (the penguin faces him, holding the fish out in front of its head: on his side of it)
+	var side := _side_of(pal)
+	var fish := Vector2(float(pal.x) + side * float(pal.w) * 0.35, float(pal.y) - float(pal.h) * 0.7)
+	if fish.distance_to(_mouth()) > TONGUE_REACH * px:
+		fish = _mouth() + (fish - _mouth()).limit_length(TONGUE_REACH * px)
+	await _wait(0.15)
+	if s != _seq:
+		return
+	_tongue_t = 0.0
+	_tongue_hit = true
+	_tongue_to = fish
+	await _wait(0.3)
+	if s != _seq:
+		return
+	_sfx("gulp", -18.0, 1.1)
+	_squash = Vector2(1.2, 0.85)
+	affection += 1
+	_add_heart()
+	await _wait(0.4)
+	if s != _seq:
+		return
+	_add_heart()
+	await _jump(Vector2(0.0, -230.0), 0.06, s)
 
 
 ## A penguin came over to wave: hearts, and a happy hop for them.
@@ -1038,23 +1113,38 @@ func _start_aim() -> void:
 	_sfx("grab", -14.0)
 	_aim = Vector2.ZERO
 	_aim_from = _press_at
-	_aim_shift = Vector2.ZERO
 	Input.set_custom_mouse_cursor(load("res://assets/cursorclosed.png"))
-	if not track_os_cursor:
-		return
-	# Down on the bottom of the screen there's nowhere to pull back to, so (like the game's cursor
-	# lock) the pointer hides and moves up out of the way, and the pull carries on from there.
+	# Down on the bottom of the screen there's hardly any room to pull back, so in a cramped direction
+	# each pixel of pull counts for more: pulling to the edge of the screen is a full-strength jump.
+	# (It used to hide the pointer and move it up out of the way, which felt like the mouse jumped.)
 	var need := AIM_ROOM * px
-	var to := cursor
-	to.y = maxf(minf(to.y, room.y - need.y), 8.0)
-	to.x = clampf(to.x, minf(need.x, room.x * 0.5), maxf(room.x - need.x, room.x * 0.5))
-	if to.distance_to(cursor) > 1.0:
-		_aim_shift = to - cursor
-		_aim_from += _aim_shift
-		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
-		Input.warp_mouse(to)
-		cursor = to
-		_last_cursor = to
+	var reach := _pointer_reach(_aim_from)
+	_gain_left = _aim_gain(need.x, _aim_from.x - reach.position.x)
+	_gain_right = _aim_gain(need.x, reach.end.x - _aim_from.x)
+	_gain_down = _aim_gain(need.y, reach.end.y - _aim_from.y)
+
+
+## Where the pointer can go from p, in window pixels: along his row across every screen side by side,
+## and down to the bottom of his own screen (over the taskbar too: the pointer can go there, he can't).
+func _pointer_reach(p: Vector2) -> Rect2:
+	if not track_os_cursor:
+		return Rect2(Vector2.ZERO, room)
+	var origin := Vector2(get_window().position)
+	var at := p + origin
+	var reach := Rect2(at, Vector2.ZERO)
+	for screen in DisplayServer.get_screen_count():
+		var r := Rect2(Vector2(DisplayServer.screen_get_position(screen)), Vector2(DisplayServer.screen_get_size(screen)))
+		if at.y >= r.position.y and at.y < r.end.y:
+			reach = reach.merge(Rect2(r.position.x, at.y, r.size.x, 0.0))
+		if r.has_point(at):
+			reach = reach.merge(Rect2(at.x, r.position.y, 0.0, r.size.y))
+	reach.position -= origin
+	return reach
+
+
+## How much each pixel of pull counts with this much room (need: the room a full-strength jump takes).
+func _aim_gain(need: float, space: float) -> float:
+	return clampf(need / maxf(space, 1.0), 1.0, AIM_GAIN_MOST)
 
 
 func _step_aim() -> void:
@@ -1062,7 +1152,11 @@ func _step_aim() -> void:
 		_pressing = false  # the button came up somewhere we didn't hear about
 		_launch()
 		return
-	_aim = (_aim_from - cursor) / px
+	var pull := _aim_from - cursor  # (pulling to the left is +x: he goes right)
+	pull.x *= _gain_left if pull.x > 0.0 else _gain_right
+	if pull.y < 0.0:
+		pull.y *= _gain_down
+	_aim = pull / px
 	_play("prejump" if _aim.length() * GAME_UNITS_PER_PX > 200.0 else "idle")  # the game crouches on a big pull
 
 
@@ -1080,15 +1174,9 @@ func _launch() -> void:
 	_set_air()
 
 
-## The pointer back as it was, where you'd have pulled it to (as near as the screen allows).
+## The pointer back to the normal one (it's the closed hand while you pull).
 func _end_aim_pointer() -> void:
 	Input.set_custom_mouse_cursor(null)
-	if _aim_shift == Vector2.ZERO:
-		return
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	if track_os_cursor:
-		Input.warp_mouse((cursor - _aim_shift).clamp(Vector2.ZERO, room - Vector2.ONE))
-	_aim_shift = Vector2.ZERO
 
 
 ## Trajectory.gd's own numbers, worked in the game's units: pull back further, jump further.
@@ -1411,7 +1499,7 @@ func _play(anim: StringName) -> void:
 ## His hat and skin are the ones he wears in the game (see player.gd _apply_equipped_cosmetics).
 func _dress_up() -> void:
 	var hat := MusicManager.equipped_hat if randf() < HAT_CHANCE else ""  # (only once in a while)
-	_hat.texture = load(HATS[hat][0]) if HATS.has(hat) else null
+	_hat.texture = _solid_hat(HATS[hat][0]) if HATS.has(hat) else null
 	_hat.scale = Vector2.ONE * (HATS[hat][1] if HATS.has(hat) else 1.0)
 	_hat.visible = _hat.texture != null
 	if hat == "blackcrown":
@@ -1425,25 +1513,88 @@ func _dress_up() -> void:
 			_body.material = _shader_material("res://assets/negative.gdshader")
 
 
-## One of his frames from the game, less the faint shading under his feet. In the game it blends
-## softly into the ground; out here each chunky pixel is drawn solid or not at all, and that half
-## see-through row came out as a stray block under him.
+## A hat with its soft edge made hard: each pixel all hat or not at all. Drawn half see-through over
+## his head, the crown's edge mixed with his green and came out as a row of odd yellow-green blocks.
+## (Hats are drawn at their own scale, not on his grid, so that's all they need; lone specks go too.)
+func _solid_hat(path: String) -> Texture2D:
+	var art := (load(path) as Texture2D).get_image()
+	if art.is_compressed():
+		art.decompress()
+	art.convert(Image.FORMAT_RGBA8)
+	var w := art.get_width()
+	var h := art.get_height()
+	var solid := art.duplicate() as Image
+	for y in h:
+		for x in w:
+			var c := art.get_pixel(x, y)
+			solid.set_pixel(x, y, Color(c.r, c.g, c.b, 1.0 if c.a >= 0.5 else 0.0))
+	var out := solid.duplicate() as Image
+	for y in h:
+		for x in w:
+			if solid.get_pixel(x, y).a == 0.0:
+				continue
+			var alone := true
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var p := Vector2i(x, y) + d
+				if p.x >= 0 and p.y >= 0 and p.x < w and p.y < h and solid.get_pixelv(p).a > 0.0:
+					alone = false
+					break
+			if alone:
+				out.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
+	return ImageTexture.create_from_image(out)
+
+
+## One of his frames from the game, redrawn on the chunky-pixel grid froggy_pixels.gdshader draws.
+## The shader keeps one art pixel out of every 2x2 block, solid or not at all, so the game art's soft
+## see-through edges (in the game they blend into the ground) came out as stray blocks out here:
+## single pixels sticking out of his outline, a notch under his belly, and different ones as he moved.
+## So each frame is shrunk onto that grid first, lined up the way _process snaps him (whole game
+## pixels from his feet): a block is solid when 2 or more of its 4 pixels are, in their commonest
+## colour; a block touching nothing side-on is a speck and goes; and nothing under his feet line is
+## kept. All 4 pixels of a block are then the same, so whichever one the shader picks, he looks right.
 func _solid_frame(path: String) -> Texture2D:
-	var image := (load(path) as Texture2D).get_image()
-	var bottom := image.get_height() - 1
-	while bottom > 0 and not _has_solid_pixel(image, bottom):
-		bottom -= 1
-	for y in range(bottom + 1, image.get_height()):
-		for x in image.get_width():
-			image.set_pixel(x, y, Color(0.0, 0.0, 0.0, 0.0))
-	return ImageTexture.create_from_image(image)
-
-
-func _has_solid_pixel(image: Image, y: int) -> bool:
-	for x in image.get_width():
-		if image.get_pixel(x, y).a >= 0.9:
-			return true
-	return false
+	var art := (load(path) as Texture2D).get_image()
+	if art.is_compressed():
+		art.decompress()
+	art.convert(Image.FORMAT_RGBA8)
+	var w := art.get_width()
+	var h := art.get_height()
+	var feet_row := int(FEET_TO_CENTER) + h / 2  # the first art row under his feet
+	# (the sprite is centred, his feet sit on a grid line: so the grid's blocks start on these)
+	var start := Vector2i(posmod(w / 2, 2), posmod(feet_row, 2))
+	var corners := [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
+	var blocks := {}  # top-left art pixel -> colour
+	for by in range(start.y - 2, feet_row, 2):
+		for bx in range(start.x - 2, w, 2):
+			var counts := {}
+			var solid := 0
+			for corner: Vector2i in corners:
+				var p: Vector2i = Vector2i(bx, by) + corner
+				if p.x < 0 or p.y < 0 or p.x >= w or p.y >= feet_row:
+					continue
+				var c := art.get_pixelv(p)
+				if c.a >= 0.5:
+					solid += 1
+					var rgb := Color(c.r, c.g, c.b)
+					counts[rgb] = int(counts.get(rgb, 0)) + 1
+			if solid >= 2:
+				var best := Color()
+				var most := 0
+				for rgb: Color in counts:
+					if int(counts[rgb]) > most:
+						most = int(counts[rgb])
+						best = rgb
+				blocks[Vector2i(bx, by)] = best
+	var out := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	for b: Vector2i in blocks:
+		if not (blocks.has(b + Vector2i(2, 0)) or blocks.has(b - Vector2i(2, 0)) \
+				or blocks.has(b + Vector2i(0, 2)) or blocks.has(b - Vector2i(0, 2))):
+			continue  # a speck
+		for corner: Vector2i in corners:
+			var p: Vector2i = b + corner
+			if p.x >= 0 and p.y >= 0 and p.x < w and p.y < h:
+				out.set_pixelv(p, blocks[b])
+	return ImageTexture.create_from_image(out)
 
 
 func _tint(color: Color, strength: float) -> ShaderMaterial:

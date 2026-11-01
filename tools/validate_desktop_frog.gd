@@ -54,6 +54,25 @@ func _run() -> void:
 	await _until_idle("drop in")
 	_expect(is_equal_approx(_froggy.feet.y, ROOM.y), "lands on the floor after dropping in")
 	_expect(not _froggy.get_drawn_rects().is_empty(), "reports where he's drawing")
+	# Every frame sits on the game's chunky-pixel grid: each 2x2 block all one colour (so whichever
+	# pixel the shader keeps he looks the same), no lone specks, and nothing under his feet.
+	var frames: SpriteFrames = _froggy._body.sprite_frames
+	var problems := []
+	for anim in frames.get_animation_names():
+		for i in frames.get_frame_count(anim):
+			var problem := _frame_problem(frames.get_frame_texture(anim, i), froggy_script.FEET_TO_CENTER)
+			if problem != "":
+				problems.append("%s %d: %s" % [anim, i, problem])
+	_expect(problems.is_empty(), "no stray pixels in any of his frames " + str(problems))
+	var soft_hats := []
+	for hat: String in froggy_script.HATS:
+		var image: Image = _froggy._solid_hat(froggy_script.HATS[hat][0]).get_image()
+		for y in image.get_height():
+			for x in image.get_width():
+				var a := image.get_pixel(x, y).a
+				if a > 0.0 and a < 1.0 and not soft_hats.has(hat):
+					soft_hats.append(hat)
+	_expect(soft_hats.is_empty(), "every hat is all hat or nothing, pixel by pixel " + str(soft_hats))
 
 	_froggy.cursor = Vector2(1500.0, 1000.0)
 	for action in [&"wander", &"leap", &"ribbit", &"hunt", &"visit", &"boing", &"flip"]:
@@ -99,6 +118,23 @@ func _run() -> void:
 	await _until(func() -> bool: return _froggy.state != _states.AIR, 6.0, "aimed jump comes down")
 	_expect(is_equal_approx(_froggy._tilt_target, 0.0), "lands flat")
 	await _until_idle("aimed jump")
+
+	# ...and standing on the bottom of the screen, where there's hardly any room to pull down, a pull
+	# to the very edge still counts as a big one: without the pointer being moved anywhere.
+	middle = _froggy._center()
+	var room_below := ROOM.y - middle.y
+	_froggy.cursor = middle
+	_mouse_button(middle, true)
+	_mouse_motion(middle + Vector2(0.0, 8.0))
+	_froggy.cursor = middle + Vector2(-room_below * 0.5, room_below)
+	await process_frame
+	_expect(Input.mouse_mode == Input.MOUSE_MODE_VISIBLE, "aiming leaves the pointer alone (no jumping mouse)")
+	_expect(_froggy._aim.y * PX < -room_below * 1.5, "a pull to the bottom edge of the screen counts for more")
+	_mouse_button(_froggy.cursor, false)
+	_expect(_froggy.state == _states.AIR and _froggy.vel.y < 0.0 and _froggy.vel.x > 0.0, "...and still jumps him, up and the other way")
+	_froggy.cursor = Vector2(1500.0, 1000.0)
+	await _until(func() -> bool: return _froggy.state != _states.AIR, 6.0, "edge jump comes down")
+	await _until_idle("edge jump")
 
 	# ...holding still on him picks him up; carried a bit and let go...
 	middle = _froggy._center()
@@ -158,6 +194,16 @@ func _run() -> void:
 	_froggy.musiverse_event({"type": "greet", "from": "p1", "to": "froggy"})
 	_expect(_froggy._busy and not _froggy._particles.is_empty(), "waves back when a penguin says hi")
 	await _until_idle("waves back")
+	# One coming over to visit gets the same; one holding out a fish gets his tongue (and a gulp).
+	_froggy._particles.clear()
+	_froggy.musiverse_event({"type": "visit", "from": "p1", "to": "froggy"})
+	_expect(_froggy._busy and not _froggy._particles.is_empty(), "waves back when a penguin visits")
+	await _until_idle("waves back at a visit")
+	var fond: int = _froggy.affection
+	_froggy.musiverse_event({"type": "fish", "from": "p1", "to": "froggy"})
+	await _until(func() -> bool: return _froggy._tongue_t >= 0.0, 2.0, "tongue out for the fish")
+	await _until(func() -> bool: return _froggy.affection > fond, 3.0, "gulps the fish down")
+	await _until_idle("after the fish")
 	# The overlay's end: screen pixels in (here, as if he were on a second screen), his window pixels out.
 	var overlay = load("res://scripts/DesktopFrog.gd").new()
 	overlay.froggy = _froggy
@@ -168,6 +214,29 @@ func _run() -> void:
 		{"id": "odd", "kind": "penguin", "x": "nope", "y": null}, "junk", {"kind": "frog", "x": 2400.0, "y": ROOM.y}]})
 	_expect(_froggy.penguins.size() == 1 and _froggy.penguins[0].id == "p2" and is_equal_approx(float(_froggy.penguins[0].x), 580.0),
 		"hears where the penguins on his own screen are (and ignores junk)")
+	# Muse Penguin's penguins all hiding (your shake, or its HIDE!): he's blown off the screen too,
+	# stays around (the app doesn't quit), and comes back out when they do.
+	_froggy.penguins = []
+	overlay._heard_penguins({"mv": 1.0, "from": "muse-penguin", "critters": [], "hidden": true})
+	_expect(_froggy.tucked_away, "hides when the penguins do")
+	await _until(func() -> bool: return _froggy.state == _states.HIDDEN, 6.0, "blown off the screen")
+	_expect(not _left, "...and is still around while he's hiding (the app doesn't quit)")
+	overlay._heard_penguins({"mv": 1.0, "from": "muse-penguin", "critters": [], "hidden": false})
+	await _until_idle("comes back out with the penguins", 8.0)
+	_expect(not _froggy.tucked_away and is_equal_approx(_froggy.feet.y, ROOM.y), "comes back out when they do")
+	# On his own, a really hard mouse shake does it (the same test of what counts as Muse Penguin's).
+	var shake = load("res://scripts/DesktopFrog.gd").Shake.new()
+	var t := 1000
+	var fired := 0
+	for i in 40:
+		fired += 1 if shake.feed(t, 500.0 + sin(float(i)) * 30.0) else 0
+		t += 30
+	_expect(fired == 0, "ordinary mousing about isn't a shake")
+	t += 1000
+	for i in 40:
+		fired += 1 if shake.feed(t, 500.0 + (180.0 if i % 2 == 0 else -180.0)) else 0
+		t += 50
+	_expect(fired == 1, "a really hard shake is one (once, then it cools down)")
 	overlay.free()
 	_froggy.penguins = []
 	Engine.time_scale = 8.0
@@ -195,6 +264,38 @@ func _run() -> void:
 		printerr("Desktop frog smoke test failed (%d)." % _failures.size())
 	OS.remove_logger(_counter)
 	quit(1 if not _failures.is_empty() else 0)
+
+
+## What's wrong with one of his frames on the 2x2 grid (lined up from his feet, like _solid_frame), or "".
+func _frame_problem(texture: Texture2D, feet_to_center: float) -> String:
+	var image := texture.get_image()
+	var w := image.get_width()
+	var h := image.get_height()
+	var feet_row := int(feet_to_center) + h / 2
+	var start := Vector2i(posmod(w / 2, 2), posmod(feet_row, 2))
+	var solid := {}
+	for by in range(start.y - 2, h, 2):
+		for bx in range(start.x - 2, w, 2):
+			var first := Color(0, 0, 0, 0)
+			var found := false
+			for corner in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]:
+				var p: Vector2i = Vector2i(bx, by) + corner
+				if p.x < 0 or p.y < 0 or p.x >= w or p.y >= h:
+					continue
+				var c := image.get_pixelv(p)
+				if c.a > 0.0 and p.y >= feet_row:
+					return "something under his feet at %s" % p
+				if not found:
+					first = c
+					found = true
+				elif not c.is_equal_approx(first):
+					return "block at %s isn't all one colour" % Vector2i(bx, by)
+			if found and first.a > 0.0:
+				solid[Vector2i(bx, by)] = true
+	for b: Vector2i in solid:
+		if not (solid.has(b + Vector2i(2, 0)) or solid.has(b - Vector2i(2, 0)) or solid.has(b + Vector2i(0, 2)) or solid.has(b - Vector2i(0, 2))):
+			return "a lone speck at %s" % b
+	return "" if not solid.is_empty() else "empty"
 
 
 func _until_idle(label: String, seconds := 6.0) -> void:

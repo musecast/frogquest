@@ -4,7 +4,7 @@ extends Node2D
 ## to the desktop. Right-click him (or his tray icon) for the menu; left-click the tray icon to
 ## call him over. See DesktopFrogLink.gd for how the game lets him out.
 
-enum { MENU_COME, MENU_NAP, MENU_SOUNDS, MENU_OPEN_GAME, MENU_BYE }
+enum { MENU_COME, MENU_NAP, MENU_SOUNDS, MENU_SHAKE, MENU_OPEN_GAME, MENU_BYE }
 
 const CLICK_GRID := 8.0  # the click area moves in steps this big, so it isn't re-cut every frame
 # What's on screen trails a frame or two behind the click area (which is also all Windows draws),
@@ -17,6 +17,7 @@ const MUSIVERSE_PORT := 47830  # he listens here (this computer only)
 const PENGUINS_PORT := 47831  # Muse Penguin listens here
 const MUSIVERSE_EVERY := 0.15
 const PENGUINS_GONE_AFTER := 3.0
+const FAST_POINTER := 900.0  # px a second: the pointer's flying about (a shake?), so look 60 times a second
 
 var link  # DesktopFrogLink.gd
 var froggy  # DesktopFroggy.gd
@@ -34,6 +35,12 @@ var _quitting := false
 var _musiverse: PacketPeerUDP
 var _musiverse_in := 0.0
 var _penguins_heard := -INF  # (seconds)
+var _penguins_hidden := -1  # the penguins hiding: 1 yes, 0 no, -1 not heard from lately
+var shake_to_hide := true  # a really hard mouse shake hides him (and another brings him back)
+var _shake := Shake.new()
+var _shake_dir := 0.0  # which way the pointer was last going (the way he gets blown)
+var _pointer_last := Vector2.ZERO
+var _pointer_fast_until := 0  # msec
 
 
 func _ready() -> void:
@@ -56,6 +63,7 @@ func _ready() -> void:
 	froggy.sounds_on = settings.get_value("froggy", "sounds", true)
 	froggy.affection = settings.get_value("froggy", "affection", 0)
 	froggy.flies_eaten = settings.get_value("froggy", "flies_eaten", 0)
+	shake_to_hide = settings.get_value("froggy", "shake_to_hide", true)
 	froggy.wants_menu.connect(_show_menu_at_cursor)
 	froggy.left.connect(_on_froggy_left)
 	add_child(froggy)
@@ -77,7 +85,8 @@ func _process(delta: float) -> void:
 		return
 	_update_click_region()
 	_step_musiverse(delta)
-	Engine.max_fps = 60 if froggy.is_lively() else 20
+	_step_shake(delta)
+	Engine.max_fps = 60 if froggy.is_lively() or Time.get_ticks_msec() < _pointer_fast_until else 20
 	_heartbeat_in -= delta
 	if _heartbeat_in <= 0.0:
 		_heartbeat_in = HEARTBEAT_EVERY
@@ -206,6 +215,7 @@ func _make_tray() -> void:
 	_menu.add_item("Come here!", MENU_COME)
 	_menu.add_check_item("Nap time", MENU_NAP)
 	_menu.add_check_item("Sounds", MENU_SOUNDS)
+	_menu.add_check_item("Hide when I shake the mouse", MENU_SHAKE)
 	_menu.add_separator()
 	_menu.add_item("Open Frog Quest", MENU_OPEN_GAME)
 	_menu.add_item("Bye for now", MENU_BYE)
@@ -229,6 +239,9 @@ func _refresh_menu() -> void:
 	var sounds := _menu.get_item_index(MENU_SOUNDS)
 	if _menu.is_item_checked(sounds) != froggy.sounds_on:
 		_menu.set_item_checked(sounds, froggy.sounds_on)
+	var shake := _menu.get_item_index(MENU_SHAKE)
+	if _menu.is_item_checked(shake) != shake_to_hide:
+		_menu.set_item_checked(shake, shake_to_hide)
 
 
 func _on_menu_id_pressed(id: int) -> void:
@@ -239,6 +252,11 @@ func _on_menu_id_pressed(id: int) -> void:
 			froggy.toggle_nap()
 		MENU_SOUNDS:
 			froggy.sounds_on = not froggy.sounds_on
+			_save_settings()
+		MENU_SHAKE:
+			shake_to_hide = not shake_to_hide
+			if not shake_to_hide:
+				froggy.come_back_out()  # (nothing would bring him back otherwise)
 			_save_settings()
 		MENU_OPEN_GAME:
 			_open_game()
@@ -261,7 +279,11 @@ func _show_menu_at_cursor() -> void:
 func _call_over() -> void:
 	var screen := _screen_under_cursor()
 	var x := float(DisplayServer.mouse_get_position().x - _room_on(screen).position.x)
-	if screen != _screen:
+	if froggy.tucked_away:
+		if screen != _screen:
+			_move_to_screen(screen)
+		froggy.come_back_out(x)  # (out of hiding, right where you are)
+	elif screen != _screen:
 		_move_to_screen(screen)
 		froggy.drop_in(x)
 	else:
@@ -308,6 +330,9 @@ func _check_for_command() -> void:
 			_call_over()
 		"home":
 			var rect: Rect2i = note.get_value("command", "rect", Rect2i())
+			if froggy.tucked_away:
+				_quit()  # (he's hiding: nothing to see him go)
+				return
 			if not rect.has_area():
 				_say_bye()
 				return
@@ -322,6 +347,7 @@ func _save_settings() -> void:
 	if froggy == null:
 		return
 	settings.set_value("froggy", "sounds", froggy.sounds_on)
+	settings.set_value("froggy", "shake_to_hide", shake_to_hide)
 	settings.set_value("froggy", "affection", froggy.affection)
 	settings.set_value("froggy", "flies_eaten", froggy.flies_eaten)
 	settings.set_value("froggy", "x", froggy.feet.x)
@@ -371,8 +397,9 @@ func _step_musiverse(delta: float) -> void:
 		if m is Dictionary and _num(m.get("mv")) == 1.0 and m.get("from") == "muse-penguin":
 			_penguins_heard = now
 			_heard_penguins(m)
-	if not froggy.penguins.is_empty() and now - _penguins_heard > PENGUINS_GONE_AFTER:
+	if now - _penguins_heard > PENGUINS_GONE_AFTER:
 		froggy.penguins = []  # (Muse Penguin closed)
+		_penguins_hidden = -1
 	_musiverse_in -= delta
 	if _musiverse_in > 0.0:
 		return
@@ -408,6 +435,15 @@ func _heard_penguins(m: Dictionary) -> void:
 	for e: Variant in (events.slice(0, 8) if events is Array else []):
 		if e is Dictionary and e.get("to") == "froggy":
 			froggy.musiverse_event(e)
+	# With Muse Penguin open, it decides when everybody hides (your shake, or its HIDE! shortcut) and
+	# he goes along with it; on first hearing from it he matches whatever the penguins are doing.
+	var hidden := 1 if m.get("hidden") == true else 0
+	if hidden != _penguins_hidden:
+		_penguins_hidden = hidden
+		if hidden == 1 and shake_to_hide:
+			froggy.shake_away(_shake_dir)
+		elif hidden == 0:
+			froggy.come_back_out()
 
 
 static func _num(v: Variant) -> float:
@@ -416,3 +452,84 @@ static func _num(v: Variant) -> float:
 
 static func _text(v: Variant, most: int) -> String:
 	return str(v).left(most) if v is String else ""
+
+
+# ── Shake to hide ──────────────────────────────────────────────────────────
+# A really hard mouse shake ("somebody's coming!") blows him off the screen, and another brings him
+# back, just like Muse Penguin's penguins. While Muse Penguin is open it does the deciding (its own
+# shake, or its HIDE! shortcut) and he follows its "hidden" (see _heard_penguins), so the two of them
+# hide and come back together; on his own, he watches the pointer himself.
+
+func _step_shake(delta: float) -> void:
+	var pointer := Vector2(DisplayServer.mouse_get_position())
+	if delta > 0.0 and pointer.distance_to(_pointer_last) / delta > FAST_POINTER:
+		_pointer_fast_until = Time.get_ticks_msec() + 1500  # (so the next swings get seen properly)
+	if pointer.x != _pointer_last.x:
+		_shake_dir = signf(pointer.x - _pointer_last.x)
+	_pointer_last = pointer
+	if not shake_to_hide or _penguins_hidden != -1:
+		return  # (off; or Muse Penguin is open and deciding)
+	_shake.swing = 100.0 * maxf(1.0, DisplayServer.screen_get_dpi(_screen) / 96.0)  # (its swings are in Windows' scaled pixels)
+	if _shake.feed(Time.get_ticks_msec(), pointer.x):
+		if froggy.tucked_away:
+			froggy.come_back_out()
+		else:
+			froggy.shake_away(_shake_dir)
+
+
+## Muse Penguin's src/renderer/shake.js, line for line, so the two of them agree on what counts: big,
+## fast swings back and forth (not the little wiggles of normal mousing). Feed it the pointer's x
+## with a time in msec; it says when a shake just happened.
+class Shake:
+	var swing := 100.0  # pixels each way
+	var need := 9  # swings (8 turnarounds) ...
+	var window := 1000  # ... within this many msec
+	var cool := 1800  # msec before the next one counts
+	var pause := 220  # a gap this long between looks starts over
+	var until := 0
+	var _dir := 0
+	var _ext := NAN
+	var _lo := 0.0
+	var _hi := 0.0
+	var _turns: Array[int] = []
+	var _last_t := 0
+
+	func feed(t: int, x: float) -> bool:
+		if _last_t != 0 and t - _last_t > pause:
+			_reset()
+		_last_t = t
+		if is_nan(_ext):
+			_ext = x
+			_lo = x
+			_hi = x
+			return false
+		if _dir == 0:
+			# the first big swing, whichever way it goes
+			_lo = minf(_lo, x)
+			_hi = maxf(_hi, x)
+			if _hi - _lo >= swing:
+				_dir = 1 if x >= _hi else -1
+				_ext = x
+			return false
+		if (x - _ext) * _dir > 0.0:
+			_ext = x  # still going the same way
+			return false
+		if absf(x - _ext) < swing:
+			return false
+		# a big swing back the other way
+		_dir = -_dir
+		_ext = x
+		_turns.append(t)
+		while not _turns.is_empty() and t - _turns[0] > window:
+			_turns.pop_front()
+		if _turns.size() >= need - 1 and t >= until:
+			_reset()
+			until = t + cool
+			return true
+		return false
+
+	func _reset() -> void:
+		_dir = 0
+		_ext = NAN
+		_turns.clear()
+		_last_t = 0
