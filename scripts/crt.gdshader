@@ -8,7 +8,9 @@ the modified result to godotshaders.com.
 */
 
 shader_type canvas_item;
-uniform sampler2D SCREEN_TEXTURE : hint_screen_texture, filter_linear_mipmap;
+// (filter_nearest: the game is drawn in big square pixels, and a smooth read smears every one of them into
+// its neighbours; it also saves building mipmaps of the whole screen every frame, which nothing here used)
+uniform sampler2D SCREEN_TEXTURE : hint_screen_texture, filter_nearest;
 
 //*** IMPORTANT! ***/ 
 // - If you are using this shader to affect the node it is applied to set 'overlay' to false (unchecked in the instepctor).

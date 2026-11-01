@@ -3,6 +3,7 @@ extends Node
 var MusicPosition = 0
 var froggyCrown = 0
 var game_beaten: bool = false
+var desktop_frog_unlocked: bool = false  # Lil Froggy has jumped out onto the desktop at least once
 var ads_removed: bool = false
 var has_launched_before: bool = false
 
@@ -12,6 +13,9 @@ var unlocked_skins: Array = []
 var seen_cosmetics: Array = []
 
 const WARDROBE_PATH := "user://wardrobe.save"
+
+func _trace(label: String) -> void:
+	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
 
 func has_any_cosmetic() -> bool:
 	return froggyCrown != 0 or unlocked_skins.size() > 0
@@ -25,6 +29,7 @@ func has_unseen_cosmetics() -> bool:
 	return false
 
 func save_wardrobe() -> void:
+	_trace("MusicManager save_wardrobe start")
 	var f = FileAccess.open(WARDROBE_PATH, FileAccess.WRITE)
 	f.store_var({
 		"froggyCrown": froggyCrown,
@@ -33,21 +38,26 @@ func save_wardrobe() -> void:
 		"unlocked_skins": unlocked_skins,
 		"seen_cosmetics": seen_cosmetics,
 		"game_beaten": game_beaten,
+		"desktop_frog_unlocked": desktop_frog_unlocked,
 		"ads_removed": ads_removed,
 		"has_launched_before": has_launched_before,
 	})
 	f.close()
+	_trace("MusicManager save_wardrobe end")
 
 func load_wardrobe() -> void:
+	_trace("MusicManager load_wardrobe start")
 	if not FileAccess.file_exists(WARDROBE_PATH):
 		froggyCrown    = 0
 		equipped_hat   = ""
 		equipped_skin  = ""
 		unlocked_skins = []
 		seen_cosmetics = []
+		_trace("MusicManager load_wardrobe end missing file")
 		return
 	var f = FileAccess.open(WARDROBE_PATH, FileAccess.READ)
 	if not f:
+		_trace("MusicManager load_wardrobe end open failed")
 		return
 	var d = f.get_var()
 	f.close()
@@ -57,8 +67,10 @@ func load_wardrobe() -> void:
 	unlocked_skins = d.get("unlocked_skins", [])
 	seen_cosmetics = d.get("seen_cosmetics", [])
 	game_beaten         = d.get("game_beaten",          false)
+	desktop_frog_unlocked = d.get("desktop_frog_unlocked", false)
 	ads_removed         = d.get("ads_removed",          false)
 	has_launched_before = d.get("has_launched_before",  false)
+	_trace("MusicManager load_wardrobe end")
 
 func show_unlock_notification(item_type: String) -> void:
 	var cl := CanvasLayer.new()
@@ -118,10 +130,13 @@ func show_unlock_notification(item_type: String) -> void:
 
 
 func _ready():
+	_trace("MusicManager ready start")
 	load_wardrobe()
 	if not has_launched_before:
 		has_launched_before = true
 		save_wardrobe()
+	_trace("MusicManager ready end")
+	print("StartupTrace: MusicManager ready at %d ms" % Time.get_ticks_msec())
 
 func _process(_delta):
 	pass

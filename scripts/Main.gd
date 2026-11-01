@@ -16,8 +16,18 @@ var gateDestroyed = 0
 @onready var current_window = DisplayServer.window_get_mode()
 
 
+func _trace(label: String) -> void:
+	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
+
+
+func _supports_desktop_mouse() -> bool:
+	var platform := OS.get_name()
+	return platform != "iOS" and platform != "Android"
+
+
 # Called when the node enters the scene tree for the first time.
 func _ready():
+	_trace("Main ready start")
 	
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_SENSOR_LANDSCAPE)
 	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_VIEWPORT
@@ -49,8 +59,18 @@ func _ready():
 	_loop_cave_audio($"Environmental Audio/caveaudio")
 	_loop_cave_audio($"Environmental Audio/darktreeAudio")
 
+	_trace("Main ready end")
+	_request_ads_after_first_frames()
+
+
+func _request_ads_after_first_frames() -> void:
+	await get_tree().process_frame
+	await get_tree().create_timer(0.65).timeout
+	if not is_inside_tree():
+		return
 	AdsManager.show_banner_bottom()
 	AdsManager.preload_interstitial()
+
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
@@ -85,7 +105,8 @@ func _process(delta):
 			Engine.time_scale = 1.0
 		else:
 			#GAME IS PAUSED HERE
-			Input.mouse_mode = 0
+			if _supports_desktop_mouse():
+				Input.mouse_mode = 0
 			$Player/PauseScreen.visible=true
 			$Player/frogaim.play()
 			Engine.time_scale = 0.05

@@ -1,0 +1,137 @@
+# Builds Frog Quest+ for iOS on GitHub's Mac machines and uploads it to TestFlight. No Mac needed.
+# Run it from the Actions tab: TestFlight > Run workflow.
+#
+# Needs three repository secrets (Settings > Secrets and variables > Actions), from an
+# App Store Connect API key with Admin access (Users and Access > Integrations > App Store Connect API):
+#   ASC_KEY_ID       the key's Key ID
+#   ASC_ISSUER_ID    the Issuer ID shown above the keys list
+#   ASC_PRIVATE_KEY  the whole AuthKey_XXXX.p8 file, BEGIN/END lines included
+#
+# The version (1.1) comes from the iOS export preset; the build number is 2 + this workflow's run number,
+# so every run uploads a new, higher build (the first run is build 3).
+
+name: TestFlight
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+
+jobs:
+  ios:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      GODOT_VERSION: "4.7.1"
+      PROJECT: Frog Quest FOREVER
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - name: Check the App Store Connect key is set up
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          missing=""
+          [ -n "$ASC_KEY_ID" ] || missing="$missing ASC_KEY_ID"
+          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$ASC_PRIVATE_KEY" ] || missing="$missing ASC_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Add these repository secrets first:$missing"
+            exit 1
+          fi
+          case "$ASC_PRIVATE_KEY" in
+            *"BEGIN PRIVATE KEY"*) ;;
+            *) echo "::error::ASC_PRIVATE_KEY should be the whole .p8 file, including the BEGIN PRIVATE KEY line"; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v7
+
+      - name: Cache Godot and its iOS template
+        uses: actions/cache@v6
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-macos-ios
+
+      - name: Get Godot ${{ env.GODOT_VERSION }} and the iOS export template
+        run: |
+          mkdir -p ~/godot
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          if [ ! -d ~/godot/Godot.app ]; then
+            curl -sSfL -o ~/godot/godot.zip "$base/Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+            unzip -q ~/godot/godot.zip -d ~/godot
+            rm ~/godot/godot.zip
+          fi
+          if [ ! -f ~/godot/ios.zip ]; then
+            python3 tools/ci/fetch_zip_member.py "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" templates/ios.zip ~/godot/ios.zip
+          fi
+          templates="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$templates"
+          cp ~/godot/ios.zip "$templates/ios.zip"
+          printf '%s.stable' "$GODOT_VERSION" > "$templates/version.txt"
+          echo "GODOT=$HOME/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
+
+      - name: Import the project
+        run: '"$GODOT" --headless --path . --import'
+
+      - name: Export the Xcode project
+        run: |
+          out="$RUNNER_TEMP/xcode"
+          mkdir -p "$out"
+          "$GODOT" --headless --path . --export-release "iOS" "$out/$PROJECT.xcodeproj"
+          "$GODOT" --headless --path . --script res://tools/ci/patch_admob_pbxproj.gd -- "$out/$PROJECT.xcodeproj/project.pbxproj"
+          version=$(grep -m1 -o 'MARKETING_VERSION = [^;]*' "$out/$PROJECT.xcodeproj/project.pbxproj" | cut -d' ' -f3)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "BUILD=$((2 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Archive ${{ env.VERSION }} (${{ env.BUILD }})
+        working-directory: ${{ runner.temp }}/xcode
+        run: |
+          xcodebuild -version
+          # Unsigned here; Xcode's cloud signing signs it for the App Store in the next step.
+          xcodebuild archive -quiet \
+            -project "$PROJECT.xcodeproj" \
+            -scheme "$PROJECT" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/FrogQuest.xcarchive" \
+            CURRENT_PROJECT_VERSION="$BUILD" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Sign and upload to TestFlight
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          key="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s\n' "$ASC_PRIVATE_KEY" > "$key"
+          chmod 600 "$key"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>ABNG89SP95</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          status=0
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/FrogQuest.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$key" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" || status=$?
+          rm -f "$key"
+          exit $status
+
+      - name: Summary
+        run: |
+          echo "### Frog Quest+ $VERSION ($BUILD) uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
+          echo "Apple takes 5 to 30 minutes to process it; then it shows up in App Store Connect > TestFlight and in the TestFlight app." >> "$GITHUB_STEP_SUMMARY"

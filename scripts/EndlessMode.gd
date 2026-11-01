@@ -30,6 +30,8 @@ var highest_generated_y: float = 0.0
 var last_generated_x: float = 0.0
 var highest_player_y: float = 0.0
 var is_resetting: bool = false
+var _revive_platform_id: int = 0  # the last platform he stood on before falling
+var _revived: bool = false  # one "keep going" per run
 
 var fade_rect: ColorRect
 var canvas_layer: CanvasLayer
@@ -78,11 +80,21 @@ func _ready() -> void:
 		_generate_one_platform_above()
 	fade_rect.color.a = 1.0
 	_fade(1.0, 0.0, 0.6)
-	AdsManager.show_banner_bottom()
-	AdsManager.preload_interstitial()
+	_request_ads_after_first_frames()
 	await get_tree().process_frame
 	if is_inside_tree():
 		AdsManager.sync_banner_with_viewport()
+
+
+func _request_ads_after_first_frames() -> void:
+	await get_tree().process_frame
+	await get_tree().create_timer(0.65).timeout
+	if not is_inside_tree():
+		return
+	AdsManager.show_banner_bottom()
+	AdsManager.preload_interstitial()
+	AdsManager.preload_rewarded()
+	AdsManager.sync_banner_with_viewport()
 
 func _create_ui() -> void:
 	canvas_layer = CanvasLayer.new()
@@ -155,6 +167,7 @@ func _process(delta: float) -> void:
 func _trigger_reset() -> void:
 	is_resetting = true
 	pitch_step = 0
+	_revive_platform_id = last_platform_id
 	last_platform_id = 0
 	airborne_since_landing = false
 	$EndlessPlayer.velocity.x = 0
@@ -171,6 +184,44 @@ func _trigger_reset() -> void:
 	if _pending_notification.size() > 0:
 		MusicManager.show_unlock_notification(_pending_notification[0])
 		_pending_notification = []
+
+## True if this run can still "keep going" (once per run, and his last platform is still there).
+func can_revive() -> bool:
+	return is_resetting and not _revived and _find_platform(_revive_platform_id) != null
+
+
+## Puts him back on the last platform he stood on, score and all.
+func revive() -> void:
+	if not can_revive():
+		return
+	_revived = true
+	await _fade(0.0, 1.0, 0.25)
+	var platform := _find_platform(_revive_platform_id)
+	if platform == null or not is_inside_tree():
+		return
+	player.global_position = platform.global_position + Vector2(0.0, -40.0)
+	player.velocity = Vector2.ZERO
+	player.reset_physics_interpolation()
+	var cam := player.get_node_or_null("Camera2D") as Camera2D
+	if cam:
+		cam.reset_smoothing()  # snap to him, instead of gliding up from wherever he fell to
+	highest_player_y = player.global_position.y
+	last_platform_id = _revive_platform_id
+	airborne_since_landing = false
+	is_resetting = false
+	var label_fade := create_tween()
+	label_fade.tween_property(score_label, "modulate:a", 1.0, 0.3)
+	AdsManager.show_banner_bottom()
+	await _fade(1.0, 0.0, 0.35)
+
+
+func _find_platform(platform_id: int) -> Node2D:
+	if platform_id <= 0:
+		return null
+	for platform in platforms.get_children():
+		if not platform.is_queued_for_deletion() and int(platform.get_meta("platform_id", 0)) == platform_id:
+			return platform as Node2D
+	return null
 
 func _fade(from: float, to: float, duration: float) -> void:
 	var t = 0.0

@@ -8,10 +8,12 @@ var _code_input: LineEdit
 var _status_label: Label
 var _resize_timer: SceneTreeTimer = null
 var _panel: PanelContainer = null
+var _secret_tap_count := 0
 
 const BTN_HEIGHT := 38
 const BTN_FONT_SZ := 16
 const TITLE_FONT_SZ := 22
+const SECRET_TAPS_REQUIRED := 10
 const GOLD := Color(0.95, 0.88, 0.65)
 const BLACK := Color(0.0, 0.0, 0.0, 1.0)
 
@@ -64,11 +66,14 @@ func _build_ui() -> void:
 
 	var frog_btn := TextureButton.new()
 	frog_btn.texture_normal = load("res://assets/frog.png")
+	frog_btn.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	frog_btn.modulate = Color.WHITE
+	frog_btn.self_modulate = Color.WHITE
 	frog_btn.ignore_texture_size = true
 	frog_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	frog_btn.custom_minimum_size = Vector2(64, 64)
 	frog_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	frog_btn.mouse_default_cursor_shape = Control.CURSOR_ARROW
+	frog_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	frog_btn.pressed.connect(_on_secret_pressed)
 	_main_panel.add_child(frog_btn)
 
@@ -277,6 +282,10 @@ func _on_close_pressed() -> void:
 
 
 func _on_secret_pressed() -> void:
+	_secret_tap_count += 1
+	if _secret_tap_count < SECRET_TAPS_REQUIRED:
+		return
+	_secret_tap_count = 0
 	_main_panel.visible = false
 	_passcode_panel.visible = true
 	_code_input.text = ""

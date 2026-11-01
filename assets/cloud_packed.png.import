@@ -3,21 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://tqqj3gtd6kg4"
-path.s3tc="res://.godot/imported/cloud_packed.png-74c67c6618070848c2be13f46431f08a.s3tc.ctex"
-path.etc2="res://.godot/imported/cloud_packed.png-74c67c6618070848c2be13f46431f08a.etc2.ctex"
+path="res://.godot/imported/cloud_packed.png-74c67c6618070848c2be13f46431f08a.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/cloud_packed.png"
-dest_files=["res://.godot/imported/cloud_packed.png-74c67c6618070848c2be13f46431f08a.s3tc.ctex", "res://.godot/imported/cloud_packed.png-74c67c6618070848c2be13f46431f08a.etc2.ctex"]
+dest_files=["res://.godot/imported/cloud_packed.png-74c67c6618070848c2be13f46431f08a.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

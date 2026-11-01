@@ -68,7 +68,14 @@ var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var highScore
 var currentHeight
 
+func _trace(label: String) -> void:
+	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
+
+
 func _ready():
+	if Engine.is_editor_hint():
+		return  # (a tool script for the test buttons above: the game itself only starts in the game)
+	_trace("Player ready start")
 
 	get_tree().root.content_scale_size = Vector2i(480, 270)
 
@@ -78,6 +85,7 @@ func _ready():
 
 	load_game()
 	_just_loaded = true
+	_trace("Player ready after load_game")
 	get_tree().create_timer(2.5, true, false, true).timeout.connect(func(): _just_loaded = false)
 
 	if FileAccess.file_exists(save_path):
@@ -165,6 +173,7 @@ func _ready():
 
 	await get_tree().create_timer(0.5, true, false, true).timeout
 	_apply_ui_layout()
+	_trace("Player ready end")
 
 
 func _physics_process(delta):
@@ -557,7 +566,7 @@ func _on_backfrom_settings_button_pressed():
 	var _wpb = $PauseScreen.get_node_or_null("WardrobePauseBtn")
 	if _wpb: _wpb.visible = true
 	var _rapb = $PauseScreen.get_node_or_null("RemoveAdsPauseBtn")
-	if _rapb: _rapb.visible = not MusicManager.ads_removed
+	if _rapb: _rapb.visible = not AdsManager.is_ad_free()
 	$PauseScreen/settingsContainer.visible=false
 	$PauseScreen/BackfromSettingsButton.visible = false
 
@@ -604,6 +613,7 @@ func _on_restart_yes_pressed():
 		MusicManager.unlocked_skins = []
 		MusicManager.seen_cosmetics = []
 		MusicManager.game_beaten = false
+		MusicManager.desktop_frog_unlocked = false
 	_pending_reset_type = ""
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
@@ -671,6 +681,7 @@ func setup_key_trail():
 func save_game():
 	if currentHeight > 513:  # skip autosave in finale area
 		return
+	_trace("Player save_game start")
 	var save_data = {
 		"position": position,
 		"has_key": has_key,
@@ -700,20 +711,25 @@ func save_game():
 		return
 	file.store_var(save_data)
 	file.close()
+	_trace("Player save_game end")
 	print("Game saved.")
 
 
 func load_game():
+	_trace("Player load_game start")
 	if not FileAccess.file_exists(save_path):
+		_trace("Player load_game end missing file")
 		return
 	var file = FileAccess.open(save_path, FileAccess.READ)
 	if not file:
+		_trace("Player load_game end open failed")
 		return
 	var save_data = file.get_var()
 	file.close()
 
 	if not save_data is Dictionary:
 		push_warning("load_game: save file is corrupt or empty, starting fresh")
+		_trace("Player load_game end corrupt")
 		return
 
 	position = save_data.get("position", position)
@@ -747,6 +763,7 @@ func load_game():
 		get_parent().npc5 = save_data["npc5"]
 	if "npc6" in save_data:
 		get_parent().npc6 = save_data["npc6"]
+	_trace("Player load_game end")
 	print("Game loaded.")
 
 
@@ -840,6 +857,8 @@ func _apply_equipped_cosmetics() -> void:
 
 func _on_wardrobe_button_pressed() -> void:
 	$frogaim.play()
+	var title_was_visible: bool = $titlescreen.visible
+	$titlescreen.visible = false
 	var ws = load("res://scenes/WardrobeScreen.gd").new()
 	add_child(ws)
 	_active_wardrobe = ws
@@ -847,6 +866,9 @@ func _on_wardrobe_button_pressed() -> void:
 		_active_wardrobe = null
 		remove_child(ws)
 		_apply_equipped_cosmetics()
+		$titlescreen.visible = title_was_visible
+		if title_was_visible:
+			_apply_ui_layout()
 		for container in [$titlescreen.get_node_or_null("TitleRow2"), $titlescreen/HBoxContainer]:
 			if not container:
 				continue
@@ -922,6 +944,30 @@ func _on_end_animation_finished() -> void:
 		finalbuttonBool = 1
 		$Camera2D.position = Vector2(-1770.67, 7144.045)
 		_apply_win_layout()
+		_maybe_let_desktop_frog_out()
+
+
+## Once in a long while, a win on a computer: Lil Froggy jumps out of the game window onto the desktop.
+func _maybe_let_desktop_frog_out() -> void:
+	var link = load("res://scripts/DesktopFrogLink.gd")
+	if MusicManager.desktop_frog_unlocked or not link.is_supported() or not link.escapes_this_time():
+		return
+	MusicManager.desktop_frog_unlocked = true
+	MusicManager.save_wardrobe()
+	# Let the win screen land first (real seconds, even while credits run fast).
+	await get_tree().create_timer(4.0, true, false, true).timeout
+	if not is_inside_tree() or link.is_out():
+		return
+	var mode := DisplayServer.window_get_mode()
+	if mode == DisplayServer.WINDOW_MODE_MINIMIZED:
+		return
+	if mode != DisplayServer.WINDOW_MODE_WINDOWED:
+		# He needs some desktop to land on.
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		await get_tree().create_timer(0.6, true, false, true).timeout
+		if not is_inside_tree():
+			return
+	link.let_out(link.game_window_rect(), true)
 
 
 func _apply_win_layout() -> void:
@@ -983,8 +1029,7 @@ func _apply_win_layout() -> void:
 		btn.offset_bottom = btn_top + 65.0
 		btn.add_theme_font_size_override("font_size", 34)
 
-		by_muse2.add_theme_font_size_override("font_size", 26)
-		by_muse2.add_theme_constant_override("outline_size", 5)
+		_pin_to_bottom(by_muse2, 26, 5)
 	else:
 		# Landscape — set all anchors/offsets explicitly so nothing from the
 		# scene or a prior portrait layout bleeds in.
@@ -1028,8 +1073,27 @@ func _apply_win_layout() -> void:
 		btn.offset_bottom = 40.0
 		btn.add_theme_font_size_override("font_size", 19)
 
-		by_muse2.add_theme_font_size_override("font_size", 13)
-		by_muse2.add_theme_constant_override("outline_size", 3)
+		_pin_to_bottom(by_muse2, 13, 3)
+
+
+## Pins a "made by muse" label along the bottom edge, all of it on screen: just above the bottom
+## banner when one is showing (tuck pulls it that much closer to the banner), otherwise just
+## above the edge and any home-indicator area.
+func _pin_to_bottom(label: Label, font_size: int, outline: int, tuck: float = 0.0) -> void:
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_constant_override("outline_size", outline)
+	label.scale = Vector2.ONE
+	label.anchor_left = 0.0
+	label.anchor_right = 1.0
+	label.anchor_top = 1.0
+	label.anchor_bottom = 1.0
+	var banner: float = AdsManager.get_viewport_bottom_banner_clearance()
+	var gap: float = banner - tuck if banner > 0.0 else AdsManager.get_viewport_bottom_safe_inset() + 3.0
+	var height: float = label.get_theme_font("font").get_height(font_size) + outline
+	label.offset_left = 0.0
+	label.offset_right = 0.0
+	label.offset_bottom = -gap
+	label.offset_top = -gap - height
 
 
 func _initial_title_layout() -> void:
@@ -1051,7 +1115,6 @@ func _apply_ui_layout() -> void:
 	var hbox     := $titlescreen/HBoxContainer
 
 	$titlescreen.layer = AdsManager.canvas_layer_above_banner_placeholder()
-	var muse_lift: float = AdsManager.get_viewport_bottom_banner_clearance()
 	by_muse.z_index = 8
 	by_muse.z_as_relative = false
 
@@ -1060,14 +1123,8 @@ func _apply_ui_layout() -> void:
 		title.position    = Vector2(cx, vp.y * 0.25)
 		title.scale       = Vector2(0.5, 0.5)
 		fx3.position      = Vector2(cx, vp.y * 0.75)
-		# "by muse" pinned near bottom — lift by Y when a bottom banner is active; layer above ad placeholder
-		by_muse.offset_left   = 0.0
-		by_muse.offset_bottom = -muse_lift
-		by_muse.offset_top    = -(36.0 + muse_lift)
-		by_muse.offset_right  = 0.0
-		by_muse.scale         = Vector2(1.0, 1.0)
-		by_muse.add_theme_font_size_override("font_size", 32)
-		by_muse.add_theme_constant_override("outline_size", 5)
+		# "by muse" pinned near bottom, above the banner when one is up; layer above ad placeholder
+		_pin_to_bottom(by_muse, 32, 5)
 		if row2:
 			row2.visible = true
 			# Move endlessmodebutton/WardrobeButton back from hbox if landscape moved them there
@@ -1108,16 +1165,8 @@ func _apply_ui_layout() -> void:
 		title.position    = Vector2(cx, 85.0)
 		title.scale       = Vector2(0.3, 0.3)
 		fx3.position      = Vector2(cx, 238.0)
-		# "by muse" — landscape: smaller type, sits a touch lower toward the banner strip
-		var muse_ls_strip_h := 17.0
-		var muse_ls_nudge_dn := 6.0
-		by_muse.offset_left   = 0.0
-		by_muse.offset_bottom = -muse_lift + muse_ls_nudge_dn
-		by_muse.offset_top    = -(muse_ls_strip_h + muse_lift) + muse_ls_nudge_dn
-		by_muse.offset_right  = 0.0
-		by_muse.scale         = Vector2(1.0, 1.0)
-		by_muse.add_theme_font_size_override("font_size", 22)
-		by_muse.add_theme_constant_override("outline_size", 5)
+		# "by muse" — landscape: smaller type, tucked a touch lower toward the banner strip when there is one
+		_pin_to_bottom(by_muse, 22, 5, 6.0)
 		# All title buttons in one hbox for uniform gaps in landscape
 		var ls_half: float = vp.x * 0.34
 		if row2:
@@ -1244,7 +1293,7 @@ func _apply_ui_layout() -> void:
 		_ensure_pause_remove_ads_btn(bl, br, bh, bs + (bh + 8.0) * ra_slot_p, 26)
 	else:
 		# All positions scale with vp so any aspect ratio works
-		var num_btns_ls: int = 3 + (1 if MusicManager.has_any_cosmetic() else 0) + (1 if not MusicManager.ads_removed else 0)
+		var num_btns_ls: int = 3 + (1 if MusicManager.has_any_cosmetic() else 0) + (1 if not AdsManager.is_ad_free() else 0)
 		var gap_ls: float = max(3.0, vp.y * 0.03)
 		var paused_font_ls: int = max(20, int(vp.y * 0.18))
 		var paused_top_ls: float = vp.y * 0.08
@@ -1383,7 +1432,7 @@ func _ensure_pause_wardrobe_btn(bl: float, br: float, bh: float, btn_top: float,
 
 func _ensure_pause_remove_ads_btn(bl: float, br: float, bh: float, btn_top: float, font_sz: int) -> void:
 	var rapb: Button = $PauseScreen.get_node_or_null("RemoveAdsPauseBtn")
-	if MusicManager.ads_removed:
+	if AdsManager.is_ad_free():  # bought already, or no ads on this platform (desktop/web)
 		if rapb:
 			rapb.queue_free()
 		return

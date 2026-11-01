@@ -3,21 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dsc1qlfaal6oo"
-path.s3tc="res://.godot/imported/frog_prejump.png-0e24bdabe7f98ac12607995bb1ee4f8f.s3tc.ctex"
-path.etc2="res://.godot/imported/frog_prejump.png-0e24bdabe7f98ac12607995bb1ee4f8f.etc2.ctex"
+path="res://.godot/imported/frog_prejump.png-0e24bdabe7f98ac12607995bb1ee4f8f.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/frog_prejump.png"
-dest_files=["res://.godot/imported/frog_prejump.png-0e24bdabe7f98ac12607995bb1ee4f8f.s3tc.ctex", "res://.godot/imported/frog_prejump.png-0e24bdabe7f98ac12607995bb1ee4f8f.etc2.ctex"]
+dest_files=["res://.godot/imported/frog_prejump.png-0e24bdabe7f98ac12607995bb1ee4f8f.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -2,24 +2,37 @@
 
 Things **already wired in the project**:
 
-- Google **UMP** runs before ads initialize (`AdsManager`): consent form when required by region.
-- `RequestConfiguration`: max rating **G**, child-directed and under-age signals set to **false** (change in `AdsManager._initialize_mobile_ads` if you truly target minors).
+- Google **UMP** runs before ads initialize (`AdsManager`): consent form when required by region, then the IDFA explainer and Apple's tracking (ATT) prompt once the AdMob IDFA message is published (see below). The consent timeout leaves a showing form alone, so ads start after the player answers.
+- `RequestConfiguration`: max rating **T** (teen), child-directed and under-age signals set to **false** (change in `AdsManager._initialize_mobile_ads` if you truly target minors). T lets far more advertisers bid than G did; the App Store age rating has to cover it (13+, below).
+- **Rewarded ads**: Endless mode offers one "KEEP GOING (WATCH AD)" revive per run after a fall (`game_over_screen.gd` → `AdsManager.show_rewarded`). Remove Ads owners get "KEEP GOING" with no ad.
 - **Privacy Policy** and **Terms of Use** are bundled as `legal/privacy_policy.txt` and `legal/terms_of_use.txt` and open in-game via **`PrivacyTermsPopup`** (Remove Ads → Privacy Policy / Terms of Use). Optionally set **`ComplianceConfig.APP_STORE_PRIVACY_POLICY_URL`** to your hosted HTTPS duplicate for App Store Connect only (same text as `legal/privacy_policy.txt`).
-- iOS export preset **`NSUserTrackingUsageDescription`** via **Additional plist content** (needed because the Poing AdMob plugin links App Tracking Transparency). Edit the wording in **`export_presets.cfg`** → `application/additional_plist_content` if you want different copy.
+- iOS export preset includes `NSUserTrackingUsageDescription` in **Additional plist content**, declares tracking (`privacy/tracking_enabled=true`), and marks device ID and advertising data as used for tracking.
+
+**Current ATT decision:** Frog Quest+ asks for tracking so ads can be targeted. The prompt comes from Google's UMP SDK, which only shows it after an **IDFA explainer message** is published for this app in AdMob. Apple has already asked why a build with `NSUserTrackingUsageDescription` showed no prompt, so **do not upload until a fresh install shows the prompt** (step 1 under ATT below).
 
 ## You complete in App Store Connect (cannot be scripted from Godot)
 
-1. **Privacy Policy URL** — App Store Connect still requires an HTTPS URL. Paste the hosted copy of **`legal/privacy_policy.txt`** (matching wording): **https://musecast.github.io/frogquest/privacy_policy.html**. Players can also read the bundled policy in-app.
+1. **Privacy Policy URL** — App Store Connect still requires an HTTPS URL. Paste the hosted copy of **`legal/privacy_policy.txt`** (matching wording): **https://jasonmuse.github.io/frog-quest-support/privacy_policy.html**. Players can also read the bundled policy in-app.
 
 2. **App Privacy questionnaire** — answer truthfully for your build (ads, IAP, analytics, Firebase/AdMob, crash tools, etc.). Match what SDKs collect; adjust if you add/remove SDKs.
 
-3. **Support URL** — set in App Store Connect as needed for your storefront listing (website, ticketing, etc.).
+3. **Support URL** — use the hosted support page: **https://jasonmuse.github.io/frog-quest-support/support.html**.
 
-4. **Age rating / kids** — align with COPPA/Google child-directed declarations; if aimed at kids, change UMP/request flags accordingly and follow kids policies.
+4. **Marketing URL / developer website** — use **https://jasonmuse.github.io/frog-quest-support/**.
+
+4. **Age rating / kids**: **done for 1.1.** The content answers are all None/No (Advertising: Yes; the newer Social Media questions: No), so Apple calculates 4+. **Override to Higher Age Rating → 13+** covers the T-rated ads, and Apple requires ads to fit the app's age rating. It shows as 13+ in 172 countries, 12+ in Brazil and Vietnam, and 12+ on iOS versions before 26. It goes live with version 1.1. Korea's "Add RCN" only matters if Korea's game rating board requires a classification number. Align with COPPA/Google child-directed declarations; if aimed at kids, change UMP/request flags (and drop the ad rating back to G) and follow kids policies.
 
 ## Production ad & IAP identifiers
 
 Live iOS AdMob identifiers are wired in **`scripts/AdsManager.gd`**, **`export_presets.cfg`** (`plugins_plist/GADApplicationIdentifier`), and the bundled iOS AdMob plugin plist.
+
+Before expecting reliable live ad fill, finish these AdMob-side items:
+
+- **Privacy & messaging**: the **IDFA explainer is published** ("Frog Quest+ IDFA explainer", Google's standard English text, Frog Quest+ only). It's what makes the tracking prompt appear; AdMob says allow up to an hour. Still to do: AdMob shows no European regulations (GDPR) or US state regulations message for the account yet. Without the GDPR one, players in the EEA, UK and Switzerland only get limited (lower-paying) ads. If device logs say `Failed to read publisher's account configuration`, the in-app SDK ran but AdMob does not have the matching form/config ready yet.
+- **Rewarded ad unit**: done. **FQrewarded** (Rewarded, 1 Revive, no partner bidding) is `ca-app-pub-3776793413956253/4063431642`, in `REWARDED_ID` in `scripts/AdsManager.gd`. Rewarded units take video and interactive/playable creatives by default. New units can take up to an hour to start serving.
+- **Interstitial ad unit**: in AdMob, make sure the interstitial unit allows video and rich media too, so playable and video ads can compete for it.
+- **app-ads.txt / app readiness**: after the App Store listing has a developer website, publish AdMob's `app-ads.txt` snippet at that site's root and request/check verification in AdMob. New AdMob apps may have limited serving until app verification and readiness review finish.
+- **No fill**: `Request Error: No ad to show` means the request reached AdMob but no ad was returned. It is not a Godot scene crash; retest after AdMob approval/verification and on a stable device network.
 
 Ensure **Remove Ads** product id `com.muse.frogquest.removeads` matches App Store Connect and is cleared for sale.
 
@@ -34,9 +47,17 @@ App Store Connect status **Missing Metadata** usually means the product still ne
 - Review screenshot: upload a screenshot that shows the in-game Remove Ads screen / buy button. This is for Apple's review, not the optional App Store Promotion image.
 - Review notes suggestion: `Non-consumable Remove Ads purchase. Launch the app, open the pause/settings menu, then tap Remove Ads. The product ID is com.muse.frogquest.removeads. Purchase removes integrated banner and interstitial ads. Restore Purchases is available on the same screen. No login is required.`
 
+**Version**: 1.0 is live, so the next upload is **1.1 (build 3)**. Version 1.1 exists in App Store Connect (Prepare for Submission), and the iOS export preset matches. The Godot 4.7 template already sets `ITSAppUsesNonExemptEncryption = NO`, so TestFlight builds skip the export-compliance question.
+
 For the first in-app purchase, Apple requires it to be submitted with a new app version: after the binary is uploaded, go to the app version page and add `Remove Ads` in **In-App Purchases and Subscriptions** before submitting the version to App Review.
 
-The Godot code expects the iOS StoreKit singleton `InAppStore` (or a compatible `InAppPurchase` singleton). Before the final iPhone build, make sure an iOS IAP plugin is installed and enabled in the iOS export preset; otherwise the Remove Ads buttons stay disabled in-game even though App Store Connect has the product.
+The Godot code now supports the installed StoreKit 2 plugin singleton `IOSInAppPurchase`, plus older `InAppStore` / `InAppPurchase` fallbacks. The iOS IAP plugin lives at `ios/plugins/ios-in-app-purchase/ios-in-app-purchase.gdip` and is enabled in the iOS export preset as `plugins/IOSInAppPurchase=true`.
+
+**iOS plugins are tied to the Godot version.** The project is on Godot **4.7.1**, so `ios/plugins` holds the 4.7 builds: the IAP plugin is **v0.4.0** (hrk4649/godot_ios_plugin_iap, "for Godot 4.7"; v0.3.0 was the 4.6 build) and the AdMob libraries come from **`poing-godot-admob-ios-v4.7.1.zip`** in the AdMob plugin's v4.3.1 release. Our `.gdip` files were kept: the download's `poing-godot-admob-ads.gdip` carries Google's *test* app ID. After any Godot upgrade, swap both again before exporting for iOS, or the app can fail to link or crash. The 4.7.1 iOS export template is installed in `%APPDATA%\Godot\export_templates\4.7.1.stable\ios.zip`.
+
+**Exporting from the command line:** the AdMob exporter patches `project.pbxproj` with the Google Mobile Ads Swift package in a *deferred* step, and a `--headless --export-release` run quits before it happens. After a headless export, run `PbxprojService.patch(<pbxproj>, "PoingGodotAdMobDepsPackage")` (see the log for "AdMob: Patched project.pbxproj"), or export from the editor window, where it runs on its own. Without it Xcode can't find the `GAD…` symbols.
+
+On the final iPhone/TestFlight build, open Remove Ads and confirm the buy/restore buttons are enabled. In the device log you should see `AdsManager: purchase backend detected: IOSInAppPurchase`. If the screen still says store purchases are not configured, stop and re-check that the iOS export preset has the `IOSInAppPurchase` plugin checked.
 
 Before uploading, run this from the project root on the machine that has Godot:
 
@@ -50,9 +71,19 @@ Do not upload while it reports any **BLOCKER**. The current repo has the live iO
 
 For the App Privacy answers, include the data collected by Google AdMob and Apple purchases. Apple says third-party partner data must be included in App Store Connect privacy answers, and Google's current AdMob iOS disclosure says the Mobile Ads SDK may collect device IDs, advertising data, IP address/general location signals, diagnostics, and ad interaction/performance data. Recheck the final answers against your exact enabled SDKs and consent settings.
 
+### ATT / tracking (targeted ads)
+
+Frog Quest+ requests App Tracking Transparency permission through Google's UMP SDK so AdMob can serve targeted ads to players who allow it.
+
+1. **Confirm the prompt before every upload**: delete the app (or reset Settings → Privacy & Security → Tracking), install the build, launch it, and check that the IDFA explainer appears followed by Apple's "Allow … to track your activity" alert. No alert means the AdMob IDFA message isn't published yet. Fix that before uploading, or App Review will reject the build again.
+2. **App Privacy answers**: **done and published.** **Device ID** and **Advertising Data** are marked **used for tracking**, so the label now has "Data Used to Track You: Identifiers, Usage Data". The rest was already declared, linked but not tracking: Purchase History, Product Interaction, Coarse Location, Performance Data, Crash Data. Recheck it if you add or remove SDKs. The Godot export privacy settings match: `privacy/tracking_enabled=true`, with `device_id` and `advertising_data` marked `used_for_tracking=true`.
+3. **Review notes**: you can add "Frog Quest+ shows Apple's App Tracking Transparency prompt on first launch, after a short explainer, before any ads load."
+
+Players who tap **Ask App Not to Track** still get ads, just not targeted ones. The privacy policy already covers advertising identifiers "subject to consent" and the iOS Tracking setting.
+
 ## Review / smoke passes (recommended)
 
-Cold launch → playable level; **pause/resume/settings** portrait and landscape; **Remove Ads** / restore; **Privacy Policy** and **Terms of Use** buttons open bundled in-app text; gameplay with banner; **rotation** mid-game; endless **game over** + restart + exit.
+Cold launch → playable level; **pause/resume/settings** portrait and landscape; **Remove Ads** buy/restore buttons enabled; sandbox purchase applies ad-free state; restore re-applies ad-free state after resetting local data; **Privacy Policy** and **Terms of Use** buttons open bundled in-app text; gameplay with banner; **rotation** mid-game; endless **game over** + restart + exit.
 
 After first production ad build on device, verify real fills and revenue in AdMob; test ATT prompt behavior if personalization depends on consent + tracking.
 

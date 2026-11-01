@@ -18,7 +18,9 @@ config/name="Frog Quest+"
 config/description="CLIMB THE TREE"
 config/tags=PackedStringArray("frog_quest+")
 run/main_scene="res://scenes/BootLoader.tscn"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
+boot_splash/bg_color=Color(0.05, 0.05, 0.08, 1)
+boot_splash/show_image=false
 boot_splash/stretch_mode=0
 boot_splash/use_filter=false
 boot_splash/image="uid://cqtw1lsseoik5"
@@ -40,11 +42,17 @@ window/size/window_height_override=720
 window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 window/handheld/orientation=6
+window/per_pixel_transparency/allowed.pc=true
 window/vsync/vsync_mode=2
 
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/admob/plugin.cfg")
+
+[frogquest]
+
+ads/enabled=true
+ads/debug_disable_ads=false
 
 [input]
 
@@ -92,5 +100,6 @@ common/physics_interpolation=true
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
 environment/defaults/default_clear_color=Color(0.79607844, 0.92941177, 0.99215686, 1)

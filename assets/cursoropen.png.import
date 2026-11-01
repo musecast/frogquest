@@ -3,21 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dsl5k3rksj3sc"
-path.s3tc="res://.godot/imported/cursoropen.png-9d134a58e91622518e9d0ee1b5691ecd.s3tc.ctex"
-path.etc2="res://.godot/imported/cursoropen.png-9d134a58e91622518e9d0ee1b5691ecd.etc2.ctex"
+path="res://.godot/imported/cursoropen.png-9d134a58e91622518e9d0ee1b5691ecd.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/cursoropen.png"
-dest_files=["res://.godot/imported/cursoropen.png-9d134a58e91622518e9d0ee1b5691ecd.s3tc.ctex", "res://.godot/imported/cursoropen.png-9d134a58e91622518e9d0ee1b5691ecd.etc2.ctex"]
+dest_files=["res://.godot/imported/cursoropen.png-9d134a58e91622518e9d0ee1b5691ecd.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

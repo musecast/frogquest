@@ -22,18 +22,25 @@ const ITEMS: Dictionary = {
 	"negative_skin":  {"label": "Negative",      "type": "skin",
 					  "shader": "res://assets/negative.gdshader",
 					  "how": "Score 50 in Endless"},
+	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop",
+					  "how": "He lives on your desktop. Right-click him or his tray icon for more."},
 }
 
 var _item_buttons: Dictionary = {}  # item_id -> Button
 var _hint_label: Label = null
 var _resize_timer: SceneTreeTimer = null
+var _froggy_link = null  # DesktopFrogLink.gd, loaded on first use
+var _froggy_busy_until := 0  # msec; LET OUT / CALL IN waits while froggy starts up or heads home
+var _froggy_refresh_in := 0.0
 
 func _compute_action_button_size(base_size: Vector2, font_size: int) -> Vector2:
 	var button_font := load("res://assets/fibberish.ttf") as Font
 	if button_font == null:
 		return base_size
 
-	var text_width: float = button_font.get_string_size("UNEQUIP", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var text_width: float = 0.0
+	for label in ["UNEQUIP", "LET OUT", "CALL IN"]:
+		text_width = max(text_width, button_font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x)
 	# Account for the button style's horizontal padding and a little extra
 	# headroom so the longest label never clips on scaled layouts.
 	var padded_width: float = ceil(text_width + 28.0)
@@ -197,6 +204,16 @@ func _build_ui() -> void:
 		none_lbl2.add_theme_font_size_override("font_size", font_size_body)
 		vbox.add_child(none_lbl2)
 
+	# ── DESKTOP (computers only, once he's unlocked) ─────────────────────
+	if _is_unlocked("lil_froggy"):
+		vbox.add_child(HSeparator.new())
+		var desk_label := Label.new()
+		desk_label.text = "— DESKTOP —"
+		desk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desk_label.add_theme_font_size_override("font_size", font_size_body)
+		vbox.add_child(desk_label)
+		vbox.add_child(_make_item_row("lil_froggy", action_btn_min, font_size_body, info_btn_size))
+
 	# ── HINT LABEL (shown when info button pressed) ──────────────────────
 	_hint_label = Label.new()
 	_hint_label.visible = false
@@ -347,7 +364,16 @@ func _on_info_pressed(id: String) -> void:
 func _is_unlocked(id: String) -> bool:
 	if id == "froggycrown":
 		return MusicManager.froggyCrown != 0
+	if id == "lil_froggy":
+		var link = _desktop_frog_link()
+		return link.is_supported() and link.is_unlocked()
 	return id in MusicManager.unlocked_skins
+
+
+func _desktop_frog_link():
+	if _froggy_link == null:
+		_froggy_link = load("res://scripts/DesktopFrogLink.gd")
+	return _froggy_link
 
 
 func _is_equipped(id: String) -> bool:
@@ -358,10 +384,35 @@ func _is_equipped(id: String) -> bool:
 
 
 func _update_button_label(btn: Button, id: String) -> void:
+	if id == "lil_froggy":
+		var waiting := Time.get_ticks_msec() < _froggy_busy_until
+		btn.disabled = waiting
+		btn.text = "..." if waiting else ("CALL IN" if _desktop_frog_link().is_out() else "LET OUT")
+		return
 	btn.text = "UNEQUIP" if _is_equipped(id) else "EQUIP"
 
 
+func _process(delta: float) -> void:
+	# Froggy comes and goes on his own (tray menu, startup), so keep his button honest.
+	var btn: Button = _item_buttons.get("lil_froggy")
+	if btn == null:
+		return
+	_froggy_refresh_in -= delta
+	if _froggy_refresh_in <= 0.0:
+		_froggy_refresh_in = 0.5
+		_update_button_label(btn, "lil_froggy")
+
+
 func _on_item_button_pressed(id: String, btn: Button) -> void:
+	if id == "lil_froggy":
+		var link = _desktop_frog_link()
+		if link.is_out():
+			link.send_command("home", link.game_window_rect())  # he hops back into this window
+		else:
+			link.let_out(link.game_window_rect())  # he hops out of this window
+		_froggy_busy_until = Time.get_ticks_msec() + 3000
+		_update_button_label(btn, id)
+		return
 	var def = ITEMS[id]
 	if def["type"] == "hat":
 		MusicManager.equipped_hat = "" if _is_equipped(id) else id

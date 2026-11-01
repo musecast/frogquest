@@ -156,6 +156,7 @@
 [ext_resource type="Texture2D" uid="uid://bb4tisnaabfnx" path="res://assets/bae.png" id="153_7f41k"]
 [ext_resource type="Script" uid="uid://vf5i63slyy84" path="res://scenes/bae.gd" id="154_qiqef"]
 [ext_resource type="Texture2D" uid="uid://cw2b8c21jaj5n" path="res://assets/beanbag-top.png" id="154_ste0v"]
+[ext_resource type="Texture2D" uid="uid://b00gipabdpjbl" path="res://assets/beanbag.png" id="155_bean"]
 [ext_resource type="Texture2D" uid="uid://crcw5rrxgo3k3" path="res://assets/sunflower.png" id="156_uer86"]
 [ext_resource type="Texture2D" uid="uid://dj0iapqy0bjko" path="res://assets/uturnsign.png" id="157_w0c4r"]
 
@@ -1308,9 +1309,6 @@ animations = [{
 "name": &"default",
 "speed": 0.7
 }]
-
-[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_w0c4r"]
-load_path = "res://.godot/imported/beanbag.png-42b771655589ae1ae1830114bdf09570.ctex"
 
 [node name="Main" type="Node2D" unique_id=2124205239]
 texture_filter = 1
@@ -3299,7 +3297,7 @@ texture_scale = 0.15
 z_index = -1
 position = Vector2(1281.5, 273.5)
 scale = Vector2(1.3281246, 0.7343749)
-texture = SubResource("CompressedTexture2D_w0c4r")
+texture = ExtResource("155_bean")
 
 [node name="Beanbag2" type="Sprite2D" parent="." unique_id=237394040]
 z_index = 21

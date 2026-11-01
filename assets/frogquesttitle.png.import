@@ -3,21 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ck2sqdfuk6fuh"
-path.s3tc="res://.godot/imported/frogquesttitle.png-1b40cd84f92cc593d97e015986f3ad0e.s3tc.ctex"
-path.etc2="res://.godot/imported/frogquesttitle.png-1b40cd84f92cc593d97e015986f3ad0e.etc2.ctex"
+path="res://.godot/imported/frogquesttitle.png-1b40cd84f92cc593d97e015986f3ad0e.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/frogquesttitle.png"
-dest_files=["res://.godot/imported/frogquesttitle.png-1b40cd84f92cc593d97e015986f3ad0e.s3tc.ctex", "res://.godot/imported/frogquesttitle.png-1b40cd84f92cc593d97e015986f3ad0e.etc2.ctex"]
+dest_files=["res://.godot/imported/frogquesttitle.png-1b40cd84f92cc593d97e015986f3ad0e.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

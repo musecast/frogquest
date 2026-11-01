@@ -1,4 +1,3 @@
-class_name PrivacyTermsPopup
 extends CanvasLayer
 ## Displays bundled plain-text legal docs from res://legal/
 

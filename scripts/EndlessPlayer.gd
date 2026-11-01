@@ -14,11 +14,28 @@ var landed_platform_ids: Dictionary = {}
 var mouse_origin: Vector2 = Vector2.ZERO
 var mouse_position: Vector2 = Vector2.ZERO
 var mouse_path: Vector2 = Vector2.ZERO
+var _cursor_closed: Texture2D
+var _cursor_open: Texture2D
+var _cursor_x: Texture2D
 
 @onready var game_root: Node = get_parent()
 
+func _supports_desktop_mouse() -> bool:
+	var platform := OS.get_name()
+	return platform != "iOS" and platform != "Android"
+
+
+func _set_custom_cursor(texture: Texture2D) -> void:
+	if _supports_desktop_mouse():
+		Input.set_custom_mouse_cursor(texture)
+
+
 func _ready() -> void:
-	Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
+	if _supports_desktop_mouse():
+		_cursor_closed = load("res://assets/cursorclosed.png")
+		_cursor_open = load("res://assets/cursoropen.png")
+		_cursor_x = load("res://assets/cursor-x.png")
+		_set_custom_cursor(_cursor_open)
 
 func _physics_process(delta: float) -> void:
 	var gravity: float = float(ProjectSettings.get_setting("physics/2d/default_gravity"))
@@ -38,17 +55,17 @@ func _process(_delta: float) -> void:
 			mouse_origin = get_global_mouse_position()
 
 		if Input.is_action_pressed("ui_mouse"):
-			Input.set_custom_mouse_cursor(load("res://assets/cursorclosed.png"))
+			_set_custom_cursor(_cursor_closed)
 			mouse_position = get_global_mouse_position()
 			if mouse_origin != Vector2.ZERO:
 				mouse_path = mouse_origin - mouse_position
 		else:
-			Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
+			_set_custom_cursor(_cursor_open)
 
 		if Input.is_action_just_released("ui_mouse") and mouse_origin != Vector2.ZERO:
 			_launch_from_mouse_drag()
 	else:
-		Input.set_custom_mouse_cursor(load("res://assets/cursor-x.png"))
+		_set_custom_cursor(_cursor_x)
 
 func _launch_from_mouse_drag() -> void:
 	var launch_velocity: Vector2 = mouse_path * launch_sensitivity
@@ -67,7 +84,7 @@ func _launch_from_mouse_drag() -> void:
 	mouse_origin = Vector2.ZERO
 	mouse_path = Vector2.ZERO
 	mouse_position = Vector2.ZERO
-	Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
+	_set_custom_cursor(_cursor_open)
 
 func _register_landed_platform() -> void:
 	for i in range(get_slide_collision_count()):

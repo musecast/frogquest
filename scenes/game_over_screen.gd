@@ -2,6 +2,7 @@ extends CanvasLayer
 
 var _rock_tweens: Array = []
 var _resize_timer: SceneTreeTimer = null
+const MODAL_LAYER_OFFSET := 20
 
 
 func _ready() -> void:
@@ -44,6 +45,10 @@ func _apply_layout() -> void:
 		label.add_theme_font_size_override("font_size", label_size)
 	$MarginContainer/TryAgainButton.custom_minimum_size = btn_min
 	$MarginContainer/TryAgainButton.add_theme_font_size_override("font_size", label_size)
+	var kgb := $MarginContainer.get_node_or_null("KeepGoingButton")
+	if kgb:
+		kgb.custom_minimum_size = btn_min
+		kgb.add_theme_font_size_override("font_size", int(label_size * 0.75))
 	$MarginContainer/BottomRow/ExitButton.custom_minimum_size = btn_min
 	$MarginContainer/BottomRow/ExitButton.add_theme_font_size_override("font_size", label_size)
 	var wb := $MarginContainer/BottomRow.get_node_or_null("WardrobeButton")
@@ -68,8 +73,11 @@ func show_scores(score: int, high_score: int, is_new_record: bool) -> void:
 	$MarginContainer/HighScoreRow/HighScoreDisplay.text = "Best: %d" % high_score
 	_ensure_wardrobe_button()
 	_ensure_remove_ads_button()
+	_ensure_keep_going_button()
 	AdsManager.show_banners_top_and_bottom()
-	AdsManager.connect("ads_removed_changed", _on_ads_removed, CONNECT_ONE_SHOT)
+	# After a "keep going" this screen can come back in the same run, still connected.
+	if not AdsManager.is_connected("ads_removed_changed", _on_ads_removed):
+		AdsManager.connect("ads_removed_changed", _on_ads_removed, CONNECT_ONE_SHOT)
 
 	for t in _rock_tweens:
 		t.kill()
@@ -145,11 +153,20 @@ func _ensure_wardrobe_button() -> void:
 func _on_wardrobe_button_pressed() -> void:
 	var ws = load("res://scenes/WardrobeScreen.gd").new()
 	get_tree().root.add_child(ws)
+	ws.layer = AdsManager.canvas_layer_above_banner_placeholder() + MODAL_LAYER_OFFSET
+	$MarginContainer.visible = false
+	AdsManager.hide_banner()
 	ws.closed.connect(func() -> void:
-		get_tree().root.remove_child(ws)
+		if is_instance_valid(ws):
+			ws.queue_free()
+		if not is_inside_tree():
+			return
+		$MarginContainer.visible = true
 		var wb := $MarginContainer/BottomRow.get_node_or_null("WardrobeButton")
 		if wb:
 			_refresh_new_badge(wb)
+		AdsManager.show_banners_top_and_bottom()
+		_apply_layout()
 	)
 
 
@@ -186,6 +203,61 @@ func _refresh_new_badge(btn: Button) -> void:
 		badge.visible = MusicManager.has_unseen_cosmetics()
 
 
+## "Keep going": once per run, watch a rewarded video (or nothing, with Remove Ads) to carry on
+## from the last platform with the same score.
+func _ensure_keep_going_button() -> void:
+	var existing := $MarginContainer.get_node_or_null("KeepGoingButton")
+	var offer: bool = get_parent().has_method("can_revive") and get_parent().can_revive() \
+		and (AdsManager.is_ad_free() or AdsManager.is_rewarded_ready())
+	if not offer:
+		if existing:
+			existing.queue_free()
+		return
+	if existing:
+		existing.disabled = false
+		return
+	var btn := Button.new()
+	btn.name = "KeepGoingButton"
+	btn.text = "KEEP GOING" if AdsManager.is_ad_free() else "KEEP GOING (WATCH AD)"
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	$MarginContainer.add_child(btn)
+	$MarginContainer.move_child(btn, $MarginContainer/TryAgainButton.get_index())
+	btn.pressed.connect(_on_keep_going_button_pressed)
+
+
+func _on_keep_going_button_pressed() -> void:
+	var btn := $MarginContainer.get_node_or_null("KeepGoingButton") as Button
+	if btn:
+		btn.disabled = true
+	if AdsManager.is_ad_free():
+		_keep_going()
+	elif not AdsManager.show_rewarded(_on_rewarded_ad_done):
+		if btn:
+			btn.queue_free()  # the video went away in the meantime
+
+
+func _on_rewarded_ad_done(earned: bool) -> void:
+	if not is_inside_tree():
+		return
+	if earned:
+		_keep_going()
+	else:
+		var btn := $MarginContainer.get_node_or_null("KeepGoingButton")
+		if btn:
+			btn.queue_free()
+
+
+func _keep_going() -> void:
+	var btn := $MarginContainer.get_node_or_null("KeepGoingButton")
+	if btn:
+		btn.queue_free()
+	for t in _rock_tweens:
+		t.kill()
+	_rock_tweens.clear()
+	visible = false
+	get_parent().revive()
+
+
 func _on_try_again_button_pressed() -> void:
 	AdsManager.hide_banner()
 	get_tree().reload_current_scene()
@@ -197,7 +269,7 @@ func _on_exit_button_pressed() -> void:
 
 
 func _ensure_remove_ads_button() -> void:
-	if MusicManager.ads_removed:
+	if AdsManager.is_ad_free():  # bought already, or no ads on this platform (desktop/web)
 		var existing := $MarginContainer.get_node_or_null("RemoveAdsButton")
 		if existing:
 			existing.queue_free()
@@ -218,9 +290,18 @@ func _ensure_remove_ads_button() -> void:
 func _on_remove_ads_button_pressed() -> void:
 	var screen = load("res://scenes/RemoveAdsScreen.gd").new()
 	get_tree().root.add_child(screen)
+	screen.layer = AdsManager.canvas_layer_above_banner_placeholder() + MODAL_LAYER_OFFSET
+	$MarginContainer.visible = false
+	AdsManager.hide_banner()
 	screen.closed.connect(func() -> void:
-		get_tree().root.remove_child(screen)
+		if is_instance_valid(screen):
+			screen.queue_free()
+		if not is_inside_tree():
+			return
+		$MarginContainer.visible = true
 		_ensure_remove_ads_button()
+		AdsManager.show_banners_top_and_bottom()
+		_apply_layout()
 	)
 
 

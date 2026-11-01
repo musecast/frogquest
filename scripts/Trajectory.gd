@@ -7,6 +7,16 @@ var cursorLock = false
 var endGame = 1
 var sensitivity = 3.5
 
+func _supports_desktop_mouse() -> bool:
+	var platform := OS.get_name()
+	return platform != "iOS" and platform != "Android"
+
+
+func _set_custom_cursor(texture: Texture2D) -> void:
+	if _supports_desktop_mouse():
+		Input.set_custom_mouse_cursor(texture)
+
+
 func _ready():
 
 	pass
@@ -17,29 +27,30 @@ func _process(delta):
 			if Input.is_action_just_pressed("ui_mouse"):
 				#Input.set_default_cursor_shape()
 				#Input.set_custom_mouse_cursor(load("res://assets/cursorclosed.png"))
-				if cursorLock == true:
+				if cursorLock == true and _supports_desktop_mouse():
 					Input.mouse_mode = 4
 					get_viewport().warp_mouse(Vector2(160,15))
 				#elif DisplayServer.window_get_mode() == 3:
 				#	Input.mouse_mode = 3
 				else:
-					Input.mouse_mode = 0
+					if _supports_desktop_mouse():
+						Input.mouse_mode = 0
 				mouseOrigin = get_global_mouse_position()
 				$"../frogaim".play()
 				
 			if Input.is_action_pressed("ui_mouse"):
-				Input.set_custom_mouse_cursor(load("res://assets/cursorclosed.png"))
+				_set_custom_cursor(load("res://assets/cursorclosed.png"))
 				mousePosition = get_global_mouse_position()
 				if mouseOrigin != Vector2(0, 0):
 					mousePath = mouseOrigin - mousePosition
 					queue_redraw()
 			else:
-				Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
+				_set_custom_cursor(load("res://assets/cursoropen.png"))
 				
 			if Input.is_action_just_released("ui_mouse"):
 				
 				
-				Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
+				_set_custom_cursor(load("res://assets/cursoropen.png"))
 				if cursorLock == true:
 					#Input.mouse_mode = 3
 					pass
@@ -85,7 +96,7 @@ func _process(delta):
 			
 			#Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
 		else:
-			Input.set_custom_mouse_cursor(load("res://assets/cursor-x.png"))
+			_set_custom_cursor(load("res://assets/cursor-x.png"))
 					
 func _draw():
 	if Input.is_action_pressed("ui_mouse"):

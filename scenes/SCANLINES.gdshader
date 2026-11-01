@@ -7,7 +7,7 @@ uniform float opacity : hint_range(0.0, 1.0) = 1.0;
 uniform float center_transparency : hint_range(0.0, 1.0) = 1.0; // how transparent the center is
 uniform float edge_opacity : hint_range(0.0, 1.0) = 1.0; // how opaque the edges are
 uniform float gradient_radius : hint_range(0.0, 2.0) = 1.0; // size of the gradient falloff
-uniform sampler2D SCREEN_TEXTURE: hint_screen_texture, filter_linear_mipmap;
+uniform sampler2D SCREEN_TEXTURE: hint_screen_texture, filter_nearest;  // (crisp pixels, and no mipmaps of the screen every frame)
 
 vec2 uv_curve(vec2 uv)
 {

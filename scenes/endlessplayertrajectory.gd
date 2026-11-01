@@ -12,10 +12,21 @@ var _cursor_closed: Texture2D
 var _cursor_open: Texture2D
 var _cursor_x: Texture2D
 
+func _supports_desktop_mouse() -> bool:
+	var platform := OS.get_name()
+	return platform != "iOS" and platform != "Android"
+
+
+func _set_custom_cursor(texture: Texture2D) -> void:
+	if _supports_desktop_mouse():
+		Input.set_custom_mouse_cursor(texture)
+
+
 func _ready():
-	_cursor_closed = load("res://assets/cursorclosed.png")
-	_cursor_open = load("res://assets/cursoropen.png")
-	_cursor_x = load("res://assets/cursor-x.png")
+	if _supports_desktop_mouse():
+		_cursor_closed = load("res://assets/cursorclosed.png")
+		_cursor_open = load("res://assets/cursoropen.png")
+		_cursor_x = load("res://assets/cursor-x.png")
 
 func _process(delta):
 	if Engine.time_scale != 0.05 and Engine.time_scale != 0.0 and endGame == 0:
@@ -23,29 +34,30 @@ func _process(delta):
 			if Input.is_action_just_pressed("ui_mouse"):
 				#Input.set_default_cursor_shape()
 				#Input.set_custom_mouse_cursor(_cursor_closed)
-				if cursorLock == true:
+				if cursorLock == true and _supports_desktop_mouse():
 					Input.mouse_mode = 4
 					get_viewport().warp_mouse(Vector2(160,15))
 				#elif DisplayServer.window_get_mode() == 3:
 				#	Input.mouse_mode = 3
 				else:
-					Input.mouse_mode = 0
+					if _supports_desktop_mouse():
+						Input.mouse_mode = 0
 				mouseOrigin = get_global_mouse_position()
 				$"../frogaim".play()
 
 			if Input.is_action_pressed("ui_mouse"):
-				Input.set_custom_mouse_cursor(_cursor_closed)
+				_set_custom_cursor(_cursor_closed)
 				mousePosition = get_global_mouse_position()
 				if mouseOrigin != Vector2(0, 0):
 					mousePath = mouseOrigin - mousePosition
 					queue_redraw()
 			else:
-				Input.set_custom_mouse_cursor(_cursor_open)
+				_set_custom_cursor(_cursor_open)
 
 			if Input.is_action_just_released("ui_mouse"):
 
 
-				Input.set_custom_mouse_cursor(_cursor_open)
+				_set_custom_cursor(_cursor_open)
 				if cursorLock == true:
 					#Input.mouse_mode = 3
 					pass
@@ -91,7 +103,7 @@ func _process(delta):
 
 			#Input.set_custom_mouse_cursor(_cursor_open)
 		else:
-			Input.set_custom_mouse_cursor(_cursor_x)
+			_set_custom_cursor(_cursor_x)
 
 func _draw():
 	if Input.is_action_pressed("ui_mouse"):

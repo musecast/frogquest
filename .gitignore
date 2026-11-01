@@ -1,2 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
+
+# Export output (the Web and Windows presets build into these; frogquest.exe is over GitHub's 100 MB limit)
+web/
+windowsbuild/
+itch/

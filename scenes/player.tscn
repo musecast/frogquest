@@ -636,7 +636,7 @@ texture = ExtResource("2_c8w13")
 [node name="FroggyWizHat" type="Sprite2D" parent="." unique_id=845240182]
 visible = false
 position = Vector2(1.42109e-14, -9.16667)
-scale = Vector2(0.54, 0.54)
+scale = Vector2(0.76, 0.76)
 texture = ExtResource("3_w5j5w")
 
 [node name="FroggyCakeHat" type="Sprite2D" parent="." unique_id=399085400]

@@ -8,6 +8,12 @@ const RESOURCES := [
 	"res://scenes/EndlessMode.tscn",
 	"res://scenes/player.tscn",
 	"res://scenes/endlessplayer.tscn",
+	"res://scenes/RemoveAdsScreen.gd",
+	"res://scripts/AdsManager.gd",
+	"res://scripts/BootLoader.gd",
+	"res://scripts/ComplianceConfig.gd",
+	"res://scripts/MusicManager.gd",
+	"res://scripts/PrivacyTermsPopup.gd",
 ]
 
 
