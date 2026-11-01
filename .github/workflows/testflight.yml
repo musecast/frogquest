@@ -42,7 +42,7 @@ jobs:
             echo "::error::Add these repository secrets first:$missing"
             exit 1
           fi
-          # Writes $RUNNER_TEMP/AuthKey.p8, signs in to App Store Connect with it, and sets BUILD.
+          # Writes the .p8 to $ASC_KEY_PATH, signs in to App Store Connect with it, and sets BUILD.
           python3 tools/ci/check_asc_key.py
 
       - name: Cache Godot and its iOS template
@@ -112,18 +112,21 @@ jobs:
           </dict>
           </plist>
           EOF
+          # A pasted secret can carry a trailing line break, which breaks the token Xcode signs.
+          key_id=$(printf '%s' "$ASC_KEY_ID" | tr -d '[:space:]')
+          issuer_id=$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/FrogQuest.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
-            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$key_id" \
+            -authenticationKeyIssuerID "$issuer_id"
 
       - name: Remove the key file
         if: always()
-        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+        run: rm -rf "$RUNNER_TEMP/private_keys"
 
       - name: Summary
         run: |

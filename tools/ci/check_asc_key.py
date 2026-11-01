@@ -1,5 +1,6 @@
 # Checks the App Store Connect API key secrets before the long build, and picks the build number.
-# - Accepts the .p8 with or without its BEGIN/END lines (and squashed onto one line), writes it to $RUNNER_TEMP/AuthKey.p8.
+# - Accepts the .p8 with or without its BEGIN/END lines (and squashed onto one line), and writes it to
+#   $RUNNER_TEMP/private_keys/AuthKey_<KEY_ID>.p8 (the name Apple's tools look for), path in $ASC_KEY_PATH.
 # - Says what a wrong value looks like (a Key ID, an Issuer ID, a file name...) without ever printing it.
 # - Signs in to the App Store Connect API with it, so a bad key fails in seconds, not after a 20 minute build.
 # - Writes BUILD (one above anything already uploaded, and at least 2 + the run number) to $GITHUB_ENV.
@@ -32,7 +33,9 @@ def b64url(data):
 key_id = os.environ.get("ASC_KEY_ID", "").strip()
 issuer = os.environ.get("ASC_ISSUER_ID", "").strip()
 raw = os.environ.get("ASC_PRIVATE_KEY", "").replace("\r", "")
-key_path = os.path.join(os.environ["RUNNER_TEMP"], "AuthKey.p8")
+for name in ("ASC_KEY_ID", "ASC_ISSUER_ID"):
+    if os.environ.get(name, "") != os.environ.get(name, "").strip():
+        print("%s has spaces or line breaks around it; the workflow trims them." % name)
 
 if not re.fullmatch(r"[A-Z0-9]{10}", key_id):
     fail("ASC_KEY_ID should be the key's 10-character Key ID, but it looks like %s." % looks_like(key_id))
@@ -56,6 +59,9 @@ if len(der) < 100 or der[0] != 0x30:
     fail("ASC_PRIVATE_KEY should be the contents of AuthKey_XXXX.p8 (open it in Notepad, Ctrl+A, Ctrl+C), "
          "but it looks like %s." % looks_like(raw))
 
+key_dir = os.path.join(os.environ["RUNNER_TEMP"], "private_keys")
+os.makedirs(key_dir, exist_ok=True)
+key_path = os.path.join(key_dir, "AuthKey_%s.p8" % key_id)
 lines = [b64[i:i + 64] for i in range(0, len(b64), 64)]
 with open(key_path, "w") as f:
     f.write("-----BEGIN PRIVATE KEY-----\n" + "\n".join(lines) + "\n-----END PRIVATE KEY-----\n")
@@ -106,6 +112,6 @@ uploaded = [int(b["attributes"]["version"]) for b in builds if str(b["attributes
 highest = max(uploaded, default=0)
 build = max(2 + int(os.environ.get("GITHUB_RUN_NUMBER", "1")), highest + 1)
 with open(os.environ["GITHUB_ENV"], "a") as f:
-    f.write("BUILD=%d\n" % build)
+    f.write("BUILD=%d\nASC_KEY_PATH=%s\n" % (build, key_path))
 print("Key works: %s (%s). Highest build already uploaded: %d. This run uploads build %d."
       % (app["attributes"]["name"], BUNDLE_ID, highest, build))
