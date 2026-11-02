@@ -1,0 +1,33 @@
+# Renames the app on the App Store (App Information > Name) with the TestFlight workflow's App Store
+# Connect key, so nobody has to sign in to App Store Connect. The new name goes live with the next
+# approved version. Run it from the Actions tab: App Store name > Run workflow.
+
+name: App Store name
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: The app's name on the App Store (30 characters at most)
+        required: true
+        default: Frog Quest
+
+jobs:
+  rename:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the App Store Connect key
+        env:
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: python3 tools/ci/check_asc_key.py
+
+      - name: Rename the app
+        env:
+          APP_NAME: ${{ inputs.name }}
+        run: python3 tools/ci/asc_app_name.py "$APP_NAME"
