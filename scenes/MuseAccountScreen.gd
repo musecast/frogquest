@@ -118,7 +118,7 @@ func _show_state() -> void:
 		_secondary.text = "Sign Out"
 		_secondary.visible = true
 	elif _mode == "link" and not MuseAccount.linking.is_empty():
-		_body.text = "In Muse Shelf, open Settings, then Link a Game, and type this code:"
+		_body.text = "Tap Open Muse Shelf, check it shows this code, and approve it there:"
 		_code.text = str(MuseAccount.linking.get("code", ""))
 		_code.visible = true
 		_input.visible = false
