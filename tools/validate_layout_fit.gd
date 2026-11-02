@@ -2,8 +2,9 @@ extends SceneTree
 ## Headless check that the menus fit every screen shape the game meets (phones, foldables, iPads and
 ## computers, upright and sideways): the Endless game over screen with every button it can have,
 ## squeezed between both banners; the story's title screen, pause menu, settings and reset question
-## (in the whole world, over the bottom banner); and the Remove Ads, Muse account and wardrobe
-## screens. Nothing may hang off the screen or sit under a banner. Each screen is laid out in a
+## (in the whole world, over the bottom banner); the Remove Ads, Muse account and wardrobe screens
+## (with every hat and skin) between both banners, since the ads draw over everything; and the
+## notifications that drop in. Nothing may hang off the screen or sit under a banner. Each screen is laid out in a
 ## SubViewport the size the game's stretch settings (viewport, expand) would give that window. The
 ## story climb saves to scratch files meanwhile, so yours is never touched.
 ##   Godot --headless --path . --script res://tools/validate_layout_fit.gd
@@ -38,11 +39,21 @@ func _initialize() -> void:
 func _run() -> void:
 	var mm := root.get_node("MusicManager")
 	var acct := root.get_node("MuseAccount")
+	# Nothing here may write your wardrobe (opening the wardrobe marks things seen and saves): it saves
+	# to a scratch file, and if your real one changes anyway, it's put back and the test fails.
+	var real_wardrobe: String = mm.wardrobe_path
+	var real_bytes := FileAccess.get_file_as_bytes(real_wardrobe) if FileAccess.file_exists(real_wardrobe) else PackedByteArray()
+	mm.wardrobe_path = SCRATCH_WARDROBE
 	# Every button there can be: a crown (so the wardrobe button shows), and ads not removed.
 	var real_crown: int = mm.froggyCrown
 	var real_ads_removed: bool = mm.ads_removed
+	var real_unlocked: Array = mm.unlocked_skins.duplicate()
+	var real_seen: Array = mm.seen_cosmetics.duplicate()
 	mm.froggyCrown = 1
 	mm.ads_removed = false
+	for id in load("res://scenes/WardrobeScreen.gd").ITEMS:
+		if id != "froggycrown" and id not in mm.unlocked_skins:
+			mm.unlocked_skins.append(id)  # (the fullest wardrobe; in memory only, never saved)
 	var signed_in := func(_screen: Node) -> void:
 		acct.email = LONG_EMAIL
 		acct._refresh_token = "test"
@@ -57,16 +68,19 @@ func _run() -> void:
 		var window: Vector2 = WINDOWS[shape]
 		var endless_vp := _viewport_for(window, ENDLESS_BASE)
 		var story_vp := _viewport_for(window, STORY_BASE)
-		await _check_game_over(shape, endless_vp, window.y > window.x)
-		await _check_panel("%s, story: Remove Ads" % shape, load("res://scenes/RemoveAdsScreen.gd"), story_vp)
-		await _check_panel("%s, Endless: Remove Ads" % shape, load("res://scenes/RemoveAdsScreen.gd"), endless_vp)
-		await _check_panel("%s, story: wardrobe" % shape, load("res://scenes/WardrobeScreen.gd"), story_vp)
-		await _check_panel("%s, Endless: wardrobe" % shape, load("res://scenes/WardrobeScreen.gd"), endless_vp)
+		var up := window.y > window.x
+		await _check_game_over(shape, endless_vp, up)
+		await _check_panel("%s, story: Remove Ads" % shape, load("res://scenes/RemoveAdsScreen.gd"), story_vp, up)
+		await _check_panel("%s, Endless: Remove Ads" % shape, load("res://scenes/RemoveAdsScreen.gd"), endless_vp, up)
+		await _check_panel("%s, story: wardrobe" % shape, load("res://scenes/WardrobeScreen.gd"), story_vp, up)
+		await _check_panel("%s, Endless: wardrobe" % shape, load("res://scenes/WardrobeScreen.gd"), endless_vp, up)
 		var muse: GDScript = load("res://scenes/MuseAccountScreen.gd")
-		await _check_panel("%s: Muse account" % shape, muse, story_vp)
-		await _check_panel("%s, Endless: Muse account" % shape, muse, endless_vp)
-		await _check_panel("%s: Muse account, code sent" % shape, muse, story_vp, code_sent)
-		await _check_panel("%s: Muse account, signed in" % shape, muse, story_vp, signed_in)
+		await _check_panel("%s: Muse account" % shape, muse, story_vp, up)
+		await _check_panel("%s, Endless: Muse account" % shape, muse, endless_vp, up)
+		await _check_panel("%s: Muse account, code sent" % shape, muse, story_vp, up, code_sent)
+		await _check_panel("%s: Muse account, signed in" % shape, muse, story_vp, up, signed_in)
+		await _check_toast("%s, story" % shape, story_vp, up)
+		await _check_toast("%s, Endless" % shape, endless_vp, up)
 		acct.email = real_session[0]
 		acct._refresh_token = real_session[1]
 		acct._pro = real_session[2]
@@ -75,6 +89,17 @@ func _run() -> void:
 
 	mm.froggyCrown = real_crown
 	mm.ads_removed = real_ads_removed
+	mm.unlocked_skins = real_unlocked
+	mm.seen_cosmetics = real_seen
+	mm.wardrobe_path = real_wardrobe
+	if FileAccess.file_exists(SCRATCH_WARDROBE):
+		DirAccess.remove_absolute(SCRATCH_WARDROBE)
+	var now := FileAccess.get_file_as_bytes(real_wardrobe) if FileAccess.file_exists(real_wardrobe) else PackedByteArray()
+	if now != real_bytes:
+		var f := FileAccess.open(real_wardrobe, FileAccess.WRITE)
+		f.store_buffer(real_bytes)
+		f.close()
+		_failures.append("the test wrote your real wardrobe save (put back as it was): find what saved it")
 	root.get_node("AdsManager").test_banner_clearance = Vector2(-1.0, -1.0)
 	for _i in 3:
 		await process_frame
@@ -132,10 +157,7 @@ func _check_game_over(shape: String, vp: Vector2, upright: bool) -> void:
 ## The story's menus, in the whole world (Main.tscn) as the game has them, at every shape, with its
 ## bottom banner up.
 func _check_story_menus() -> void:
-	var mm := root.get_node("MusicManager")
 	var ads := root.get_node("AdsManager")
-	var real_wardrobe: String = mm.wardrobe_path
-	mm.wardrobe_path = SCRATCH_WARDROBE
 	var view := _view(_viewport_for(WINDOWS["computer"], STORY_BASE))
 	var main: Node = load("res://scenes/Main.tscn").instantiate()
 	var player: Node = main.get_node("Player")
@@ -174,10 +196,8 @@ func _check_story_menus() -> void:
 	ads.test_banner_clearance = Vector2(-1.0, -1.0)
 	view.queue_free()
 	await _frames(3)
-	for path in [SCRATCH_SAVE, SCRATCH_WARDROBE]:
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(path)
-	mm.wardrobe_path = real_wardrobe
+	if FileAccess.file_exists(SCRATCH_SAVE):
+		DirAccess.remove_absolute(SCRATCH_SAVE)
 
 
 func _frames(n: int) -> void:
@@ -185,8 +205,9 @@ func _frames(n: int) -> void:
 		await process_frame
 
 
-func _check_panel(what: String, script: GDScript, vp: Vector2, prepare := Callable()) -> void:
-	root.get_node("AdsManager").test_banner_clearance = Vector2(-1.0, -1.0)  # (these cover the banners)
+func _check_panel(what: String, script: GDScript, vp: Vector2, upright: bool, prepare := Callable()) -> void:
+	var banner := _banner_height(vp, upright)
+	root.get_node("AdsManager").test_banner_clearance = Vector2(banner + 6.0, banner + 6.0)
 	var view := _view(vp)
 	var screen: CanvasLayer = script.new()
 	view.add_child(screen)
@@ -196,8 +217,26 @@ func _check_panel(what: String, script: GDScript, vp: Vector2, prepare := Callab
 			screen._show_state()
 	for _i in 4:
 		await process_frame
-	_check_inside(screen, Rect2(Vector2.ZERO, vp), what)
+	_check_inside(screen, Rect2(0.0, banner, vp.x, vp.y - banner * 2.0), what)
 	view.queue_free()
+	await process_frame
+
+
+## The widest notification there is (a picture, a long title and a second line), once it's dropped in,
+## between both banners.
+func _check_toast(what: String, vp: Vector2, upright: bool) -> void:
+	var mm := root.get_node("MusicManager")
+	var banner := _banner_height(vp, upright)
+	root.get_node("AdsManager").test_banner_clearance = Vector2(banner + 6.0, banner + 6.0)
+	var view := _view(vp)
+	mm.toast_host = view
+	mm.show_unlock_notification("hat", "blackcrown")
+	await create_timer(0.75).timeout
+	_check_inside(view, Rect2(0.0, banner, vp.x, vp.y - banner * 2.0), "%s: notification" % what)
+	view.queue_free()
+	mm.toast_host = null
+	mm._toasts.clear()
+	mm._toast_up = false  # (its card went with the view)
 	await process_frame
 
 

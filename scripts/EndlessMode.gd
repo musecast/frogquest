@@ -39,7 +39,7 @@ var score_label: Label
 
 var _resize_timer: SceneTreeTimer = null
 var _zoom_tween: Tween = null
-var _pending_notification: Array = []  # [label, type] or empty
+var _pending_notification: Array = []  # [type, item id] or empty
 
 @onready var player: CharacterBody2D = $EndlessPlayer
 @onready var platforms: Node2D = $Platforms
@@ -182,7 +182,7 @@ func _trigger_reset() -> void:
 	AdsManager.on_game_over()
 	$GameOverScreen.show_scores(score, high_score, is_new_record)
 	if _pending_notification.size() > 0:
-		MusicManager.show_unlock_notification(_pending_notification[0])
+		MusicManager.show_unlock_notification(_pending_notification[0], _pending_notification[1])
 		_pending_notification = []
 
 ## True if this run can still "keep going" (once per run, and his last platform is still there).
@@ -339,7 +339,7 @@ func _check_score_unlocks() -> void:
 		if id not in MusicManager.unlocked_skins:
 			MusicManager.unlocked_skins.append(id)
 			MusicManager.save_wardrobe()
-			_pending_notification = [milestone_types[score]]
+			_pending_notification = [milestone_types[score], id]
 
 func _update_score_label() -> void:
 	score_label.text = "Score: %d" % score

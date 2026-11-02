@@ -68,24 +68,26 @@ func _size_column(is_portrait: bool, fit: float) -> void:
 	for label in [$MarginContainer/HighScoreRow/HighScoreDisplay,
 			$MarginContainer/HighScoreRow/NewBadge]:
 		label.add_theme_font_size_override("font_size", label_size)
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	$MarginContainer/TryAgainButton.custom_minimum_size = btn_min
-	$MarginContainer/TryAgainButton.add_theme_font_size_override("font_size", label_size)
+	ui.style_button($MarginContainer/TryAgainButton, label_size, "go")
 	var kgb := $MarginContainer.get_node_or_null("KeepGoingButton")
 	if kgb:
 		kgb.custom_minimum_size = btn_min
-		kgb.add_theme_font_size_override("font_size", int(label_size * 0.75))
+		ui.style_button(kgb, int(label_size * 0.75), "gold")
 	$MarginContainer/BottomRow/ExitButton.custom_minimum_size = btn_min
-	$MarginContainer/BottomRow/ExitButton.add_theme_font_size_override("font_size", label_size)
+	ui.style_button($MarginContainer/BottomRow/ExitButton, label_size, "wood")
 	var wb := $MarginContainer/BottomRow.get_node_or_null("WardrobeButton")
 	if wb:
 		# Fixed square — crown icon only, exit button expands to fill the rest
 		wb.custom_minimum_size = Vector2(btn_min.y, btn_min.y)
+		ui.style_button(wb, label_size, "wood")
 		var wb_badge := wb.get_node_or_null("NewBadge") as Label
 		if wb_badge:
 			wb_badge.add_theme_font_size_override("font_size", int(btn_min.y * 0.33))
 	var rab := $MarginContainer.get_node_or_null("RemoveAdsButton")
 	if rab:
-		rab.add_theme_font_size_override("font_size", int(label_size * 0.6))
+		ui.style_button(rab, int(label_size * 0.6), "quiet")
 
 
 func show_scores(score: int, high_score: int, is_new_record: bool) -> void:

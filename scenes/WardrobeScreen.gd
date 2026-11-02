@@ -3,31 +3,35 @@ extends CanvasLayer
 signal closed
 signal cosmetic_changed
 
-# Item definitions — add new cosmetics here
+# Item definitions — add new cosmetics here. "icon" (and "tint"/"strength" or "shader") is the picture in
+# its row and in the notification when it's unlocked: the hat itself, or the frog wearing the skin.
 const ITEMS: Dictionary = {
-	"froggycrown":    {"label": "Froggy Crown",  "type": "hat",
+	"froggycrown":    {"label": "Froggy Crown",  "type": "hat", "icon": "res://assets/froggycrown.png",
 					  "how": "Beat Frog Quest"},
-	"blackcrown":     {"label": "Black Crown",   "type": "hat",
+	"blackcrown":     {"label": "Black Crown",   "type": "hat", "icon": "res://assets/froggycrown.png",
+					  "tint": Color(0.0, 0.0, 0.0), "strength": 1.0,
 					  "how": "Score 100 in Endless"},
-	"wizhat":         {"label": "Wiz Hat",       "type": "hat",
+	"wizhat":         {"label": "Wiz Hat",       "type": "hat", "icon": "res://assets/froggywizhat.png",
 					  "how": "Find it in the world"},
-	"cakehat":        {"label": "Cake Hat",      "type": "hat",
+	"cakehat":        {"label": "Cake Hat",      "type": "hat", "icon": "res://assets/froggycakehat.png",
 					  "how": "Find it in the world"},
-	"golden_skin":    {"label": "Golden Frog",   "type": "skin",
-					  "tint": Color(1.0, 0.75, 0.0), "strength": 1.0,
+	"golden_skin":    {"label": "Golden Frog",   "type": "skin", "icon": "res://assets/frog.png",
+					  "tint": Color(1.0, 0.75, 0.0), "strength": 0.55,
 					  "how": "Catch every fly hiding in the World Tree"},
-	"grayscale_skin": {"label": "Grayscale",     "type": "skin",
+	"grayscale_skin": {"label": "Grayscale",     "type": "skin", "icon": "res://assets/frog.png",
 					  "shader": "res://assets/grayscale.gdshader",
 					  "how": "Score 25 in Endless"},
-	"negative_skin":  {"label": "Negative",      "type": "skin",
+	"negative_skin":  {"label": "Negative",      "type": "skin", "icon": "res://assets/frog.png",
 					  "shader": "res://assets/negative.gdshader",
 					  "how": "Score 50 in Endless"},
-	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop",
+	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop", "icon": "res://assets/frog.png",
 					  "how": "He lives on your desktop. Right-click him or his tray icon for more."},
 }
 
 var _item_buttons: Dictionary = {}  # item_id -> Button
+var _item_rows: Dictionary = {}  # item_id -> its row (lit up while worn)
 var _hint_label: Label = null
+var _hint_box: PanelContainer = null
 var _resize_timer: SceneTreeTimer = null
 var _froggy_link = null  # DesktopFrogLink.gd, loaded on first use
 var _froggy_busy_until := 0  # msec; LET OUT / CALL IN waits while froggy starts up or heads home
@@ -51,6 +55,11 @@ func _ready() -> void:
 	_mark_all_seen()
 	_build_ui()
 	get_viewport().size_changed.connect(_on_viewport_resized)
+	add_to_group("banner_reserve_ui")  # (AdsManager calls _apply_ui_layout when a banner comes or goes)
+
+
+func _apply_ui_layout() -> void:
+	_on_viewport_resized()
 
 func _mark_all_seen() -> void:
 	var changed := false
@@ -74,12 +83,16 @@ func _on_viewport_resized() -> void:
 	for child in get_children():
 		child.queue_free()
 	_item_buttons.clear()
+	_item_rows.clear()
 	_hint_label = null
+	_hint_box = null
 	_build_ui()
 
 
 func _build_ui() -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var vp := get_viewport().get_visible_rect().size
+	var room: Rect2 = ui.room(vp)  # clear of the notch and the ad banners, which draw over everything
 	var is_portrait: bool = vp.y > vp.x * 1.3
 
 	# Darkened backdrop
@@ -89,58 +102,46 @@ func _build_ui() -> void:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
-	var font_size_title: int = 28 if is_portrait else 13
+	var font_size_title: int = 32 if is_portrait else 16
 	var font_size_body:  int = 22 if is_portrait else 11
-	# Scale button and info sizes proportionally to viewport width so they
-	# never exceed available space on any phone resolution / pixel density.
-	var btn_min := Vector2(vp.x * 0.30, vp.y * 0.052) if is_portrait else Vector2(70, 18)
+	# Buttons and pictures scale with the room so they fit any phone.
+	var btn_min := Vector2(room.size.x * 0.27, maxf(room.size.y * 0.05, font_size_body * 1.9)) if is_portrait else Vector2(70, 20)
 	var action_btn_min := _compute_action_button_size(btn_min, font_size_body)
-	var info_btn_size: float = vp.x * 0.058 if is_portrait else 18.0
-	var pad: float = 10.0 if is_portrait else 5.0
+	var info_btn_size: float = btn_min.y
+	var icon_size: float = btn_min.y * 1.1
+	var pad: float = 14.0 if is_portrait else 7.0
 
-	# Panel: uses a percentage-based width with a hard cap, ensuring it never
-	# reaches the screen edge on any device.
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.18, 0.14, 0.11, 0.96)
-	panel_style.border_width_left   = 2
-	panel_style.border_width_right  = 2
-	panel_style.border_width_top    = 2
-	panel_style.border_width_bottom = 2
-	panel_style.border_color = Color(0.55, 0.47, 0.35, 0.8)
-	panel_style.corner_radius_top_left     = 8
-	panel_style.corner_radius_top_right    = 8
-	panel_style.corner_radius_bottom_left  = 8
-	panel_style.corner_radius_bottom_right = 8
-
+	# Panel: a share of the room, capped, centred in it.
 	var panel := Panel.new()
-	panel.add_theme_stylebox_override("panel", panel_style)
-	panel.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
-	var margin: float = vp.x * (0.06 if is_portrait else 0.017)
-	var pw: float = min(vp.x - margin * 2.0, 420.0)
-	var ph: float = vp.y * (0.82 if is_portrait else 0.88)
-	panel.position = Vector2(floor((vp.x - pw) * 0.5), floor((vp.y - ph) * 0.5))
+	panel.add_theme_stylebox_override("panel", ui.panel_box(10))
+	var margin: float = room.size.x * (0.05 if is_portrait else 0.017)
+	var pw: float = minf(room.size.x - margin * 2.0, 440.0)
+	var ph: float = room.size.y * (0.88 if is_portrait else 0.92)
+	panel.position = (room.position + (room.size - Vector2(pw, ph)) * 0.5).floor()
 	panel.size = Vector2(pw, ph)
 	add_child(panel)
 
 	# Outer VBox: title | scroll-area | hint | close  (title & close never scroll off)
 	var outer := VBoxContainer.new()
 	outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	outer.add_theme_constant_override("separation", 6 if is_portrait else 3)
+	outer.add_theme_constant_override("separation", 8 if is_portrait else 4)
 	outer.offset_left   =  pad
 	outer.offset_right  = -pad
 	outer.offset_top    =  pad
 	outer.offset_bottom = -pad
 	panel.add_child(outer)
 
-	# Title
+	# Title, with the crown
+	var title_row := HBoxContainer.new()
+	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	title_row.add_theme_constant_override("separation", 8)
+	var crown := item_icon("froggycrown", font_size_title * 1.2)
+	title_row.add_child(crown)
 	var title := Label.new()
 	title.text = "WARDROBE"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", font_size_title)
-	outer.add_child(title)
-
-	var sep := HSeparator.new()
-	outer.add_child(sep)
+	ui.style_label(title, font_size_title, ui.GOLD)
+	title_row.add_child(title)
+	outer.add_child(title_row)
 
 	# ScrollContainer holds all the items and expands to fill available space
 	var scroll := ScrollContainer.new()
@@ -148,6 +149,7 @@ func _build_ui() -> void:
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	ui.style_scrollbar(scroll.get_v_scroll_bar())
 	outer.add_child(scroll)
 
 	var vbox := VBoxContainer.new()
@@ -155,76 +157,39 @@ func _build_ui() -> void:
 	vbox.add_theme_constant_override("separation", 8 if is_portrait else 3)
 	scroll.add_child(vbox)
 
-	# ── HATS ────────────────────────────────────────────────────────────
-	var hats_label := Label.new()
-	hats_label.text = "— HATS —"
-	hats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hats_label.add_theme_font_size_override("font_size", font_size_body)
-	vbox.add_child(hats_label)
+	for section in [["HATS", "hat"], ["SKINS", "skin"], ["DESKTOP", "desktop"]]:
+		var ids := []
+		for id in ITEMS:
+			if ITEMS[id]["type"] == section[1] and _is_unlocked(id):
+				ids.append(id)
+		if ids.is_empty() and section[1] == "desktop":
+			continue  # (computers only, once he's unlocked)
+		vbox.add_child(_section_header(section[0], font_size_body))
+		for id in ids:
+			vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size, icon_size))
+		if ids.is_empty():
+			var none_lbl := Label.new()
+			none_lbl.text = "(none yet)"
+			none_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			ui.style_label(none_lbl, font_size_body, ui.CREAM.darkened(0.3))
+			vbox.add_child(none_lbl)
 
-	var any_hat := false
-	for id in ITEMS:
-		if ITEMS[id]["type"] != "hat":
-			continue
-		if not _is_unlocked(id):
-			continue
-		any_hat = true
-		vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size))
-
-	if not any_hat:
-		var none_lbl := Label.new()
-		none_lbl.text = "(none yet)"
-		none_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		none_lbl.add_theme_font_size_override("font_size", font_size_body)
-		vbox.add_child(none_lbl)
-
-	var sep2 := HSeparator.new()
-	vbox.add_child(sep2)
-
-	# ── SKINS ───────────────────────────────────────────────────────────
-	var skins_label := Label.new()
-	skins_label.text = "— SKINS —"
-	skins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	skins_label.add_theme_font_size_override("font_size", font_size_body)
-	vbox.add_child(skins_label)
-
-	var any_skin := false
-	for id in ITEMS:
-		if ITEMS[id]["type"] != "skin":
-			continue
-		if not _is_unlocked(id):
-			continue
-		any_skin = true
-		vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size))
-
-	if not any_skin:
-		var none_lbl2 := Label.new()
-		none_lbl2.text = "(none yet)"
-		none_lbl2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		none_lbl2.add_theme_font_size_override("font_size", font_size_body)
-		vbox.add_child(none_lbl2)
-
-	# ── DESKTOP (computers only, once he's unlocked) ─────────────────────
-	if _is_unlocked("lil_froggy"):
-		vbox.add_child(HSeparator.new())
-		var desk_label := Label.new()
-		desk_label.text = "— DESKTOP —"
-		desk_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		desk_label.add_theme_font_size_override("font_size", font_size_body)
-		vbox.add_child(desk_label)
-		vbox.add_child(_make_item_row("lil_froggy", action_btn_min, font_size_body, info_btn_size))
-
-	# ── HINT LABEL (shown when info button pressed) ──────────────────────
+	# ── HINT (shown when an info button is pressed) ──────────────────────
+	_hint_box = PanelContainer.new()
+	var hint_style := StyleBoxFlat.new()
+	hint_style.bg_color = Color(0.0, 0.0, 0.0, 0.35)
+	hint_style.set_corner_radius_all(6)
+	hint_style.set_content_margin_all(6.0)
+	_hint_box.add_theme_stylebox_override("panel", hint_style)
+	_hint_box.visible = false
 	_hint_label = Label.new()
-	_hint_label.visible = false
 	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint_label.add_theme_font_size_override("font_size", font_size_body)
-	_hint_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.6))
-	outer.add_child(_hint_label)
+	ui.style_label(_hint_label, font_size_body, ui.GOLD)
+	_hint_box.add_child(_hint_label)
+	outer.add_child(_hint_box)
 
-	var sep3 := HSeparator.new()
-	outer.add_child(sep3)
+	outer.add_child(ui.rule())
 
 	# Close button — always visible at the bottom of the panel
 	var close_btn := Button.new()
@@ -232,79 +197,52 @@ func _build_ui() -> void:
 	close_btn.custom_minimum_size = btn_min
 	close_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	close_btn.clip_text = true
-	close_btn.add_theme_font_size_override("font_size", font_size_body)
+	ui.style_button(close_btn, font_size_body, "wood")
 	close_btn.pressed.connect(_play_sfx.bind("res://assets/frogjump.wav"))
 	close_btn.pressed.connect(_on_close_pressed)
-	_style_button(close_btn, false)
 	outer.add_child(close_btn)
 
-
-func _style_button(btn: Button, accent: bool = false) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.55, 0.47, 0.38, 0.85) if not accent else Color(0.35, 0.55, 0.42, 0.9)
-	normal.border_width_left   = 2
-	normal.border_width_right  = 2
-	normal.border_width_top    = 2
-	normal.border_width_bottom = 2
-	normal.border_color = Color(0.0, 0.0, 0.0, 0.6)
-	normal.corner_radius_top_left     = 4
-	normal.corner_radius_top_right    = 4
-	normal.corner_radius_bottom_left  = 4
-	normal.corner_radius_bottom_right = 4
-	normal.content_margin_left   = 6
-	normal.content_margin_right  = 6
-	normal.content_margin_top    = 2
-	normal.content_margin_bottom = 2
-
-	var hover := StyleBoxFlat.new()
-	hover.bg_color = Color(0.72, 0.63, 0.52, 0.9) if not accent else Color(0.45, 0.72, 0.55, 0.95)
-	hover.border_width_left   = 2
-	hover.border_width_right  = 2
-	hover.border_width_top    = 2
-	hover.border_width_bottom = 2
-	hover.border_color = Color(0.0, 0.0, 0.0, 0.5)
-	hover.corner_radius_top_left     = 4
-	hover.corner_radius_top_right    = 4
-	hover.corner_radius_bottom_left  = 4
-	hover.corner_radius_bottom_right = 4
-	hover.content_margin_left   = 6
-	hover.content_margin_right  = 6
-	hover.content_margin_top    = 2
-	hover.content_margin_bottom = 2
-
-	var pressed_sb := StyleBoxFlat.new()
-	pressed_sb.bg_color = Color(0.32, 0.27, 0.22, 0.9)
-	pressed_sb.border_width_left   = 2
-	pressed_sb.border_width_right  = 2
-	pressed_sb.border_width_top    = 2
-	pressed_sb.border_width_bottom = 2
-	pressed_sb.border_color = Color(0.0, 0.0, 0.0, 0.7)
-	pressed_sb.corner_radius_top_left     = 4
-	pressed_sb.corner_radius_top_right    = 4
-	pressed_sb.corner_radius_bottom_left  = 4
-	pressed_sb.corner_radius_bottom_right = 4
-
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed_sb)
-	btn.add_theme_color_override("font_color", Color(0.95, 0.90, 0.80))
-	btn.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.8))
-	btn.add_theme_constant_override("outline_size", 2)
+	# Only as tall as it needs (up to the room's share above), the list scrolling past that.
+	var fit_h: float = minf(ph, outer.get_combined_minimum_size().y + vbox.get_combined_minimum_size().y + pad * 2.0 + 6.0)
+	panel.size.y = fit_h
+	panel.position.y = floorf(room.position.y + (room.size.y - fit_h) * 0.5)
 
 
-func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size: float = 30.0) -> HBoxContainer:
+## A section's name between two gold lines.
+func _section_header(text: String, font_size: int) -> HBoxContainer:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	for i in 3:
+		if i == 1:
+			var lbl := Label.new()
+			lbl.text = text
+			ui.style_label(lbl, font_size, ui.GOLD)
+			row.add_child(lbl)
+		else:
+			var line: HSeparator = ui.rule()
+			line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			line.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			row.add_child(line)
+	return row
+
+
+func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size: float, icon_size: float) -> PanelContainer:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var box := PanelContainer.new()  # (lit up while you're wearing it)
+	_item_rows[id] = box
 	var row := HBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 8)
+	box.add_child(row)
+
+	row.add_child(ui.slot(item_icon(id, 0.0), icon_size))
 
 	var lbl := Label.new()
 	lbl.text = ITEMS[id]["label"]
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.clip_text = true
-	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(0.95, 0.90, 0.80))
-	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	lbl.add_theme_constant_override("outline_size", 2)
+	ui.style_label(lbl, font_size)
 	row.add_child(lbl)
 
 	var btn := Button.new()
@@ -312,30 +250,51 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	# width never changes when toggling between EQUIP / UNEQUIP.
 	btn.custom_minimum_size = btn_min
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	btn.clip_text = false
 	btn.add_theme_font_size_override("font_size", font_size)
-	_update_button_label(btn, id)
 	btn.pressed.connect(_on_item_button_pressed.bind(id, btn))
 	btn.pressed.connect(_play_sfx.bind("res://assets/frogaim.wav"))
 	_item_buttons[id] = btn
-	_style_button(btn, false)
 	row.add_child(btn)
+	_update_button_label(btn, id)
 
 	# Info button — shows how to unlock
 	var how: String = ITEMS[id].get("how", "")
 	if how != "":
 		var info_btn := Button.new()
 		info_btn.text = "?"
-		info_btn.add_theme_font_size_override("font_size", max(font_size - 4, 8))
 		info_btn.custom_minimum_size = Vector2(info_btn_size, info_btn_size)
-		info_btn.add_theme_color_override("font_color", Color(0.85, 0.80, 0.70, 0.45))
-		info_btn.add_theme_color_override("font_hover_color", Color(0.95, 0.90, 0.80, 0.85))
+		info_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		ui.style_button(info_btn, font_size, "quiet")
 		info_btn.pressed.connect(_on_info_pressed.bind(id))
 		info_btn.pressed.connect(_play_sfx.bind("res://assets/frogaim.wav"))
-		_style_button(info_btn, false)
 		row.add_child(info_btn)
 
-	return row
+	return box
+
+
+## The item's picture: the hat itself, or the frog wearing the skin (size 0: no minimum size).
+static func item_icon(id: String, size: float) -> TextureRect:
+	var def: Dictionary = ITEMS.get(id, {})
+	var icon := TextureRect.new()
+	icon.texture = load(def.get("icon", "res://assets/frog.png"))
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.custom_minimum_size = Vector2(size, size)
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if def.has("shader"):
+		var mat := ShaderMaterial.new()
+		mat.shader = load(def["shader"])
+		icon.material = mat
+	elif def.has("tint"):
+		var mat := ShaderMaterial.new()
+		mat.shader = load("res://assets/skin_tint.gdshader")
+		mat.set_shader_parameter("tint_color", def["tint"])
+		mat.set_shader_parameter("tint_strength", def.get("strength", 1.0))
+		icon.material = mat
+	return icon
 
 
 func _play_sfx(path: String) -> void:
@@ -357,11 +316,11 @@ func _on_info_pressed(id: String) -> void:
 	var label_text: String = ITEMS[id]["label"]
 	var new_text := how
 	# Toggle off if already showing the same hint
-	if _hint_label.visible and _hint_label.text == new_text:
-		_hint_label.visible = false
+	if _hint_box.visible and _hint_label.text == new_text:
+		_hint_box.visible = false
 	else:
 		_hint_label.text = new_text
-		_hint_label.visible = true
+		_hint_box.visible = true
 
 
 func _is_unlocked(id: String) -> bool:
@@ -387,12 +346,27 @@ func _is_equipped(id: String) -> bool:
 
 
 func _update_button_label(btn: Button, id: String) -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var font_size: int = btn.get_theme_font_size("font_size") if btn.has_theme_font_size_override("font_size") else 0
+	if font_size == 0:
+		font_size = 22 if get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x * 1.3 else 11
 	if id == "lil_froggy":
 		var waiting := Time.get_ticks_msec() < _froggy_busy_until
 		btn.disabled = waiting
-		btn.text = "..." if waiting else ("CALL IN" if _desktop_frog_link().is_out() else "LET OUT")
+		var out: bool = _desktop_frog_link().is_out()
+		btn.text = "..." if waiting else ("CALL IN" if out else "LET OUT")
+		ui.style_button(btn, font_size, "go" if out else "wood")
 		return
-	btn.text = "UNEQUIP" if _is_equipped(id) else "EQUIP"
+	var worn := _is_equipped(id)
+	btn.text = "UNEQUIP" if worn else "EQUIP"
+	ui.style_button(btn, font_size, "go" if worn else "wood")
+	var row: PanelContainer = _item_rows.get(id)
+	if row:
+		var lit := StyleBoxFlat.new()
+		lit.bg_color = Color(1.0, 0.86, 0.42, 0.13) if worn else Color(0, 0, 0, 0)
+		lit.set_corner_radius_all(6)
+		lit.set_content_margin_all(4.0)
+		row.add_theme_stylebox_override("panel", lit)
 
 
 func _process(delta: float) -> void:

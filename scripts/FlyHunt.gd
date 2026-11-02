@@ -81,10 +81,36 @@ static func caught(fly: Node) -> void:
 		MusicManager.unlocked_skins.append(REWARD)
 	MusicManager.save_wardrobe()
 	if unlocked:
-		MusicManager.show_toast("All %d flies caught!" % total())
-		tree.create_timer(3.4).timeout.connect(func() -> void: MusicManager.show_unlock_notification("skin"))
+		MusicManager.show_toast("All %d flies caught!" % total(), icon(), "Every last one!")
+		MusicManager.show_unlock_notification("skin", REWARD)  # (it waits its turn)
 		var player := fly.get_parent().get_node_or_null("Player")
 		if player and player.has_method("_refresh_all_wardrobe_badges"):
 			player._refresh_all_wardrobe_badges()  # (the NEW badge on the wardrobe button)
 	else:
-		MusicManager.show_toast("Fly caught!  %d / %d" % [count_caught(), total()])
+		MusicManager.show_toast("Fly caught!", icon(), "%d of %d" % [count_caught(), total()])
+
+
+## A fly to show in the notification: the one from the world, wings up.
+static func icon() -> TextureRect:
+	var rows := [  # w wing, b body, e eye
+		"..ww...ww..",
+		".wwww.wwww.",
+		".wwwwbwwww.",
+		"..wwebeww..",
+		"...bbbbb...",
+		"...bbbbb...",
+		"....bbb....",
+		"...b...b...",
+	]
+	var colours := {"w": Color(0.86, 0.94, 1.0, 0.95), "b": Color(0.12, 0.12, 0.14), "e": Color(0.85, 0.15, 0.15)}
+	var img := Image.create(rows[0].length(), rows.size(), false, Image.FORMAT_RGBA8)
+	for y in rows.size():
+		for x in rows[y].length():
+			if colours.has(rows[y][x]):
+				img.set_pixel(x, y, colours[rows[y][x]])
+	var rect := TextureRect.new()
+	rect.texture = ImageTexture.create_from_image(img)
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	return rect

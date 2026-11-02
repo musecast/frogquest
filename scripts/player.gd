@@ -1677,7 +1677,7 @@ func _on_wiz_area_2d_body_shape_entered(body_rid: RID, body: Node2D, body_shape_
 	if "wizhat" not in MusicManager.unlocked_skins:
 		MusicManager.unlocked_skins.append("wizhat")
 		MusicManager.save_wardrobe()
-		MusicManager.show_unlock_notification("hat")
+		MusicManager.show_unlock_notification("hat", "wizhat")
 		_refresh_all_wardrobe_badges()
 		for snd in ["res://assets/powerUp.wav", "res://assets/coolfind.mp3"]:
 			var sfx := AudioStreamPlayer.new()
@@ -1715,12 +1715,12 @@ func _on_pineapple_upsidedown_cake_area_2d_body_shape_entered(body_rid: RID, bod
 		if "cakehat" not in MusicManager.unlocked_skins:
 			MusicManager.unlocked_skins.append("cakehat")
 			MusicManager.save_wardrobe()
-			MusicManager.show_unlock_notification("hat")
+			MusicManager.show_unlock_notification("hat", "cakehat")
 			_refresh_all_wardrobe_badges()
 
 
 func _test_hat_notif() -> void:
-	MusicManager.show_unlock_notification("hat")
+	MusicManager.show_unlock_notification("hat", "wizhat")
 
 func _test_skin_notif() -> void:
-	MusicManager.show_unlock_notification("skin")
+	MusicManager.show_unlock_notification("skin", "golden_skin")

@@ -32,18 +32,8 @@ func _build_ui() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
 
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.13, 0.10, 0.08, 0.97)
-	panel_style.border_width_left = 2
-	panel_style.border_width_right = 2
-	panel_style.border_width_top = 2
-	panel_style.border_width_bottom = 2
-	panel_style.border_color = Color(0.75, 0.65, 0.45, 0.9)
-	for corner in ["top_left", "top_right", "bottom_left", "bottom_right"]:
-		panel_style.set("corner_radius_" + corner, 8)
-
 	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", panel_style)
+	panel.add_theme_stylebox_override("panel", load("res://scripts/UIStyle.gd").panel_box(10))
 	_panel = panel
 	add_child(panel)  # (placed by _fit)
 
@@ -76,9 +66,7 @@ func _build_ui() -> void:
 	if fibberish:
 		title.add_theme_font_override("font", fibberish)
 	title.add_theme_font_size_override("font_size", TITLE_FONT_SZ)
-	title.add_theme_color_override("font_color", GOLD)
-	title.add_theme_color_override("font_outline_color", BLACK)
-	title.add_theme_constant_override("outline_size", 6)
+	load("res://scripts/UIStyle.gd").style_label(title, TITLE_FONT_SZ, load("res://scripts/UIStyle.gd").GOLD)
 	_main_panel.add_child(title)
 
 	_status_label = Label.new()
@@ -94,7 +82,7 @@ func _build_ui() -> void:
 	if not MusicManager.ads_removed:
 		var store_ready := AdsManager.has_purchase_backend()
 
-		var buy_btn := _make_button("$0.99 - Remove Ads Forever", fibberish)
+		var buy_btn := _make_button("$0.99 - Remove Ads Forever", fibberish, "go")
 		buy_btn.name = "BuyButton"
 		buy_btn.disabled = not store_ready
 		buy_btn.pressed.connect(_on_buy_pressed)
@@ -184,42 +172,12 @@ func _build_ui() -> void:
 		AdsManager.connect("ads_removed_changed", _on_ads_removed_changed)
 
 
-func _make_button(label_text: String, fibberish: Font) -> Button:
+func _make_button(label_text: String, _fibberish: Font, kind := "wood") -> Button:
 	var btn := Button.new()
 	btn.text = label_text
 	btn.size_flags_horizontal = Control.SIZE_FILL
 	btn.custom_minimum_size = Vector2(0, BTN_HEIGHT)
-
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color(0.20, 0.16, 0.12, 1.0)
-	normal.border_width_left = 2
-	normal.border_width_right = 2
-	normal.border_width_top = 2
-	normal.border_width_bottom = 2
-	normal.border_color = Color(0.75, 0.65, 0.45, 0.9)
-	for corner in ["top_left", "top_right", "bottom_left", "bottom_right"]:
-		normal.set("corner_radius_" + corner, 5)
-
-	var hover := normal.duplicate() as StyleBoxFlat
-	hover.bg_color = Color(0.30, 0.24, 0.18, 1.0)
-	hover.border_color = Color(0.95, 0.85, 0.55, 1.0)
-
-	var pressed := normal.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color(0.12, 0.09, 0.07, 1.0)
-
-	btn.add_theme_stylebox_override("normal", normal)
-	btn.add_theme_stylebox_override("hover", hover)
-	btn.add_theme_stylebox_override("pressed", pressed)
-	btn.add_theme_stylebox_override("focus", hover)
-
-	if fibberish:
-		btn.add_theme_font_override("font", fibberish)
-	btn.add_theme_font_size_override("font_size", BTN_FONT_SZ)
-	btn.add_theme_color_override("font_color", GOLD)
-	btn.add_theme_color_override("font_hover_color", GOLD)
-	btn.add_theme_color_override("font_pressed_color", GOLD)
-	btn.add_theme_color_override("font_outline_color", BLACK)
-	btn.add_theme_constant_override("outline_size", 6)
+	load("res://scripts/UIStyle.gd").style_button(btn, BTN_FONT_SZ, kind)
 	return btn
 
 
@@ -227,20 +185,22 @@ func _process(_delta: float) -> void:
 	_fit()
 
 
-## Centres the panel and shrinks it, all together, when the screen is too short or narrow for it
-## (every frame, since wrapped text settles a frame late).
+## Centres the panel in the room the screen has (clear of the notch and the ad banners, which are
+## drawn over everything) and shrinks it, all together, when that's too short or narrow for it (every
+## frame, since wrapped text settles a frame late, and banners come and go).
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	if _panel == null or vp.x < 50.0 or vp.y < 50.0:
 		return
+	var room: Rect2 = load("res://scripts/UIStyle.gd").room(vp)
 	var portrait := vp.y > vp.x * 1.3
 	var zoom := 1.4 if portrait else 1.0  # (upright on a phone: laid out narrower, shown bigger)
-	_panel.custom_minimum_size = Vector2(vp.x * (0.82 if portrait else 0.38) / zoom, 0)
+	_panel.custom_minimum_size = Vector2(room.size.x * (0.82 if portrait else 0.38) / zoom, 0)
 	var need := _panel.get_combined_minimum_size()
-	var s := minf(zoom, minf(vp.x * 0.96 / need.x, vp.y * 0.94 / need.y))
+	var s := minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))
 	_panel.size = need
 	_panel.scale = Vector2(s, s)
-	_panel.position = (vp - need * s) / 2.0
+	_panel.position = room.position + (room.size - need * s) / 2.0
 
 
 func _on_buy_pressed() -> void:

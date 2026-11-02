@@ -83,63 +83,96 @@ func load_wardrobe() -> void:
 	has_launched_before = d.get("has_launched_before",  false)
 	_trace("MusicManager load_wardrobe end")
 
-func show_unlock_notification(item_type: String) -> void:
-	show_toast("New %s Unlocked!" % ("Hat" if item_type == "hat" else "Skin"))
+## "New Hat Unlocked!", with the hat (or the frog wearing the skin) when item_id says which.
+func show_unlock_notification(item_type: String, item_id := "") -> void:
+	var icon: Control = null
+	var detail := ""
+	var wardrobe: GDScript = load("res://scenes/WardrobeScreen.gd")
+	if wardrobe.ITEMS.has(item_id):
+		icon = wardrobe.item_icon(item_id, 0.0)
+		detail = "%s, in your wardrobe" % wardrobe.ITEMS[item_id]["label"]
+	show_toast("New %s Unlocked!" % ("Hat" if item_type == "hat" else "Skin"), icon, detail)
 
 
-## A little panel that drops in from the top for a few seconds (unlocks, flies caught...).
-func show_toast(text: String) -> void:
+var _toasts: Array = []  # waiting their turn: [text, icon, detail]
+var _toast_up := false
+var toast_host: Node = null  # (tools/validate_layout_fit.gd shows them in its own viewport)
+
+
+## A card that drops in at the top for a few seconds (unlocks, flies caught...): words, and maybe a
+## picture and a second line. One at a time: the next waits until this one's gone.
+func show_toast(text: String, icon: Control = null, detail := "") -> void:
+	_toasts.append([text, icon, detail])
+	if not _toast_up:
+		_next_toast()
+
+
+func _next_toast() -> void:
+	if _toasts.is_empty():
+		_toast_up = false
+		return
+	_toast_up = true
+	var toast: Array = _toasts.pop_front()
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var cl := CanvasLayer.new()
 	cl.layer = 100
-	add_child(cl)
+	var host: Node = toast_host if is_instance_valid(toast_host) else self
+	host.add_child(cl)
 
-	var vp_size := get_viewport().get_visible_rect().size
-	var is_portrait: bool = vp_size.y > vp_size.x * 1.3
+	var vp := host.get_viewport().get_visible_rect().size
+	var room: Rect2 = ui.room(vp)  # (clear of the notch and any banner)
+	var portrait: bool = vp.y > vp.x * 1.3
+	var title_size: int = clampi(roundi(minf(vp.y * 0.032, vp.x * 0.058)), 14, 32) if portrait else clampi(roundi(vp.y * 0.055), 10, 24)
 
-	var pw: float = vp_size.x * (0.90 if is_portrait else 0.58)
-	var ph: float = vp_size.y * (0.09 if is_portrait else 0.10)
-	var px: float = (vp_size.x - pw) * 0.5
-	var start_y: float = -ph - 4.0
-	var end_y: float = vp_size.y * (0.1 if is_portrait else 0.04)
-	var font_size: int = int(min(vp_size.y * 0.028, vp_size.x * 0.050)) if is_portrait else int(vp_size.y * 0.048)
-
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.18, 0.14, 0.11, 0.96)
-	panel_style.border_width_left   = 2
-	panel_style.border_width_right  = 2
-	panel_style.border_width_top    = 2
-	panel_style.border_width_bottom = 2
-	panel_style.border_color = Color(0.75, 0.65, 0.45, 0.9)
-	panel_style.corner_radius_top_left     = 6
-	panel_style.corner_radius_top_right    = 6
-	panel_style.corner_radius_bottom_left  = 6
-	panel_style.corner_radius_bottom_right = 6
-
-	var panel := Panel.new()
-	panel.add_theme_stylebox_override("panel", panel_style)
-	panel.position = Vector2(px, start_y)
-	panel.size = Vector2(pw, ph)
+	var box: StyleBoxFlat = ui.panel_box(10)
+	box.content_margin_left = title_size * 0.7
+	box.content_margin_right = title_size * 0.9
+	box.content_margin_top = title_size * 0.4
+	box.content_margin_bottom = title_size * 0.4
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", box)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", roundi(title_size * 0.5))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(row)
+	var icon: Control = null  # (the picture, in its slot)
+	if toast[1]:
+		icon = ui.slot(toast[1], title_size * 2.2)
+		row.add_child(icon)
+	var words := VBoxContainer.new()
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	words.add_theme_constant_override("separation", 0)
+	row.add_child(words)
+	var title := Label.new()
+	title.text = toast[0]
+	ui.style_label(title, title_size, ui.GOLD)
+	words.add_child(title)
+	if toast[2] != "":
+		var detail := Label.new()
+		detail.text = toast[2]
+		ui.style_label(detail, roundi(title_size * 0.72), ui.CREAM)
+		words.add_child(detail)
 	cl.add_child(panel)
 
-	var h_pad: float = 8.0
-
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	lbl.offset_left  =  h_pad
-	lbl.offset_right = -h_pad
-	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(0.95, 0.88, 0.65))
-	lbl.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.85))
-	lbl.add_theme_constant_override("outline_size", 2)
-	panel.add_child(lbl)
-
-	var tween := create_tween()
-	tween.tween_property(panel, "position:y", end_y, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-	tween.tween_interval(2.5)
-	tween.tween_property(panel, "modulate:a", 0.0, 0.4).set_ease(Tween.EASE_IN)
+	# Centred at the top of the room, dropping in from above it (smaller, if it's wider than the room).
+	var size := panel.get_combined_minimum_size()
+	var s := minf(1.0, room.size.x * 0.96 / size.x)
+	panel.size = size
+	panel.scale = Vector2(s, s)
+	size *= s
+	panel.position = Vector2(room.position.x + (room.size.x - size.x) * 0.5, room.position.y - size.y - 16.0)
+	var rest_y := room.position.y + (room.size.y * 0.05 if portrait else 6.0)
+	var tween := cl.create_tween()
+	tween.tween_property(panel, "position:y", rest_y, 0.45).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	if icon:
+		icon.pivot_offset = icon.get_combined_minimum_size() / 2.0
+		tween.tween_property(icon, "scale", Vector2.ONE * 1.25, 0.12).set_ease(Tween.EASE_OUT)
+		tween.tween_property(icon, "scale", Vector2.ONE, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
+	tween.tween_interval(2.2)
+	tween.tween_property(panel, "position:y", room.position.y - size.y - 16.0, 0.35).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
+	tween.parallel().tween_property(panel, "modulate:a", 0.0, 0.35).set_ease(Tween.EASE_IN)
+	tween.tween_callback(_next_toast)
 	tween.tween_callback(cl.queue_free)
 
 
