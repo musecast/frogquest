@@ -1,11 +1,15 @@
 extends Node
-## Your Muse account, the same one Muse Shelf and the other Muse apps use. Sign in with the code Muse
-## emails you; if the account has Muse Pro, this is Frog Quest+: the + on the logo, no ads, and Lil
-## Froggy can come out on your computer.
+## Your Muse account, the same one Muse Shelf and the other Muse apps use. Sign in through Muse Shelf
+## (the game shows a code; you type it into Muse Shelf, where you're signed in with Google, Apple or
+## email), or with the code Muse emails you. If the account has Muse Pro, this is Frog Quest+: the +
+## on the logo, no ads, and Lil Froggy can come out on your computer.
 ##
 ## Sign-in only: Frog Quest never makes accounts (you make yours in a Muse app, which is also where you
 ## delete it). It talks to the Muse account's Supabase project directly with the public publishable
 ## key, the one every Muse app ships with: an email code to sign in, then muse_has_pro() now and then.
+## Signing in through Muse Shelf goes by way of the Muse API (MUSE_API): it hands out the code, Muse
+## Shelf approves it there for whoever's signed in, and the game, checking back with a secret only it
+## knows, gets a one-time sign-in to trade with Supabase for a session of its own.
 ## The session lives in user://, encrypted to this device. A Pro that's been seen stays on offline for
 ## PRO_OFFLINE_DAYS, so a flight doesn't take the + away.
 ##
@@ -13,6 +17,7 @@ extends Node
 ## refresh tokens are single use, so two copies refreshing at once would sign you out.
 
 signal changed  # signed in or out, or Pro came or went
+signal link_ended(result: String)  # signing in through Muse Shelf stopped: "" signed in, "expired", or what went wrong
 signal _check_finished(answered: bool)
 
 const SUPABASE_URL := "https://rdafaxpamctnqbevgnxd.supabase.co"
@@ -24,6 +29,7 @@ const TIMEOUT := 10.0
 const FIRST_CHECK_DELAY := 4.0  # after launch, once the world's up (never during the launch itself)
 const LOGO := "res://assets/frogquesttitle.png"
 const LOGO_PLUS := "res://assets/frogquesttitle_plus.png"  # (the same, with the +)
+const MUSE_API := "https://muse-tracker-api.jasonmuse.workers.dev"
 
 var email := ""
 var save_path := SAVE_PATH  # (the tests point this somewhere else, so they never touch your sign-in)
@@ -36,6 +42,8 @@ var _access_token := ""
 var _access_expires_at := 0.0
 var _loaded := false
 var _checking := false
+var linking := {}  # while waiting on Muse Shelf: the code to type there, its secret, links to open it
+var _link_token := 0
 
 
 func _ready() -> void:
@@ -85,14 +93,115 @@ func verify_code(address: String, code: String) -> String:
 		{"type": "email", "email": address.strip_edges(), "token": code.strip_edges()})
 	if r.code != 200 or not (r.data is Dictionary) or str(r.data.get("refresh_token", "")) == "":
 		return _problem(r, "verify")
-	email = address.strip_edges()
-	_take_session(r.data)
+	_signed_in(address.strip_edges(), r.data)
+	await check_pro()
+	return ""
+
+
+## Signs in through Muse Shelf: gets a code to show (in linking) and checks back every few seconds
+## until Muse Shelf approves it (link_ended("") once signed in), it runs out (link_ended("expired")) or
+## it's cancelled. "" when there's a code to show, otherwise what went wrong.
+func start_link() -> String:
+	cancel_link()
+	var r: Dictionary = await _call("/api/link/start", {"app": "frog-quest", "device": _device_name()}, "", MUSE_API)
+	var d: Dictionary = r.data if r.data is Dictionary else {}
+	if r.code == 200 and str(d.get("code", "")) != "" and str(d.get("secret", "")) != "":
+		linking = d
+		_link_token += 1
+		_wait_for_link(_link_token)
+		return ""
+	if r.code == 404:
+		return "Signing in through Muse Shelf isn't ready yet. Use your email for now."
+	return _problem(r, "link")
+
+
+## Stops waiting on Muse Shelf.
+func cancel_link() -> void:
+	linking = {}
+	_link_token += 1
+
+
+## Opens Muse Shelf at its Link a Game page with the code filled in: the app if it's on this phone,
+## otherwise the website.
+func open_muse_shelf() -> void:
+	if linking.is_empty():
+		return
+	var app := str(linking.get("app_url", ""))
+	var web := str(linking.get("approve_url", ""))
+	var mobile := OS.get_name() in ["iOS", "Android"]
+	if mobile and app != "" and OS.shell_open(app) == OK:
+		return
+	if web != "":
+		OS.shell_open(web)
+
+
+## Asks once whether Muse Shelf has approved the code. "pending" until it has; "" once it has and
+## we're signed in (Pro checked too); "expired" if the code's run out or gone; or what went wrong.
+func poll_link(code: String, secret: String) -> String:
+	var r: Dictionary = await _call("/api/link/poll", {"code": code, "secret": secret}, "", MUSE_API)
+	var d: Dictionary = r.data if r.data is Dictionary else {}
+	if r.code == 0:
+		return "pending"  # (a blip offline: keep waiting)
+	if r.code == 410 or r.code == 404:
+		return "expired"
+	if r.code != 200:
+		return _problem(r, "link")
+	if str(d.get("status", "")) != "approved":
+		return "pending"
+	var v: Dictionary = await _call("/auth/v1/verify", {"type": "email", "token_hash": str(d.get("token_hash", ""))})
+	if v.code != 200 or not (v.data is Dictionary) or str(v.data.get("refresh_token", "")) == "":
+		return _problem(v, "link")
+	var who := str(d.get("email", ""))
+	if who == "" and v.data.get("user") is Dictionary:
+		who = str(v.data.user.get("email", ""))
+	_signed_in(who, v.data)
+	await check_pro()
+	return ""
+
+
+func _wait_for_link(token: int) -> void:
+	var code := str(linking.get("code", ""))
+	var secret := str(linking.get("secret", ""))
+	var every := maxf(2.0, float(linking.get("interval", 3)))
+	var until := _now() + float(linking.get("expires_in", 600))
+	while token == _link_token:
+		await get_tree().create_timer(every, true, false, true).timeout
+		if token != _link_token:
+			return
+		if _now() > until:
+			_end_link(token, "expired")
+			return
+		var result: String = await poll_link(code, secret)
+		if token != _link_token:
+			return
+		if result != "pending":
+			_end_link(token, result)
+			return
+
+
+func _end_link(token: int, result: String) -> void:
+	if token != _link_token:
+		return
+	linking = {}
+	_link_token += 1
+	link_ended.emit(result)
+
+
+## What Muse Shelf shows for this device when it asks to be let in.
+static func _device_name() -> String:
+	var model := OS.get_model_name()
+	if model != "" and model != "GenericDevice":
+		return "%s (%s)" % [OS.get_name(), model]
+	return OS.get_name()
+
+
+func _signed_in(address: String, d: Dictionary) -> void:
+	email = address
+	_take_session(d)
 	_pro = false
 	_pro_checked_at = 0.0
 	_save()
 	changed.emit()
-	await check_pro()
-	return ""
 
 
 ## Asks the account whether it has Muse Pro, refreshing the session first if it's old. True if it
@@ -176,7 +285,7 @@ func _set_pro(on: bool) -> void:
 
 
 ## One request to the account service: {code, data}, code 0 when it couldn't be reached.
-func _call(path: String, body: Dictionary, bearer := "") -> Dictionary:
+func _call(path: String, body: Dictionary, bearer := "", base := SUPABASE_URL) -> Dictionary:
 	if transport.is_valid():
 		return transport.call(path, body, bearer)
 	var http := HTTPRequest.new()
@@ -185,7 +294,7 @@ func _call(path: String, body: Dictionary, bearer := "") -> Dictionary:
 	var headers := PackedStringArray(["apikey: " + PUBLISHABLE_KEY, "Content-Type: application/json"])
 	if bearer != "":
 		headers.append("Authorization: Bearer " + bearer)
-	if http.request(SUPABASE_URL + path, headers, HTTPClient.METHOD_POST, JSON.stringify(body)) != OK:
+	if http.request(base + path, headers, HTTPClient.METHOD_POST, JSON.stringify(body)) != OK:
 		http.queue_free()
 		return {"code": 0, "data": null}
 	var res: Array = await http.request_completed
@@ -209,6 +318,8 @@ func _problem(r: Dictionary, step: String) -> String:
 		return "That's a lot of tries. Wait a minute, then try again."
 	if step == "verify":
 		return "That code didn't work. Check it, or send a new one."
+	if step == "link":
+		return "Muse Shelf couldn't sign you in (%d). Try again in a bit." % r.code
 	if kind in ["email_address_invalid", "validation_failed"]:
 		return "That doesn't look like an email address."
 	return "Something went wrong (%d). Try again in a bit." % r.code

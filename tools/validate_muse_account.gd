@@ -110,6 +110,47 @@ func _run() -> void:
 	_expect(_calls.size() == 1 and _calls[0].path == "/auth/v1/logout?scope=local" and _calls[0].bearer == "access-4",
 		"and ends it on Muse's side, for this device only (the Muse apps stay signed in)")
 
+	# Signing in through Muse Shelf: a code to type in there, then checking back until it's approved.
+	_calls.clear()
+	_reply("/api/link/start", 404, {"error": "not_found"})
+	var problem: String = await acct.start_link()
+	_expect(problem.contains("isn't ready yet") and acct.linking.is_empty(),
+		"before the Muse API can link, it says so (and email still works)")
+	_reply("/api/link/start", 200, {"code": "ABCD-2345", "secret": "s3cret", "expires_in": 600, "interval": 3,
+		"approve_url": "https://muse.example/link?code=ABCD-2345", "app_url": "jasonmuse-mediatracker://link?code=ABCD-2345"})
+	problem = await acct.start_link()
+	_expect(problem == "" and acct.linking.get("code") == "ABCD-2345", "it gets a code to show, to type into Muse Shelf")
+	_expect(_calls[-1].body.get("app") == "frog-quest", "asking for it as Frog Quest")
+	acct.cancel_link()  # (the checks below are made one at a time, by hand)
+	_reply("/api/link/poll", 200, {"status": "pending"})
+	_expect(await acct.poll_link("ABCD-2345", "s3cret") == "pending", "until Muse Shelf approves it, it waits")
+	_expect(_calls[-1].body.get("code") == "ABCD-2345" and _calls[-1].body.get("secret") == "s3cret",
+		"checking back with the code and the secret only this game has")
+	_reply("/api/link/poll", 200, {"status": "approved", "email": "jay@example.com", "token_hash": "hash-1"})
+	_reply("/auth/v1/verify", 200, _session("access-5", "refresh-5"))
+	_reply("/rest/v1/rpc/muse_has_pro", 200, true)
+	var result: String = await acct.poll_link("ABCD-2345", "s3cret")
+	_expect(result == "" and acct.is_signed_in() and acct.email == "jay@example.com" and acct.has_pro(),
+		"once Muse Shelf approves, it's signed in as that account, Pro and all")
+	var verify: Array = _calls.filter(func(c: Dictionary) -> bool: return c.path == "/auth/v1/verify")
+	_expect(verify.size() == 1 and verify[0].body.get("type") == "email" and verify[0].body.get("token_hash") == "hash-1",
+		"trading the one-time sign-in for its own session with Muse")
+	_reply("/api/link/poll", 410, {"status": "expired"})
+	_expect(await acct.poll_link("ABCD-2345", "s3cret") == "expired", "a code that's run out says so")
+	acct._clear()
+	# And the waiting, end to end: approved on its first check back, it signs in and says so.
+	_reply("/api/link/start", 200, {"code": "WXYZ-6789", "secret": "s2", "expires_in": 600, "interval": 2,
+		"approve_url": "https://muse.example/link?code=WXYZ-6789", "app_url": ""})
+	_reply("/api/link/poll", 200, {"status": "approved", "email": "jay@example.com", "token_hash": "hash-2"})
+	_reply("/auth/v1/verify", 200, _session("access-6", "refresh-6"))
+	_reply("/rest/v1/rpc/muse_has_pro", 200, false)
+	var ended: Array[String] = []
+	acct.link_ended.connect(func(r: String) -> void: ended.append(r), CONNECT_ONE_SHOT)
+	await acct.start_link()
+	await create_timer(3.0).timeout
+	_expect(ended == [""] and acct.is_signed_in() and acct.linking.is_empty() and not acct.has_pro(),
+		"waiting on Muse Shelf ends, signed in, once it's approved")
+
 	acct.transport = Callable()
 	acct._clear()
 	acct.save_path = real_path

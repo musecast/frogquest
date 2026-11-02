@@ -61,6 +61,14 @@ func _run() -> void:
 		acct._pro_checked_at = acct._now()
 	var code_sent := func(screen: Node) -> void:
 		screen._sent_to = LONG_EMAIL
+		screen._mode = "code"
+		screen._show_state()
+	var typing_email := func(screen: Node) -> void:
+		screen._mode = "email"
+		screen._show_state()
+	var linking := func(screen: Node) -> void:  # (waiting on Muse Shelf, its code shown big)
+		acct.linking = {"code": "WWWW-WWWW", "secret": "test", "approve_url": "https://example.com", "app_url": ""}
+		screen._mode = "link"
 		screen._show_state()
 	var real_session := [acct.email, acct._refresh_token, acct._pro, acct._pro_checked_at]
 
@@ -77,7 +85,11 @@ func _run() -> void:
 		var muse: GDScript = load("res://scenes/MuseAccountScreen.gd")
 		await _check_panel("%s: Muse account" % shape, muse, story_vp, up)
 		await _check_panel("%s, Endless: Muse account" % shape, muse, endless_vp, up)
+		await _check_panel("%s: Muse account, typing an email" % shape, muse, story_vp, up, typing_email)
 		await _check_panel("%s: Muse account, code sent" % shape, muse, story_vp, up, code_sent)
+		await _check_panel("%s: Muse account, waiting on Muse Shelf" % shape, muse, story_vp, up, linking)
+		await _check_panel("%s, Endless: Muse account, waiting on Muse Shelf" % shape, muse, endless_vp, up, linking)
+		acct.linking = {}
 		await _check_panel("%s: Muse account, signed in" % shape, muse, story_vp, up, signed_in)
 		await _check_toast("%s, story" % shape, story_vp, up)
 		await _check_toast("%s, Endless" % shape, endless_vp, up)

@@ -1,7 +1,9 @@
 extends CanvasLayer
-## Sign in with your Muse account (the one from Muse Shelf and the other Muse apps) by the code Muse
-## emails you. With Muse Pro, this is Frog Quest+. Opened from the title screen's MUSE ACCOUNT button
-## and from Remove Ads; built in code and dressed like RemoveAdsScreen. MuseAccount.gd does the talking.
+## Sign in with your Muse account (the one from Muse Shelf and the other Muse apps): through Muse
+## Shelf, where you're signed in with Google, Apple or email (the game shows a code to type in there),
+## or by the code Muse emails you. With Muse Pro, this is Frog Quest+. Opened from the title screen's
+## MUSE ACCOUNT button and from Remove Ads; built in code and dressed like RemoveAdsScreen.
+## MuseAccount.gd does the talking.
 
 signal closed
 
@@ -22,7 +24,9 @@ var _input: LineEdit
 var _primary: Button
 var _secondary: Button
 var _status: Label
+var _code: Label  # the code to type into Muse Shelf, big
 var _buttons: Array[Button] = []
+var _mode := ""  # signed out: "" (which way to sign in), "email", "code" (emailed) or "link" (waiting on Muse Shelf)
 var _sent_to := ""  # where the code went, between "Email Me a Code" and "Sign In"
 var _busy := false
 
@@ -33,6 +37,10 @@ func _ready() -> void:
 	_show_state()
 	_fit()
 	MuseAccount.changed.connect(_show_state)
+	MuseAccount.link_ended.connect(_on_link_ended)
+	if not MuseAccount.linking.is_empty():
+		_mode = "link"  # (opened again while it's still waiting on Muse Shelf)
+		_show_state()
 
 
 func _build_ui() -> void:
@@ -64,6 +72,10 @@ func _build_ui() -> void:
 	box.add_child(_body)
 	_pro_note = _label("", BODY_FONT_SZ, GREEN, 4)
 	box.add_child(_pro_note)
+	_code = _label("", 32, load("res://scripts/UIStyle.gd").GOLD, 8)
+	_code.autowrap_mode = TextServer.AUTOWRAP_OFF  # (one line: split, it read as two codes)
+	_code.visible = false
+	box.add_child(_code)
 
 	_input = LineEdit.new()
 	_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -86,10 +98,13 @@ func _build_ui() -> void:
 	box.add_child(_button("Close", func() -> void: closed.emit()))
 
 
-## Fills the panel in for where you are: signed out, waiting on the code, or signed in.
+## Fills the panel in for where you are: choosing how to sign in, typing your email, waiting on the
+## emailed code, waiting on Muse Shelf, or signed in.
 func _show_state() -> void:
 	_pro_note.visible = false
+	_code.visible = false
 	if MuseAccount.is_signed_in():
+		_mode = ""
 		_body.text = "Signed in as\n%s" % MuseAccount.email
 		_pro_note.visible = true
 		if MuseAccount.has_pro():
@@ -102,17 +117,34 @@ func _show_state() -> void:
 		_primary.text = "Check Again"
 		_secondary.text = "Sign Out"
 		_secondary.visible = true
-	elif _sent_to != "":
+	elif _mode == "link" and not MuseAccount.linking.is_empty():
+		_body.text = "In Muse Shelf, open Settings, then Link a Game, and type this code:"
+		_code.text = str(MuseAccount.linking.get("code", ""))
+		_code.visible = true
+		_input.visible = false
+		_primary.text = "Open Muse Shelf"
+		_secondary.text = "Cancel"
+		_secondary.visible = true
+		_wait("Waiting for Muse Shelf...")
+	elif _mode == "code" and _sent_to != "":
 		_body.text = "Muse emailed a code to\n%s" % _sent_to
 		_ask("Code from the email", LineEdit.KEYBOARD_TYPE_NUMBER, 10)
 		_primary.text = "Sign In"
 		_secondary.text = "Different Email"
 		_secondary.visible = true
-	else:
-		_body.text = "Sign in with your Muse account, the one from Muse Shelf. With Muse Pro, this is Frog Quest+: %s." % _perks()
+	elif _mode == "email":
+		_body.text = "Type the email of your Muse account, and Muse will email you a code."
 		_ask("Email", LineEdit.KEYBOARD_TYPE_EMAIL_ADDRESS, 254)
 		_primary.text = "Email Me a Code"
-		_secondary.visible = false
+		_secondary.text = "Back"
+		_secondary.visible = true
+	else:
+		_mode = ""
+		_body.text = "Sign in with your Muse account, the one from Muse Shelf (Google, Apple or email). With Muse Pro, this is Frog Quest+: %s." % _perks()
+		_input.visible = false
+		_primary.text = "Sign In with Muse Shelf"
+		_secondary.text = "Sign In with Email"
+		_secondary.visible = true
 
 
 func _ask(placeholder: String, keyboard: LineEdit.VirtualKeyboardType, longest: int) -> void:
@@ -145,7 +177,9 @@ func _on_primary() -> void:
 		_set_busy("")
 		if not answered and MuseAccount.is_signed_in():
 			_say("Couldn't reach Muse. Check your connection and try again.")
-	elif _sent_to != "":
+	elif _mode == "link":
+		MuseAccount.open_muse_shelf()
+	elif _mode == "code" and _sent_to != "":
 		var code := _input.text.strip_edges()
 		if code.length() < 6 or not code.is_valid_int():
 			_say("Type the code from the email.")
@@ -157,8 +191,9 @@ func _on_primary() -> void:
 			_say(problem)
 			return
 		_sent_to = ""
+		_mode = ""
 		_show_state()
-	else:
+	elif _mode == "email":
 		var address := _input.text.strip_edges()
 		if not ("@" in address and "." in address.get_slice("@", 1)):
 			_say("Type the email address of your Muse account.")
@@ -170,6 +205,16 @@ func _on_primary() -> void:
 			_say(problem)
 			return
 		_sent_to = address
+		_mode = "code"
+		_show_state()
+	else:
+		_set_busy("Getting a code...")
+		var problem: String = await MuseAccount.start_link()
+		_set_busy("")
+		if problem != "":
+			_say(problem)
+			return
+		_mode = "link"
 		_show_state()
 
 
@@ -179,9 +224,29 @@ func _on_secondary() -> void:
 	_say("")
 	if MuseAccount.is_signed_in():
 		MuseAccount.sign_out()  # (MuseAccount.changed brings the signed-out panel)
-	else:
-		_sent_to = ""
-		_show_state()
+		return
+	match _mode:
+		"link":
+			MuseAccount.cancel_link()
+			_mode = ""
+		"code":
+			_sent_to = ""
+			_mode = "email"
+		"email":
+			_mode = ""
+		_:
+			_mode = "email"
+	_show_state()
+
+
+## Muse Shelf let us in (MuseAccount.changed has already shown it), or the code ran out or failed.
+func _on_link_ended(result: String) -> void:
+	_mode = ""
+	_show_state()
+	if result == "expired":
+		_say("That code ran out. Get a new one with Sign In with Muse Shelf.")
+	elif result != "":
+		_say(result)
 
 
 ## Everything waits (Close too) while Muse is being asked, with a word on what for.
@@ -199,6 +264,13 @@ func _say(problem: String) -> void:
 	_status.add_theme_color_override("font_color", RED)
 	_status.text = problem
 	_status.visible = problem != ""
+
+
+## A note in gold that isn't a problem (and doesn't stop the buttons).
+func _wait(what: String) -> void:
+	_status.add_theme_color_override("font_color", GOLD)
+	_status.text = what
+	_status.visible = what != ""
 
 
 func _process(_delta: float) -> void:
