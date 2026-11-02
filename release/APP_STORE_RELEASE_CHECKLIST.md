@@ -75,9 +75,10 @@ Before uploading, run this from the project root on the machine that has Godot:
 Godot --headless --path . --script res://tools/validate_app_store_release.gd
 Godot --headless --path . --script res://tools/validate_level.gd
 Godot --headless --path . --script res://tools/validate_layout_fit.gd
+Godot --headless --path . --script res://tools/validate_endless.gd
 ```
 
-Do not upload while it reports any **BLOCKER**. `validate_level` fails after the level's been painted until `tools/thin_tilemap_collision.gd` is run again: buried wall tiles carry no collision, and the drop shadow hidden under solid wall is parked in a switched-off layer, so the world loads fast and light on a phone. `validate_layout_fit` fails if any menu runs off any screen shape or under a banner. The current repo has the live iOS AdMob app ID, banner unit, interstitial unit, and hosted privacy policy URL wired.
+Do not upload while it reports any **BLOCKER**. `validate_level` fails after the level's been painted until `tools/thin_tilemap_collision.gd` is run again: buried wall tiles carry no collision, and the drop shadow hidden under solid wall is parked in a switched-off layer, so the world loads fast and light on a phone. `validate_layout_fit` fails if any menu runs off any screen shape or under a banner, or any button or label's words are cut off. `validate_endless` climbs Endless from the pond to space and fails if a gap can't be jumped, a zone is missing, or springs, crumbling platforms or "keep going" stop working. The current repo has the live iOS AdMob app ID, banner unit, interstitial unit, and hosted privacy policy URL wired.
 
 `ComplianceConfig.APP_STORE_PRIVACY_POLICY_URL` is set to the hosted policy URL above. App Store Connect still needs that same public HTTPS URL pasted into the app metadata.
 

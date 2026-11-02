@@ -658,7 +658,6 @@ shape = SubResource("CircleShape2D_v8aux")
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1041021900]
 offset = Vector2(0, -50)
 zoom = Vector2(0.55, 0.55)
-limit_top = -8302
 limit_bottom = 200
 position_smoothing_enabled = true
 drag_horizontal_enabled = true

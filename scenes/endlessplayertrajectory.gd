@@ -91,8 +91,9 @@ func _process(delta):
 						#velocity.x = 50 * sign(velocity.x) + velocity.x
 						print("STRONG vel multiplied")
 
+					if get_parent().has_method("launch_boost"):
+						velocity *= get_parent().launch_boost()  # (off a spring: much higher)
 					get_parent().velocity = velocity
-					print(velocity)
 					mouseOrigin = Vector2(0, 0)
 					mousePath = Vector2(0, 0)
 					mousePosition = Vector2(0, 0)
@@ -114,8 +115,11 @@ func _draw():
 
 		var normalized_length = trajectoryLength / max_length
 		var lineColor = 1.2 - normalized_length
-
-		draw_line(Vector2(0,0), trajectory / 5, Color(255, lineColor, lineColor, 1), 2.0)
+		var boost: float = get_parent().launch_boost() if get_parent().has_method("launch_boost") else 1.0
+		if boost > 1.0:  # on a spring: a longer line, in spring gold
+			draw_line(Vector2(0,0), trajectory / 5 * boost, Color(1.0, 0.86, 0.3, 1), 3.0)
+		else:
+			draw_line(Vector2(0,0), trajectory / 5, Color(255, lineColor, lineColor, 1), 2.0)
 
 
 func _on_cursor_lock_button_pressed():

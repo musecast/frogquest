@@ -146,6 +146,8 @@ func _build_ui() -> void:
 	outer.add_child(title_row)
 
 	# ScrollContainer holds all the items and expands to fill available space
+	# (what a row gets across: the panel less its padding, the scroll bar and a row's own lit box)
+	var row_width: float = pw - pad * 2.0 - 18.0
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -168,7 +170,7 @@ func _build_ui() -> void:
 			continue  # (computers only, once he's unlocked)
 		vbox.add_child(_section_header(section[0], font_size_body))
 		for id in ids:
-			vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size, icon_size))
+			vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size, icon_size, row_width))
 		if ids.is_empty():
 			var none_lbl := Label.new()
 			none_lbl.text = "(none yet)"
@@ -229,7 +231,11 @@ func _section_header(text: String, font_size: int) -> HBoxContainer:
 	return row
 
 
-func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size: float, icon_size: float) -> PanelContainer:
+## An item: its picture, its name, its button and a "?" for how it's won. On a narrow screen the name
+## doesn't fit beside the buttons (it came out "Frog", or not at all), so it goes on a line of its own
+## over them, beside the picture.
+func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size: float, icon_size: float,
+		row_width: float) -> PanelContainer:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var box := PanelContainer.new()  # (lit up while you're wearing it)
 	_item_rows[id] = box
@@ -243,26 +249,43 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	var lbl := Label.new()
 	lbl.text = ITEMS[id]["label"]
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lbl.clip_text = true
 	ui.style_label(lbl, font_size)
-	row.add_child(lbl)
+	var how: String = ITEMS[id].get("how", "")
+	var name_w: float = ui.font().get_string_size(lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + font_size * 0.6
+	var buttons_w: float = btn_min.x + (info_btn_size + 8.0 if how != "" else 0.0)
+	var stacked: bool = icon_size + 8.0 + name_w + 8.0 + buttons_w > row_width
+	var button_row: HBoxContainer = row
+	if stacked:
+		var column := VBoxContainer.new()
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.add_theme_constant_override("separation", 4)
+		row.add_child(column)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # (and if it's too long even there, two lines)
+		column.add_child(lbl)
+		button_row = HBoxContainer.new()
+		button_row.add_theme_constant_override("separation", 8)
+		column.add_child(button_row)
+	else:
+		lbl.clip_text = true
+		row.add_child(lbl)
 
 	var btn := Button.new()
 	# Use a fixed width sized for "UNEQUIP" (the longer label) so the panel
 	# width never changes when toggling between EQUIP / UNEQUIP.
 	btn.custom_minimum_size = btn_min
-	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	if stacked:
+		btn.custom_minimum_size.x = minf(btn_min.x, row_width - icon_size - 8.0 - (buttons_w - btn_min.x))
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL if stacked else Control.SIZE_SHRINK_CENTER
 	btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	btn.clip_text = false
 	btn.add_theme_font_size_override("font_size", font_size)
 	btn.pressed.connect(_on_item_button_pressed.bind(id, btn))
 	btn.pressed.connect(_play_sfx.bind("res://assets/frogaim.wav"))
 	_item_buttons[id] = btn
-	row.add_child(btn)
+	button_row.add_child(btn)
 	_update_button_label(btn, id)
 
 	# Info button — shows how to unlock
-	var how: String = ITEMS[id].get("how", "")
 	if how != "":
 		var info_btn := Button.new()
 		info_btn.text = "?"
@@ -271,7 +294,7 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 		ui.style_button(info_btn, font_size, "quiet")
 		info_btn.pressed.connect(_on_info_pressed.bind(id))
 		info_btn.pressed.connect(_play_sfx.bind("res://assets/frogaim.wav"))
-		row.add_child(info_btn)
+		button_row.add_child(info_btn)
 
 	return box
 
@@ -280,7 +303,7 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 static func item_icon(id: String, size: float) -> TextureRect:
 	var def: Dictionary = ITEMS.get(id, {})
 	var icon := TextureRect.new()
-	icon.texture = load(def.get("icon", "res://assets/frog.png"))
+	icon.texture = _trimmed(load(def.get("icon", "res://assets/frog.png")))
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -297,6 +320,25 @@ static func item_icon(id: String, size: float) -> TextureRect:
 		mat.set_shader_parameter("tint_strength", def.get("strength", 1.0))
 		icon.material = mat
 	return icon
+
+
+## The picture cut down to the art in it: hats are drawn with room around them for wearing (the wiz
+## hat sits in the top of a 46 px square), which left their icons small and off-centre in a slot.
+static func _trimmed(texture: Texture2D) -> Texture2D:
+	if texture == null:
+		return null
+	var image := texture.get_image()
+	if image == null:
+		return texture
+	if image.is_compressed():
+		image.decompress()
+	var used := image.get_used_rect()
+	if used.size == Vector2i(texture.get_size()) or used.size.x <= 0:
+		return texture
+	var cut := AtlasTexture.new()
+	cut.atlas = texture
+	cut.region = Rect2(used)
+	return cut
 
 
 func _play_sfx(path: String) -> void:

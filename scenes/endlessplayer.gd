@@ -1,6 +1,9 @@
 extends CharacterBody2D
 
+signal launched(platform: Node)  # (he's jumped off a platform: EndlessMode pops its spring)
+
 const SPEED = 300.0
+const SPRING_BOOST := 1.55  # a jump off a spring: this much faster, so about 2.4 times as high
 var landed_platform_ids: Dictionary = {}
 var tempVelocityx = 0.0
 var jumpCount = 0
@@ -125,8 +128,17 @@ func _physics_process(delta):
 
 	move_and_slide()
 
-	# If we just left a moving platform (jumped), strip out the platform's lateral velocity
-	# so it doesn't contribute to launch momentum.
+	# If we just left a moving platform (jumped), strip out the platform's velocity so it doesn't
+	# add to the jump: he goes where he aimed.
 	if was_on_floor and not is_on_floor() and _floor_body != null:
-		velocity.x -= _floor_body.constant_linear_velocity.x
+		velocity -= _floor_body.constant_linear_velocity
+		if velocity.y < 0.0 and is_instance_valid(_floor_body):
+			launched.emit(_floor_body)
 		_floor_body = null
+
+
+## How much a jump from where he stands is boosted: a spring's, or none.
+func launch_boost() -> float:
+	if is_on_floor() and _floor_body != null and is_instance_valid(_floor_body) and _floor_body.has_meta("spring"):
+		return SPRING_BOOST
+	return 1.0

@@ -18,13 +18,22 @@ var _frog: Node2D = null  # the story's Player, beside the flies in Main
 var _reel := -1.0  # seconds into the tongue snap (-1: not yet)
 var _snapped_from := Vector2.ZERO  # where the fly was when the tongue got it
 var _caught := false
+var on_caught := Callable()  # (Endless: its own points; the story's flies go to FlyHunt)
+var golden := false  # (Endless's rare gold ones, worth more)
+
+
+## For a fly somewhere other than the story: which frog's tongue gets it, and what catching it does.
+func hunt_for(frog: Node2D, caught: Callable) -> void:
+	_frog = frog
+	on_caught = caught
 
 
 func _ready() -> void:
 	_home = position
 	_phase = randf() * TAU
 	_t = randf() * 3.0
-	_frog = get_parent().get_node_or_null("Player")
+	if _frog == null:
+		_frog = get_parent().get_node_or_null("Player")
 	# Several hide in the dark stretches: they show up there anyway (just small), lantern or not.
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -81,7 +90,10 @@ func catch_now() -> void:
 		return
 	_caught = true
 	queue_redraw()
-	load("res://scripts/FlyHunt.gd").caught(self)
+	if on_caught.is_valid():
+		on_caught.call(self)
+	else:
+		load("res://scripts/FlyHunt.gd").caught(self)
 	var pop := create_tween()
 	pop.tween_property(self, "scale", Vector2(1.8, 1.8), 0.08)
 	pop.tween_property(self, "modulate:a", 0.0, 0.12)
@@ -100,6 +112,8 @@ func _draw() -> void:
 	var wing := Color(0.85, 0.92, 1.0, 0.85)
 	draw_rect(Rect2(Vector2(-3.6, -lift - 0.8), Vector2(2.6, 1.8)), wing)
 	draw_rect(Rect2(Vector2(1.0, -lift - 0.8), Vector2(2.6, 1.8)), wing)
-	draw_rect(Rect2(Vector2(-1.5, -1.5), Vector2(3.0, 3.0)), Color(0.12, 0.12, 0.14))
+	draw_rect(Rect2(Vector2(-1.5, -1.5), Vector2(3.0, 3.0)), Color(1.0, 0.78, 0.18) if golden else Color(0.12, 0.12, 0.14))
+	if golden and fmod(_t * 2.0 + _phase, 1.0) < 0.5:
+		draw_rect(Rect2(Vector2(2.5, -4.0), Vector2(1.5, 1.5)), Color(1.0, 0.96, 0.7))  # (it sparkles)
 	if fmod(_t + _phase, 3.4) < 0.2:
 		draw_circle(Vector2.ZERO, 5.0, Color(1.0, 1.0, 0.8, 0.22))  # (a glint now and then, for sharp eyes)

@@ -83,6 +83,15 @@ func _size_column(is_portrait: bool, fit: float) -> void:
 		# Fixed square — crown icon only, exit button expands to fill the rest
 		wb.custom_minimum_size = Vector2(btn_min.y, btn_min.y)
 		ui.style_button(wb, label_size, "wood")
+		# (a button's usual padding is for words: on this small square it left the crown no room)
+		var pad := roundf(btn_min.y * 0.16)
+		for state in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
+			var box := wb.get_theme_stylebox(state) as StyleBoxFlat
+			if box:
+				box.content_margin_left = pad
+				box.content_margin_right = pad
+				box.content_margin_top = pad + (2.0 if state.ends_with("pressed") else 0.0)
+				box.content_margin_bottom = pad
 		var wb_badge := wb.get_node_or_null("NewBadge") as Label
 		if wb_badge:
 			wb_badge.add_theme_font_size_override("font_size", int(btn_min.y * 0.33))

@@ -262,9 +262,44 @@ func _expect_inside(node: Node, room: Rect2, what: String) -> void:
 				_failures.append("%s: %s \"%s\" at %s is outside %s" % [what, child.name,
 					str(child.get("text")).left(24).replace("\n", " "), r, room])
 				return
+			if _cut_off(child):
+				_failures.append("%s: %s \"%s\" doesn't fit its %.0f px: its words are cut off" % [what,
+					child.name, str(child.get("text")).left(24).replace("\n", " "), child.size.x])
+				return
 			if child is ScrollContainer:
+				_expect_words_fit(child, what)  # (what scrolls may go past the edges, but not past its own box)
 				continue
 		_expect_inside(child, room, what)
+
+
+## Every visible label and button under node has room for its words.
+func _expect_words_fit(node: Node, what: String) -> void:
+	for child in node.get_children():
+		if child is CanvasItem and not child.visible:
+			continue
+		if child is Control and _cut_off(child):
+			_checked += 1
+			_failures.append("%s: %s \"%s\" doesn't fit its %.0f px: its words are cut off" % [what,
+				child.name, str(child.get("text")).left(24).replace("\n", " "), child.size.x])
+			return
+		_expect_words_fit(child, what)
+
+
+## A label or button whose words are wider than it is: clip_text cuts them off without a sound (the
+## wardrobe's names came out "Frog" and "Wiz |" on a phone, all inside the screen).
+func _cut_off(c: Control) -> bool:
+	if not (c is Label or c is Button) or not c.get("clip_text"):
+		return false
+	var text := str(c.get("text"))
+	if text == "" or (c is Label and c.autowrap_mode != TextServer.AUTOWRAP_OFF):
+		return false
+	var words: float = c.get_theme_font("font").get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1,
+		c.get_theme_font_size("font_size")).x
+	var room: float = c.size.x
+	if c is Button:
+		var box: StyleBox = c.get_theme_stylebox("normal")
+		room -= box.get_margin(SIDE_LEFT) + box.get_margin(SIDE_RIGHT)
+	return words > room + 1.0
 
 
 ## Where a label's words are: its box can be far wider than they are, with them anywhere in it.

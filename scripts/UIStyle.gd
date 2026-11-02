@@ -81,8 +81,10 @@ static func style_label(lbl: Label, font_size: int, colour := CREAM) -> void:
 	lbl.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
 
 
-## A slot for an item's picture, about size across: a little tile of light wood, so dark things show on
-## it. A pixel-art picture is shown at a whole multiple of its own size, so its pixels stay square.
+## A slot for an item's picture, size across: a little tile of light wood, so dark things show on it.
+## Every slot is the same size, whatever its picture (they used to fit the picture, so a list of them
+## came out ragged); the picture sits in the middle at a whole multiple of its own size, so its pixels
+## stay square.
 static func slot(icon: Control, size: float) -> PanelContainer:
 	var margin := maxf(2.0, roundf(size * 0.1))
 	var box := StyleBoxFlat.new()
@@ -95,10 +97,13 @@ static func slot(icon: Control, size: float) -> PanelContainer:
 	tile.add_theme_stylebox_override("panel", box)
 	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tile.custom_minimum_size = Vector2.ONE * size
 	var inner := maxf(1.0, size - margin * 2.0)
 	if icon is TextureRect and icon.texture:
 		inner = pixel_size(icon.texture, inner)
 	icon.custom_minimum_size = Vector2.ONE * inner
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	tile.add_child(icon)
 	return tile
 
