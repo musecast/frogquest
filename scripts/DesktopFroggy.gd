@@ -53,7 +53,7 @@ const GRAVITY := 980.0 / GAME_UNITS_PER_PX
 const FEET_TO_CENTER := 13.0
 const HALF_W := 15.0
 const HEIGHT := 30.0
-const HAT_Y := -10.75  # where the game wears his hat, from the sprite centre (it stays put when he crouches)
+const HAT_Y := -10.75  # where the game wears his hat, from the sprite centre (it comes down with his head: _place_hat)
 const MOUTH_Y := -5.0
 const TONGUE_REACH := 48.0
 const AIM_SENSITIVITY := 3.5  # the game's (Trajectory.gd): jump speed per pixel pulled back
@@ -139,6 +139,7 @@ var _look: CanvasGroup  # him and his hat, drawn together in the game's pixels
 var _fx_look: CanvasGroup  # his hearts, flies and aim line, in the same pixels
 var _body: AnimatedSprite2D
 var _hat: Sprite2D
+var _froggy_head: Script = load("res://scripts/FroggyHead.gd")
 var _fx: Node2D
 var _font: Font
 var _bubble_box: StyleBoxFlat
@@ -170,6 +171,8 @@ func _ready() -> void:
 	_hat = Sprite2D.new()
 	_hat.position = Vector2(0.0, HAT_Y)
 	_look.add_child(_hat)
+	_body.frame_changed.connect(_place_hat)
+	_body.animation_changed.connect(_place_hat)
 	_fx_look = CanvasGroup.new()
 	_fx_look.material = _look.material
 	add_child(_fx_look)
@@ -1495,6 +1498,16 @@ func _is_night() -> bool:
 func _play(anim: StringName) -> void:
 	if _body.animation != anim or not _body.is_playing():
 		_body.play(anim)
+
+
+## His hat sits on his head, as in the game: it comes down with his head when he breathes and crouches
+## (FroggyHead.gd reads how far from his art).
+func _place_hat() -> void:
+	var frames: Array = ANIMS.get(String(_body.animation), [0.0, []])[1]
+	var drop := 0
+	if _body.frame < frames.size():
+		drop = _froggy_head.drop(load(frames[_body.frame][0]))
+	_hat.position = Vector2(0.0, HAT_Y + drop)
 
 
 ## His hat and skin are the ones he wears in the game (see player.gd _apply_equipped_cosmetics).

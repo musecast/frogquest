@@ -16,9 +16,29 @@ var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 @onready var sprite = $Sprite2D
 @onready var shadow = $Shadow
 
+var _froggy_head: Script = load("res://scripts/FroggyHead.gd")
+
+
 func _ready() -> void:
 	trajectory = $Trajectory
 	_apply_equipped_cosmetics()
+	sprite.frame_changed.connect(_place_hats)
+	sprite.animation_changed.connect(_place_hats)
+
+
+## His hat sits on his head: it comes down with his head when he breathes and when he crouches to aim
+## (see FroggyHead.gd), and turns with him. Placed every physics frame and as soon as his frame
+## changes, so it's never a frame behind his head.
+func _place_hats() -> void:
+	var frame: Texture2D = sprite.sprite_frames.get_frame_texture(sprite.animation, sprite.frame) if sprite.sprite_frames else null
+	# (the negative skin shows the screen behind him, hats and all, so its hat sits a bit higher)
+	var hat_y := -10.66667 if MusicManager.equipped_skin == "negative_skin" else -9.1667
+	hat_y += _froggy_head.drop(frame) * sprite.scale.y
+	for hat_name in ["Froggycrown", "FroggyWizHat", "FroggyCakeHat"]:
+		var hat := get_node_or_null(hat_name) as Sprite2D
+		if hat and hat.visible:
+			hat.rotation = sprite.rotation
+			hat.position = Vector2(0, hat_y).rotated(sprite.rotation)
 
 
 func _apply_equipped_cosmetics() -> void:
@@ -101,17 +121,7 @@ func _physics_process(delta):
 
 	tempVelocityx = velocity.x / 2.5
 
-	var _is_negative := MusicManager.equipped_skin == "negative_skin"
-	var _hat_y := (-9.16667 if sprite.animation == "prejump" else -10.66667) if _is_negative else -9.1667
-	if has_node("Froggycrown") and $Froggycrown.visible:
-		$Froggycrown.rotation = sprite.rotation
-		$Froggycrown.position = Vector2(0, _hat_y).rotated(sprite.rotation)
-	if has_node("FroggyWizHat") and $FroggyWizHat.visible:
-		$FroggyWizHat.rotation = sprite.rotation
-		$FroggyWizHat.position = Vector2(0, _hat_y).rotated(sprite.rotation)
-	if has_node("FroggyCakeHat") and $FroggyCakeHat.visible:
-		$FroggyCakeHat.rotation = sprite.rotation
-		$FroggyCakeHat.position = Vector2(0, _hat_y).rotated(sprite.rotation)
+	_place_hats()
 
 	move_and_slide()
 

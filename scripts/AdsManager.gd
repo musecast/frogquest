@@ -21,9 +21,7 @@ const DEBUG_DISABLE_ADS_SETTING := "frogquest/ads/debug_disable_ads"
 const PLACEHOLDER_HEIGHT := 58.0
 const PLACEHOLDER_HEIGHT_LANDSCAPE_SCALE := 0.42
 const PLACEHOLDER_LANDSCAPE_MIN_STRIP_HEIGHT := 22.0
-const BANNER_BACKING_COLOR := Color(0.11, 0.07, 0.04, 1.0)  # dark wood, like the menus
-const BANNER_BACKING_TRIM := Color(0.86, 0.66, 0.30, 1.0)  # their gold trim (UIStyle.EDGE)
-const BANNER_BACKING_TRIM_WIDTH := 2.0
+const BANNER_BACKING_COLOR := Color(0.0, 0.0, 0.0, 1.0)
 const AD_START_DELAY_SECONDS := 2.0
 const CONSENT_TIMEOUT_SECONDS := 4.0
 const MOBILE_ADS_INIT_TIMEOUT_SECONDS := 5.0
@@ -416,16 +414,12 @@ func _should_show_bottom_banner_placeholder() -> bool:
 	return false
 
 
-## Behind a banner on an upright screen: a strip the width of the screen, so an ad narrower than the
-## screen (Google often fills the full-width adaptive slot with a centred 320x50 one) sits on a bar
-## instead of floating over the game. Only once an ad has loaded; sideways the banner is a narrow one
-## in the middle, so no strip (it would take a full-width bite out of a short screen).
 func _should_show_top_banner_backing() -> bool:
-	return _ads_active and _banner_show_top and _native_top_banner_loaded and not _viewport_is_landscape_like()
+	return false
 
 
 func _should_show_bottom_banner_backing() -> bool:
-	return _ads_active and _banner_show_bottom and _native_bottom_banner_loaded and not _viewport_is_landscape_like()
+	return false
 
 
 func _notify_banner_dependent_ui() -> void:
@@ -1508,12 +1502,28 @@ func _viewport_safe_insets() -> Vector4:
 	if platform != "iOS" and platform != "Android":
 		return Vector4.ZERO
 
+	var viewport_size := get_viewport().get_visible_rect().size
+	if platform == "iOS":
+		# iOS gives the safe area as the game view's size less its insets (in the view's pixels), and
+		# the view needn't be the window's size: measured against the window instead, the difference
+		# turned into a made-up inset (one big enough down the right to push the Muse Account button
+		# well in from its corner). So take each inset as a share of the view.
+		var screen := Vector2(DisplayServer.screen_get_size())
+		if screen.x <= 0.0 or screen.y <= 0.0:
+			return Vector4.ZERO
+		var safe := Rect2(DisplayServer.get_display_safe_area())
+		var origin := Vector2(DisplayServer.screen_get_position())
+		return Vector4(
+			maxf(0.0, (safe.position.x - origin.x) / screen.x * viewport_size.x),
+			maxf(0.0, (safe.position.y - origin.y) / screen.y * viewport_size.y),
+			maxf(0.0, (origin.x + screen.x - safe.end.x) / screen.x * viewport_size.x),
+			maxf(0.0, (origin.y + screen.y - safe.end.y) / screen.y * viewport_size.y))
+
 	var window_size := DisplayServer.window_get_size()
 	if window_size.x <= 0 or window_size.y <= 0:
 		return Vector4.ZERO
 
 	var safe_area := DisplayServer.get_display_safe_area()
-	var viewport_size := get_viewport().get_visible_rect().size
 	var scale_x := viewport_size.x / float(window_size.x)
 	var scale_y := viewport_size.y / float(window_size.y)
 	var left := float(safe_area.position.x) * scale_x
@@ -1584,14 +1594,14 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_placeholder_layer.add_child(_placeholder_root)
 
-	_top_backing = _build_banner_backing("TopBannerBacking", false)
+	_top_backing = _build_banner_backing("TopBannerBacking")
 	_top_backing.anchor_left = 0.0
 	_top_backing.anchor_top = 0.0
 	_top_backing.anchor_right = 1.0
 	_top_backing.anchor_bottom = 0.0
 	_placeholder_root.add_child(_top_backing)
 
-	_bottom_backing = _build_banner_backing("BottomBannerBacking", true)
+	_bottom_backing = _build_banner_backing("BottomBannerBacking")
 	_bottom_backing.anchor_left = 0.0
 	_bottom_backing.anchor_top = 1.0
 	_bottom_backing.anchor_right = 1.0
@@ -1616,23 +1626,12 @@ func _setup_placeholder_ui() -> void:
 	_hide_placeholders()
 
 
-func _build_banner_backing(node_name: String, trim_on_top: bool) -> ColorRect:
+func _build_banner_backing(node_name: String) -> ColorRect:
 	var backing := ColorRect.new()
 	backing.name = node_name
 	backing.color = BANNER_BACKING_COLOR
 	backing.visible = false
 	backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# (the gold trim along the edge that faces the game)
-	var trim := ColorRect.new()
-	trim.name = "Trim"
-	trim.color = BANNER_BACKING_TRIM
-	trim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	trim.anchor_right = 1.0
-	trim.anchor_top = 0.0 if trim_on_top else 1.0
-	trim.anchor_bottom = trim.anchor_top
-	trim.offset_top = 0.0 if trim_on_top else -BANNER_BACKING_TRIM_WIDTH
-	trim.offset_bottom = BANNER_BACKING_TRIM_WIDTH if trim_on_top else 0.0
-	backing.add_child(trim)
 	return backing
 
 

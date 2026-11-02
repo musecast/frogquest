@@ -59,6 +59,7 @@ var _active_wardrobe: CanvasLayer = null
 var _wiz_tween: Tween = null
 var _wiz_sprite_base_y: float = 0.0
 var _zoom_tween: Tween = null
+var _froggy_head: Script = null  # (scripts/FroggyHead.gd, loaded when his hat's first placed)
 var _crt_normal_volume: float = -20.0
 ## Tracks bottom banner suppressed while paused in horizontal mode (restore on unpause).
 var _banner_hidden_for_landscape_pause: bool = false
@@ -78,6 +79,8 @@ func _ready():
 	_trace("Player ready start")
 
 	get_tree().root.content_scale_size = Vector2i(480, 270)
+	$Sprite2D.frame_changed.connect(_place_hats)
+	$Sprite2D.animation_changed.connect(_place_hats)
 
 	currentHeight = (-position.y - 472) /10
 	highScore = currentHeight
@@ -372,19 +375,7 @@ func _physics_process(delta):
 		key_trail_pos = lerp(key_trail_pos, position + trail_offset, delta * 5.0)
 		key_node.position = key_trail_pos
 
-	var _is_negative := MusicManager.equipped_skin == "negative_skin"
-	var _hat_y := (-9.16667 if $Sprite2D.animation == "prejump" else -10.66667) if _is_negative else -9.1667
-	if $Froggycrown.visible:
-		$Froggycrown.rotation = $Sprite2D.rotation
-		$Froggycrown.position = Vector2(0, _hat_y).rotated($Sprite2D.rotation)
-
-	if $FroggyWizHat.visible:
-		$FroggyWizHat.rotation = $Sprite2D.rotation
-		$FroggyWizHat.position = Vector2(0, _hat_y).rotated($Sprite2D.rotation)
-
-	if $FroggyCakeHat.visible:
-		$FroggyCakeHat.rotation = $Sprite2D.rotation
-		$FroggyCakeHat.position = Vector2(0, _hat_y).rotated($Sprite2D.rotation)
+	_place_hats()
 
 	move_and_slide()
 
@@ -809,6 +800,23 @@ func _duck_crt_for_goodbye(crt_audio: AudioStreamPlayer2D) -> void:
 		return
 	var restore := create_tween()
 	restore.tween_property(crt_audio, "volume_db", _crt_normal_volume, 4.0)
+
+
+## His hat sits on his head: it comes down with his head when he breathes and when he crouches to aim
+## (see FroggyHead.gd), and turns with him. Placed every physics frame and as soon as his frame
+## changes, so it's never a frame behind his head.
+func _place_hats() -> void:
+	var body: AnimatedSprite2D = $Sprite2D
+	if _froggy_head == null:
+		_froggy_head = load("res://scripts/FroggyHead.gd")
+	var frame: Texture2D = body.sprite_frames.get_frame_texture(body.animation, body.frame) if body.sprite_frames else null
+	# (the negative skin shows the screen behind him, hats and all, so its hat sits a bit higher)
+	var hat_y := -10.66667 if MusicManager.equipped_skin == "negative_skin" else -9.1667
+	hat_y += _froggy_head.drop(frame) * body.scale.y
+	for hat: Sprite2D in [$Froggycrown, $FroggyWizHat, $FroggyCakeHat]:
+		if hat.visible:
+			hat.rotation = body.rotation
+			hat.position = Vector2(0, hat_y).rotated(body.rotation)
 
 
 func _apply_equipped_cosmetics() -> void:
