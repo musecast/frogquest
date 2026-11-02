@@ -118,11 +118,15 @@ func _show_state() -> void:
 		_secondary.text = "Sign Out"
 		_secondary.visible = true
 	elif _mode == "link" and not MuseAccount.linking.is_empty():
-		_body.text = "Tap Open Muse Shelf, check it shows this code, and approve it there:"
+		var opened_app: bool = MuseAccount.linking.get("opened_app", false)  # (then the button's the website)
+		if opened_app:
+			_body.text = "Muse Shelf didn't show this code? Update it, or approve it on the website instead:"
+		else:
+			_body.text = "Tap Open Muse Shelf, check it shows this code, and approve it there:"
 		_code.text = str(MuseAccount.linking.get("code", ""))
 		_code.visible = true
 		_input.visible = false
-		_primary.text = "Open Muse Shelf"
+		_primary.text = "Open the Website" if opened_app else "Open Muse Shelf"
 		_secondary.text = "Cancel"
 		_secondary.visible = true
 		_wait("Waiting for Muse Shelf...")
@@ -179,6 +183,7 @@ func _on_primary() -> void:
 			_say("Couldn't reach Muse. Check your connection and try again.")
 	elif _mode == "link":
 		MuseAccount.open_muse_shelf()
+		_show_state()  # (the app opened: next time, the website)
 	elif _mode == "code" and _sent_to != "":
 		var code := _input.text.strip_edges()
 		if code.length() < 6 or not code.is_valid_int():

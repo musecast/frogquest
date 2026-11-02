@@ -122,14 +122,16 @@ func cancel_link() -> void:
 
 
 ## Opens Muse Shelf at its Link a Game page with the code filled in: the app if it's on this phone,
-## otherwise the website.
+## otherwise the website. Once the app's been opened (linking.opened_app), the website: a Muse Shelf
+## from before Link a Game opens on its home screen without the code, and the website works with any.
 func open_muse_shelf() -> void:
 	if linking.is_empty():
 		return
 	var app := str(linking.get("app_url", ""))
 	var web := str(linking.get("approve_url", ""))
 	var mobile := OS.get_name() in ["iOS", "Android"]
-	if mobile and app != "" and OS.shell_open(app) == OK:
+	if mobile and app != "" and not linking.get("opened_app", false) and OS.shell_open(app) == OK:
+		linking.opened_app = true
 		return
 	if web != "":
 		OS.shell_open(web)

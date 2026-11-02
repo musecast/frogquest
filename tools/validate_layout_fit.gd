@@ -70,6 +70,11 @@ func _run() -> void:
 		acct.linking = {"code": "WWWW-WWWW", "secret": "test", "approve_url": "https://example.com", "app_url": ""}
 		screen._mode = "link"
 		screen._show_state()
+	var linking_opened_app := func(screen: Node) -> void:  # (back from a Muse Shelf that didn't show it)
+		acct.linking = {"code": "WWWW-WWWW", "secret": "test", "approve_url": "https://example.com",
+			"app_url": "jasonmuse-mediatracker://link?code=WWWW-WWWW", "opened_app": true}
+		screen._mode = "link"
+		screen._show_state()
 	var real_session := [acct.email, acct._refresh_token, acct._pro, acct._pro_checked_at]
 
 	for shape in WINDOWS:
@@ -89,6 +94,8 @@ func _run() -> void:
 		await _check_panel("%s: Muse account, code sent" % shape, muse, story_vp, up, code_sent)
 		await _check_panel("%s: Muse account, waiting on Muse Shelf" % shape, muse, story_vp, up, linking)
 		await _check_panel("%s, Endless: Muse account, waiting on Muse Shelf" % shape, muse, endless_vp, up, linking)
+		await _check_panel("%s: Muse account, offering the website" % shape, muse, story_vp, up, linking_opened_app)
+		await _check_panel("%s, Endless: Muse account, offering the website" % shape, muse, endless_vp, up, linking_opened_app)
 		acct.linking = {}
 		await _check_panel("%s: Muse account, signed in" % shape, muse, story_vp, up, signed_in)
 		await _check_toast("%s, story" % shape, story_vp, up)
