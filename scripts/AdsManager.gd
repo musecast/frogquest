@@ -354,6 +354,10 @@ signal ads_removed_changed
 
 ## (tools/validate_layout_fit.gd: pretend banners take this much room, top and bottom; -1 is real.)
 var test_banner_clearance := Vector2(-1.0, -1.0)
+## (and that the safe area is in this far from each side: left, top, right, bottom; -1 is real.)
+var test_safe_insets := Vector4(-1.0, -1.0, -1.0, -1.0)
+var _expected_banner_px := 0.0  # a banner's height in the screen's pixels, before it's loaded
+var _expected_banner_for := Vector2i.ZERO  # (the window size that was worked out for)
 
 
 ## Layer for title / HUD that must draw above the in-engine banner placeholder.
@@ -384,20 +388,34 @@ func get_viewport_safe_insets() -> Vector4:
 	return _viewport_safe_insets()
 
 
-## Viewport pixels to leave clear above the bottom edge when a bottom banner is active.
+## Viewport pixels to leave clear above the bottom edge for the bottom banner: kept from the moment
+## one's asked for, before it's turned up (seconds later) and if it never does, so nothing above it
+## moves when it arrives. (Kept only once it had loaded, the title's menu and "made by muse" jumped.)
 func get_viewport_bottom_banner_clearance() -> float:
 	if test_banner_clearance.y >= 0.0:
 		return test_banner_clearance.y
-	if not _ads_active or not _banner_show_bottom or not _native_bottom_banner_loaded:
+	if not _banner_show_bottom:
+		return 0.0
+	return get_viewport_bottom_banner_reserve()
+
+
+## What a bottom banner takes (get_viewport_bottom_banner_clearance), asked for yet or not, wherever
+## ads show: the title keeps it from its very first frame (its banner's asked for a moment in), and
+## the loading screen's logo goes where the title's will be. 0 with no ads.
+func get_viewport_bottom_banner_reserve() -> float:
+	if test_banner_clearance.y >= 0.0:
+		return test_banner_clearance.y
+	if not _ads_active:
 		return 0.0
 	return _bottom_banner_reserved_height() + 6.0
 
 
-## Viewport pixels to reserve below the top edge when a top banner is active (e.g. game over dual ads).
+## Viewport pixels to reserve below the top edge for the top banner (the game over's dual ads): kept
+## from the moment it's asked for, like the bottom one.
 func get_viewport_top_banner_clearance() -> float:
 	if test_banner_clearance.x >= 0.0:
 		return test_banner_clearance.x
-	if not _ads_active or not _banner_show_top or not _native_top_banner_loaded:
+	if not _ads_active or not _banner_show_top:
 		return 0.0
 	return _top_banner_reserved_height() + 6.0
 
@@ -1498,6 +1516,8 @@ func _screen_to_viewport_scale_y() -> float:
 
 
 func _viewport_safe_insets() -> Vector4:
+	if test_safe_insets.x >= 0.0:
+		return test_safe_insets
 	var platform := OS.get_name()
 	if platform != "iOS" and platform != "Android":
 		return Vector4.ZERO
@@ -1542,17 +1562,35 @@ func _native_banner_height_in_viewport(banner_view) -> float:
 
 
 func _top_banner_reserved_height() -> float:
-	var ad_height := _banner_placeholder_strip_height()
+	var ad_height := _expected_banner_height()
 	if _native_top_banner_loaded:
 		ad_height = maxf(ad_height, _native_banner_height_in_viewport(_banner_view_top))
 	return ad_height + _viewport_safe_insets().y
 
 
 func _bottom_banner_reserved_height() -> float:
-	var ad_height := _banner_placeholder_strip_height()
+	var ad_height := _expected_banner_height()
 	if _native_bottom_banner_loaded:
 		ad_height = maxf(ad_height, _native_banner_height_in_viewport(_banner_view_bottom))
 	return ad_height + _viewport_safe_insets().w
+
+
+## How tall the banner will be, in viewport pixels, before one's loaded: the size the ad SDK gives a
+## banner on this screen (it's worked out without asking for an ad, the same size _request_banners
+## asks for), in the screen's pixels. With no SDK (a computer), the old guess.
+func _expected_banner_height() -> float:
+	var window := DisplayServer.window_get_size()
+	if window != _expected_banner_for:
+		_expected_banner_for = window
+		_expected_banner_px = 0.0
+		if platform_has_ads() and Engine.has_singleton(ADMOB_AD_SIZE_SINGLETON):
+			var ad_size = _resolve_banner_ad_size()
+			if ad_size == null or ad_size.width <= 0 or ad_size.height <= 0:
+				ad_size = _fixed_banner_ad_size()
+			_expected_banner_px = float(ad_size.height) * DisplayServer.screen_get_scale()
+	if _expected_banner_px <= 0.0:
+		return _banner_placeholder_strip_height()
+	return _expected_banner_px * _screen_to_viewport_scale_y()
 
 
 func _apply_placeholder_layout() -> void:

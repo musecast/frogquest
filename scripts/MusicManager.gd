@@ -157,14 +157,21 @@ func _next_toast() -> void:
 		words.add_child(detail)
 	cl.add_child(panel)
 
-	# Centred at the top of the room, dropping in from above it (smaller, if it's wider than the room).
+	# At the top of the room in the middle of the screen (UIStyle.across), dropping in from above it
+	# (smaller, if it's wider than there's room for). Too wide for the middle clear of a side strip, it
+	# comes down past the strip's camera instead, where the strip's clear (shrunk, its words were mush).
 	var size := panel.get_combined_minimum_size()
-	var s := minf(1.0, room.size.x * 0.96 / size.x)
+	var span: float = ui.across(vp, room, room.size.x * 0.96).y
+	var rest_y := room.position.y + (room.size.y * 0.05 if portrait else 6.0)
+	var corner: Rect2 = ui.camera_corner(vp, room)
+	if size.x > span and corner.has_area():
+		span = vp.x * 0.96
+		rest_y = maxf(rest_y, corner.end.y + 4.0)
+	var s := minf(1.0, span / size.x)
 	panel.size = size
 	panel.scale = Vector2(s, s)
 	size *= s
-	panel.position = Vector2(room.position.x + (room.size.x - size.x) * 0.5, room.position.y - size.y - 16.0)
-	var rest_y := room.position.y + (room.size.y * 0.05 if portrait else 6.0)
+	panel.position = Vector2((vp.x - size.x) * 0.5, room.position.y - size.y - 16.0)
 	var tween := cl.create_tween()
 	tween.tween_property(panel, "position:y", rest_y, 0.45).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 	if icon:

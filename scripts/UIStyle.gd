@@ -8,6 +8,8 @@ extends RefCounted
 ## nearest): in between, its pixels come out uneven, some one wide and some two, and the words go lumpy.
 
 const PX := 16  # the pixel font's grid
+const CAP := 9  # its capitals' height, in its own pixels (it's 10 up and 4 down: the rest is room)
+const LEAD := 1  # each letter starts this many of its pixels in from where it's put (none after the last)
 const GOLD := Color(1.0, 0.86, 0.42)
 const CREAM := Color(0.97, 0.92, 0.80)
 const INK := Color(0.07, 0.04, 0.02)  # outlines
@@ -62,13 +64,13 @@ static func panel_box(radius := 10) -> StyleBoxFlat:
 static func style_button(btn: Button, font_size: int, kind := "wood") -> void:
 	font_size = px(font_size)
 	var colours: Array = KINDS.get(kind, KINDS["wood"])
-	var lip := maxi(3, roundi(font_size * 0.22))
-	btn.add_theme_stylebox_override("normal", _button_box(colours[0], colours[3], lip, false))
-	btn.add_theme_stylebox_override("hover", _button_box(colours[1], colours[3], lip, false))
-	btn.add_theme_stylebox_override("pressed", _button_box(colours[2], colours[3], lip, true))
-	btn.add_theme_stylebox_override("hover_pressed", _button_box(colours[2], colours[3], lip, true))
+	var lip := lip_px(font_size)
+	btn.add_theme_stylebox_override("normal", _button_box(colours[0], colours[3], lip, false, font_size))
+	btn.add_theme_stylebox_override("hover", _button_box(colours[1], colours[3], lip, false, font_size))
+	btn.add_theme_stylebox_override("pressed", _button_box(colours[2], colours[3], lip, true, font_size))
+	btn.add_theme_stylebox_override("hover_pressed", _button_box(colours[2], colours[3], lip, true, font_size))
 	btn.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	var off := _button_box(colours[0].darkened(0.35), colours[3], lip, false)
+	var off := _button_box(colours[0].darkened(0.35), colours[3], lip, false, font_size)
 	off.bg_color.a = 0.75
 	btn.add_theme_stylebox_override("disabled", off)
 	btn.add_theme_font_override("font", font())
@@ -81,45 +83,47 @@ static func style_button(btn: Button, font_size: int, kind := "wood") -> void:
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
-## A picture and words together in the middle of btn (a button's own icon sits off at its edge, away
-## from its words), on its face above the lip: a pixel-art picture (pixel) at a whole multiple of its
-## size in square pixels, a smooth one (the infinity sign, the crown) at the size it'll fit. The words
-## are a label in the menus' style; the button's own text is left empty. Again on the same button, it
-## just updates.
+## A picture on btn, at the left end of its face, in a square as tall as the face; its words are the
+## button's own text, so they sit in the very middle of it like any button's (next to the picture, as
+## a pair in the middle, they came out off to one side). A pixel-art picture (pixel) is drawn at a
+## whole multiple of its size in square pixels, a smooth one (the infinity sign, the crown) at the size
+## it'll fit. It sinks with the words when the button's pressed. Again on the same button, it just
+## updates.
 static func button_face(btn: Button, texture: Texture2D, pixel: bool, words: String, font_size: int) -> void:
 	font_size = px(font_size)
-	var face := btn.get_node_or_null("Face") as HBoxContainer
-	if face == null:
-		face = HBoxContainer.new()
-		face.name = "Face"
-		face.alignment = BoxContainer.ALIGNMENT_CENTER
-		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		face.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		var picture := TextureRect.new()
-		picture.name = "Picture"
-		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		face.add_child(picture)
-		var label := Label.new()
-		label.name = "Words"
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		face.add_child(label)
-		btn.add_child(face)
-	btn.text = ""
-	face.offset_bottom = -maxi(3, roundi(font_size * 0.22))  # (style_button's lip)
-	face.add_theme_constant_override("separation", roundi(font_size * 0.4))
-	var pic: TextureRect = face.get_node("Picture")
+	btn.text = words
+	var pic := btn.get_node_or_null("Picture") as TextureRect
+	if pic == null:
+		pic = TextureRect.new()
+		pic.name = "Picture"
+		pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(pic)
+		btn.draw.connect(func() -> void: _place_picture(btn, pic))  # (each time the button's drawn)
 	pic.texture = texture
 	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if pixel else CanvasItem.TEXTURE_FILTER_LINEAR
 	var w := texture.get_width()
 	var side: float = w * maxi(1, roundi(font_size * 0.9 / w)) if pixel else roundf(font_size * 0.9)
-	pic.custom_minimum_size = Vector2(side, side)
-	var lbl: Label = face.get_node("Words")
-	lbl.text = words
-	style_label(lbl, font_size, CREAM)
+	pic.size = Vector2(side, side)
+	pic.set_meta("lip", lip_px(font_size))
+	btn.queue_redraw()
+
+
+## Where a button's picture goes (button_face): its middle at the middle of the face's left-end
+## square, and level with the words' middle. Pressed, the lip's gone and the face reaches down to the
+## rim, words and all.
+static func _place_picture(btn: Button, pic: TextureRect) -> void:
+	var lip: int = pic.get_meta("lip", 3)
+	var sunk := btn.get_draw_mode() in [BaseButton.DRAW_PRESSED, BaseButton.DRAW_HOVER_PRESSED]
+	var face := Rect2(2.0, 2.0, btn.size.x - 4.0, btn.size.y - 2.0 - (2.0 if sunk else float(lip)))
+	var middle := Vector2(face.position.x + roundf(face.size.y * 0.5), face.get_center().y)
+	pic.position = (middle - pic.size * 0.5).round()
+
+
+## How thick a button's lip is, for its words' size.
+static func lip_px(font_size: int) -> int:
+	return maxi(3, roundi(font_size * 0.22))
 
 
 ## A picture drawn from rows of "#" (PERSON, GEAR), white.
@@ -132,17 +136,25 @@ static func pixel_icon(rows: Array) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-static func _button_box(fill: Color, rim: Color, lip: int, pressed: bool) -> StyleBoxFlat:
+## A button's box. Its words go in the very middle of its face, above the lip: a button centres its
+## line of words by the font's height (10 of its pixels up, 4 down), which left the capitals a little
+## high on the face, and each letter starts a pixel of the font in, which left them a little right. The
+## margins make up for both, in whole pixels (the button rounds where its words go down to one, so a
+## half pixel more came out a whole one). Pressed, the words sink with the face.
+static func _button_box(fill: Color, rim: Color, lip: int, pressed: bool, font_size: int) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
 	box.border_color = rim
 	box.set_border_width_all(2)
 	box.border_width_bottom = 2 if pressed else lip  # the lip
 	box.set_corner_radius_all(6)
-	box.content_margin_left = 10.0
-	box.content_margin_right = 10.0
-	box.content_margin_top = 2.0 + (lip - 2 if pressed else 0)  # (the words sink with it)
-	box.content_margin_bottom = 2.0
+	var f := font()
+	var k := float(font_size / PX)  # (the font's pixel, in the screen's)
+	var lead := floorf(LEAD * k * 0.5)
+	box.content_margin_left = 10.0 - lead
+	box.content_margin_right = 10.0 + lead
+	box.content_margin_top = 2.0 + (lip - 2 if pressed else 0)
+	box.content_margin_bottom = maxf(0.0, lip + f.get_ascent(font_size) - f.get_descent(font_size) - CAP * k)
 	return box
 
 
@@ -228,14 +240,16 @@ static func panel_zoom(vp: Vector2, room: Rect2) -> float:
 	return 2.0 if vp.y > vp.x * 1.3 and room.size.y >= 760.0 else 1.0
 
 
-## Puts panel in the middle of room, drawn zoom times as big (panel_zoom; a whole number, so with
-## nearest filtering on the panel its pixels stay square) and share of the room's width across. Never
-## shrunk to fit: the pixel font drops pixels and its words go to mush (sideways on a phone they did).
-## If it's too tall, scroll (the ScrollContainer holding what's in it) is cut to fit and the rest
-## scrolls.
+## Puts panel in the middle of the screen across and of room up and down (across(): it keeps clear of
+## the notch), drawn zoom times as big (panel_zoom; a whole number, so with nearest filtering on the
+## panel its pixels stay square) and share of the room's width across. Never shrunk to fit: the pixel
+## font drops pixels and its words go to mush (sideways on a phone they did). If it's too tall, scroll
+## (the ScrollContainer holding what's in it) is cut to fit and the rest scrolls, by a finger too.
 static func fit_panel(panel: Control, scroll: ScrollContainer, room: Rect2, zoom: float, share: float) -> void:
 	var s := maxf(1.0, floorf(zoom))
-	panel.custom_minimum_size = Vector2(room.size.x * share / s, 0)
+	var vp := panel.get_viewport_rect().size
+	# (a whole number of pixels wide, so what's in it lands on whole pixels: words dead in the middle)
+	panel.custom_minimum_size = Vector2(floorf(across(vp, room, room.size.x * share).y / s), 0)
 	scroll.custom_minimum_size.y = (scroll.get_child(0) as Control).get_combined_minimum_size().y
 	var need := panel.get_combined_minimum_size()
 	var over := need.y * s - room.size.y * 0.94
@@ -244,12 +258,21 @@ static func fit_panel(panel: Control, scroll: ScrollContainer, room: Rect2, zoom
 		need = panel.get_combined_minimum_size()
 	panel.size = need
 	panel.scale = Vector2(s, s)
-	panel.position = (room.position + (room.size - need * s) / 2.0).round()
+	var at := Rect2(Vector2((vp.x - need.x * s) / 2.0, room.position.y + (room.size.y - need.y * s) / 2.0), need * s)
+	# (what's in it can need more than fits in the middle clear of a side strip: then it's in the middle
+	# all the same, a little into the strip, as long as it's clear of the camera at the end of it; if not,
+	# it keeps to the room)
+	if (at.position.x < room.position.x or at.end.x > room.end.x) and at.intersects(camera_corner(vp, room)):
+		at.position.x = clampf(at.position.x, room.position.x, maxf(room.position.x, room.end.x - at.size.x))
+	panel.position = at.position.round()
+	finger_scroll(scroll)
 
 
 ## The room a menu has on screen: in from the notch and the home indicator, and clear of the ad banners
-## (they're drawn over the game, so nothing the game draws can cover them).
-static func room(vp: Vector2) -> Rect2:
+## (they're drawn over the game, so nothing the game draws can cover them). With banner_to_come, the
+## bottom banner's room is kept even before one's been asked for, wherever there are ads (the title's,
+## from its very first frame: its banner's asked for a moment in, and turns up seconds after that).
+static func room(vp: Vector2, banner_to_come := false) -> Rect2:
 	var ads: Node = Engine.get_main_loop().root.get_node_or_null("AdsManager")
 	var inset := Vector4.ZERO
 	var top := 0.0
@@ -257,7 +280,70 @@ static func room(vp: Vector2) -> Rect2:
 	if ads:
 		inset = ads.get_viewport_safe_insets()
 		top = ads.get_viewport_top_banner_clearance()
-		bottom = ads.get_viewport_bottom_banner_clearance()
+		bottom = ads.get_viewport_bottom_banner_reserve() if banner_to_come else ads.get_viewport_bottom_banner_clearance()
 	top = maxf(top, inset.y)
 	bottom = maxf(bottom, inset.w)
 	return Rect2(inset.x, top, vp.x - inset.x - inset.z, vp.y - top - bottom)
+
+
+## Where something centred on the screen goes across, want wide at most, inside room: [its left edge,
+## its width]. In the middle of the screen, not of the room: on an upright iPhone Duo the safe area
+## stops short of a strip down one side (its camera's at the top of it), and centred in the room every
+## menu sat off to the other side. It keeps out of the strip all the same, so nothing tall reaches the
+## camera.
+static func across(vp: Vector2, room: Rect2, want: float) -> Vector2:
+	var mid := vp.x * 0.5
+	var w := maxf(0.0, minf(want, 2.0 * minf(mid - room.position.x, room.end.x - mid)))
+	return Vector2(mid - w * 0.5, w)
+
+
+## The camera's end of a side strip (across()): the safe area stops short of it all the way down, but
+## it's only the top of it, the camera, that's ever in the way; taken as a square as deep as the strip
+## is wide. Empty where the safe area's even both sides.
+static func camera_corner(vp: Vector2, room: Rect2) -> Rect2:
+	var left := room.position.x
+	var right := vp.x - room.end.x
+	var w := absf(left - right)
+	if w < 1.0:
+		return Rect2()
+	return Rect2(0.0 if left > right else vp.x - w, 0.0, w, w)
+
+
+## The title screen's spots, worked out here so the loading screen (BootLoader.gd) can put its logo
+## exactly where the title's will be, and the title fills in around it: "logo" (its middle) and
+## "logo_scale"; "byline_size" and "byline_gap" ("made by muse": its size, and how far up from the
+## screen's bottom edge it sits); "floor" (how far down the menu may come: just over "made by muse");
+## and "room". The bottom banner's room is kept from the very first frame wherever there are ads
+## (room(vp, true)), so nothing moves when the banner turns up, seconds in.
+static func title_spots(vp: Vector2) -> Dictionary:
+	var portrait := vp.y > vp.x * 1.3
+	var r := room(vp, true)
+	var ads: Node = Engine.get_main_loop().root.get_node_or_null("AdsManager")
+	var banner: float = ads.get_viewport_bottom_banner_reserve() if ads else 0.0
+	var size := 32 if portrait else 16
+	# (just over the banner, sideways tucked a little into its breathing room; with none, just over the
+	# screen's edge and the home indicator)
+	var gap: float = banner - (0.0 if portrait else 6.0) if banner > 0.0 \
+		else (ads.get_viewport_bottom_safe_inset() if ads else 0.0) + 3.0
+	var floor_y := vp.y - gap - (font().get_height(size) + outline_px(size)) - 8.0
+	var logo := Vector2(vp.x * 0.5, r.position.y + 375.0 * 0.25 + vp.y * 0.06) if portrait \
+		else Vector2(vp.x * 0.29, (r.position.y + floor_y) * 0.5)
+	return {"logo": logo, "logo_scale": 0.5 if portrait else 0.3, "byline_size": size,
+		"byline_gap": gap, "floor": floor_y, "room": r}
+
+
+## Lets a finger slide what's in scroll up and down from anywhere on it, buttons and all: they pass the
+## touch on to it as well as taking it (a slide that's started on a button doesn't press it). Only its
+## bar moved it before: the wardrobe's rows and buttons kept every touch to themselves. Again after
+## what's in it changes. (Text boxes keep theirs, for picking where to type.)
+static func finger_scroll(scroll: ScrollContainer) -> void:
+	scroll.scroll_deadzone = 6  # (how far a finger goes before it's a slide, not a tap)
+	_pass_touches(scroll)
+
+
+static func _pass_touches(node: Node) -> void:
+	for child in node.get_children():
+		if child is Control and child.mouse_filter == Control.MOUSE_FILTER_STOP \
+				and not (child is LineEdit or child is TextEdit):
+			child.mouse_filter = Control.MOUSE_FILTER_PASS
+		_pass_touches(child)

@@ -30,17 +30,19 @@ func _apply_layout() -> void:
 	var top: float = maxf(inset.y, AdsManager.get_viewport_top_banner_clearance())
 	var bottom: float = maxf(inset.w, AdsManager.get_viewport_bottom_banner_clearance())
 	var margin := 16.0 if is_portrait else 10.0
+	# (in the middle of the screen across, the same way in from both sides: UIStyle.across)
+	var side := maxf(inset.x, inset.z)
 	var box: VBoxContainer = $MarginContainer
 	box.anchor_left = 0.0
 	box.anchor_top = 0.0
 	box.anchor_right = 1.0
 	box.anchor_bottom = 1.0
-	box.offset_left = inset.x + margin
-	box.offset_right = -(inset.z + margin)
+	box.offset_left = side + margin
+	box.offset_right = -(side + margin)
 	box.offset_top = top + margin * 0.5
 	box.offset_bottom = -(bottom + margin * 0.5)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	var room := Vector2(vp.x - inset.x - inset.z - margin * 2.0, vp.y - top - bottom - margin)
+	var room := Vector2(vp.x - side * 2.0 - margin * 2.0, vp.y - top - bottom - margin)
 	# Full size for the shape of the screen, then everything smaller together until it all fits
 	# the room (Endless is only 320 wide, and a foldable's inner screen is short for its width).
 	var fit := 1.0

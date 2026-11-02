@@ -70,6 +70,7 @@ func _build() -> void:
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_body.add_theme_color_override("font_color", ui.CREAM)
 	scroll.add_child(_body)
+	ui.finger_scroll(scroll)
 
 	_close = Button.new()
 	_close.text = "Close"
@@ -88,7 +89,8 @@ static func _read(path: String) -> String:
 
 
 ## Most of the room there is (UIStyle.room: clear of the notch and the ad banners, which are drawn over
-## everything), centred in it. Every frame: banners come and go, and the phone turns.
+## everything), in the middle of the screen (UIStyle.across). Every frame: banners come and go, and the
+## phone turns.
 func _process(_delta: float) -> void:
 	_fit()
 
@@ -107,10 +109,10 @@ func _fit() -> void:
 		ui.style_button(_close, size, "wood")
 		_close.custom_minimum_size = Vector2(0, size * 1.75)
 		_body.add_theme_font_size_override("font_size", 16 if vp.y >= 300.0 else 12)
-	var w := minf(room.size.x * (0.94 if portrait else 0.8), 640.0)
+	var across: Vector2 = ui.across(vp, room, minf(room.size.x * (0.94 if portrait else 0.8), 640.0))
 	var h := room.size.y * 0.94
-	_panel.size = Vector2(w, h)
-	_panel.position = (room.position + (room.size - _panel.size) / 2.0).round()
+	_panel.size = Vector2(across.y, h)
+	_panel.position = Vector2(across.x, room.position.y + (room.size.y - h) / 2.0).round()
 
 
 func _on_backdrop_input(event: InputEvent) -> void:

@@ -57,6 +57,8 @@ var _froggy_head: Script = null  # (scripts/FroggyHead.gd, loaded when his hat's
 var _crt_normal_volume: float = -20.0
 ## Tracks bottom banner suppressed while paused in horizontal mode (restore on unpause).
 var _banner_hidden_for_landscape_pause: bool = false
+var _title_glide: Tween = null  # (the title moving to where it now goes: _place_title)
+var _title_laid_out_for := Vector2.ZERO  # (the screen size the title was last laid out for)
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
@@ -808,7 +810,7 @@ func _build_title_menu() -> void:
 	_attach_new_badge(wardrobe)
 	_title_button(menu, "MuseButton", _on_muse_button_pressed)
 	_title_button(menu, "SettingsButton", _on_title_settings_pressed).set_meta("words", "SETTINGS")
-	for b in menu.get_children():  # (each one's picture, next to its words: UIStyle.button_face)
+	for b in menu.get_children():  # (each one's picture at its left end, its words in the middle: UIStyle.button_face)
 		b.set_meta("icon", {"EndlessButton": [load("res://assets/infinity.png"), false],
 			"WardrobeButton": [load("res://assets/crownicon.png"), false],
 			"MuseButton": [ui.pixel_icon(ui.PERSON), true],
@@ -837,33 +839,34 @@ func _refresh_title_menu() -> void:
 
 
 ## The title: the logo, then its menu under it upright (or beside it sideways), and "made by muse"
-## at the bottom, all in the room clear of the notch and the bottom banner. The buttons are the
-## biggest that fit: on a short screen (an upright iPad, a foldable) they come down a size.
+## at the bottom, all in the room clear of the notch and the bottom banner, which is kept from the
+## very first frame (UIStyle.title_spots, where the loading screen put its logo too): nothing moves
+## when the banner turns up. The buttons are the biggest that fit: on a short screen (an upright iPad,
+## a foldable) they come down a size.
 func _layout_title(vp: Vector2, is_portrait: bool) -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var title := $titlescreen/Title
 	var by_muse := $"titlescreen/by muse"
 	var menu: VBoxContainer = $titlescreen/TitleMenu
-	var room: Rect2 = ui.room(vp)
-	_pin_to_bottom(by_muse, 32 if is_portrait else 16, 0.0 if is_portrait else 6.0)
-	var bottom: float = vp.y + by_muse.offset_top - 8.0  # (just over "made by muse")
+	var spots: Dictionary = ui.title_spots(vp)
+	var room: Rect2 = spots.room
+	var byline := _byline(by_muse, spots.byline_size, spots.byline_gap)
+	var bottom: float = spots.floor  # (just over "made by muse")
 	var shown: Array = menu.get_children().filter(func(b: Control) -> bool: return b.visible)
 	var count := shown.size()
 	# [words, first button's height, the others', gap]
 	var sizes := [[32, 72.0, 60.0, 10.0], [32, 56.0, 48.0, 8.0], [16, 44.0, 38.0, 6.0], [16, 34.0, 30.0, 4.0]] \
 		if is_portrait else [[16, 40.0, 34.0, 6.0], [16, 34.0, 28.0, 4.0]]
+	var logo: Vector2 = spots.logo
+	title.scale = Vector2.ONE * spots.logo_scale
 	var top: float
 	var width: float
-	if is_portrait:
-		title.scale = Vector2(0.5, 0.5)
-		title.position = Vector2(vp.x * 0.5, room.position.y + 375.0 * 0.25 + vp.y * 0.06)
-		top = title.position.y + 375.0 * 0.25 + 16.0
-		width = minf(vp.x * 0.84, 420.0)
+	if is_portrait:  # (whole pixels wide, so the words land dead in the middle)
+		top = logo.y + 375.0 * 0.25 + 16.0
+		width = floorf(minf(vp.x * 0.84, 420.0))
 	else:
-		title.scale = Vector2(0.3, 0.3)
-		title.position = Vector2(vp.x * 0.29, (room.position.y + bottom) * 0.5)
 		top = room.position.y + 8.0
-		width = minf(vp.x * 0.4, 260.0)
+		width = floorf(minf(vp.x * 0.4, 260.0))
 	var pick: Array = sizes[-1]
 	for each in sizes:
 		if each[1] + (count - 1) * (each[2] + each[3]) <= bottom - top:
@@ -881,7 +884,30 @@ func _layout_title(vp: Vector2, is_portrait: bool) -> void:
 			ui.button_face(b, icon[0], icon[1], b.get_meta("words", ""), pick[0])
 	menu.size = Vector2(width, height)
 	var x: float = (vp.x - width) * 0.5 if is_portrait else vp.x * 0.72 - width * 0.5
-	menu.position = Vector2(x, top + (bottom - top - height) * 0.5).round()
+	_place_title(vp, logo, Vector2(x, top + (bottom - top - height) * 0.5).round(), byline)
+
+
+## Puts the logo, the menu and "made by muse" where they go: straight there the first time and when the
+## screen turns, and in a glide if they move while they're showing (a banner that came out taller than
+## its room, or went with Muse Pro), so nothing jumps.
+func _place_title(vp: Vector2, logo: Vector2, menu_at: Vector2, byline: Vector2) -> void:
+	var title := $titlescreen/Title
+	var by_muse := $"titlescreen/by muse"
+	var menu: Control = $titlescreen/TitleMenu
+	var moves := [[title, "position", logo], [menu, "position", menu_at],
+		[by_muse, "offset_top", byline.x], [by_muse, "offset_bottom", byline.y]]
+	if _title_glide:
+		_title_glide.kill()
+		_title_glide = null
+	var glide: bool = $titlescreen.visible and vp == _title_laid_out_for
+	_title_laid_out_for = vp
+	for m in moves:
+		if not glide:
+			m[0].set(m[1], m[2])
+		elif m[0].get(m[1]) != m[2]:
+			if _title_glide == null:
+				_title_glide = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			_title_glide.tween_property(m[0], m[1], m[2], 0.4)
 
 
 func _on_muse_button_pressed() -> void:
@@ -1063,7 +1089,7 @@ func _apply_win_layout() -> void:
 		btn.offset_right  = cx + hw
 		btn.offset_top    = btn_top
 		btn.offset_bottom = btn_top + 65.0
-		_text_size(btn, 34)
+		load("res://scripts/UIStyle.gd").style_button(btn, 34, "go")  # (like every other button)
 
 		_pin_to_bottom(by_muse2, 26)
 	else:
@@ -1097,17 +1123,27 @@ func _apply_win_layout() -> void:
 		_text_size(time2_lbl, 16)
 
 		var hw: float = min(120.0, vp.x * 0.22)
-		btn.anchor_left   = 0.5
-		btn.anchor_right  = 0.5
-		btn.anchor_top    = 0.74
-		btn.anchor_bottom = 0.74
-		btn.offset_left   = -hw
-		btn.offset_right  =  hw
-		btn.offset_top    = 0.0
-		btn.offset_bottom = 40.0
-		_text_size(btn, 19)
+		btn.anchor_left   = 0.0
+		btn.anchor_right  = 0.0
+		btn.anchor_top    = 0.0
+		btn.anchor_bottom = 0.0
+		btn.offset_left   = cx - hw
+		btn.offset_right  = cx + hw
+		btn.offset_top    = vp.y * 0.74
+		btn.offset_bottom = vp.y * 0.74 + 40.0
+		load("res://scripts/UIStyle.gd").style_button(btn, 19, "go")
 
 		_pin_to_bottom(by_muse2, 13)
+	_snap_to_pixels([btn])
+
+
+## Puts buttons' edges on whole pixels: half a pixel out, a button's words came out a pixel off its
+## middle.
+func _snap_to_pixels(buttons: Array) -> void:
+	for b in buttons:
+		if b is Control:
+			for side in ["offset_left", "offset_top", "offset_right", "offset_bottom"]:
+				b.set(side, roundf(b.get(side)))
 
 
 ## Sets a label's or button's words to about size: the nearest whole step of the pixel font's 16-pixel
@@ -1120,9 +1156,17 @@ func _text_size(c: Control, size: float) -> void:
 
 
 ## Pins a "made by muse" label along the bottom edge, all of it on screen: just above the bottom
-## banner when one is showing (tuck pulls it that much closer to the banner), otherwise just
-## above the edge and any home-indicator area.
-func _pin_to_bottom(label: Label, font_size: int, tuck: float = 0.0) -> void:
+## banner when one is showing, otherwise just above the edge and any home-indicator area.
+func _pin_to_bottom(label: Label, font_size: int) -> void:
+	var banner: float = AdsManager.get_viewport_bottom_banner_clearance()
+	var at := _byline(label, font_size, banner if banner > 0.0 else AdsManager.get_viewport_bottom_safe_inset() + 3.0)
+	label.offset_top = at.x
+	label.offset_bottom = at.y
+
+
+## Sets a "made by muse" label up across the bottom of the screen, about font_size big, and gives the
+## offsets (top, bottom) that put it gap up from the bottom edge, all of it on screen.
+func _byline(label: Label, font_size: int, gap: float) -> Vector2:
 	_text_size(label, font_size)
 	font_size = label.get_theme_font_size("font_size")
 	var outline: int = label.get_theme_constant("outline_size")
@@ -1131,13 +1175,10 @@ func _pin_to_bottom(label: Label, font_size: int, tuck: float = 0.0) -> void:
 	label.anchor_right = 1.0
 	label.anchor_top = 1.0
 	label.anchor_bottom = 1.0
-	var banner: float = AdsManager.get_viewport_bottom_banner_clearance()
-	var gap: float = banner - tuck if banner > 0.0 else AdsManager.get_viewport_bottom_safe_inset() + 3.0
-	var height: float = label.get_theme_font("font").get_height(font_size) + outline
 	label.offset_left = 0.0
 	label.offset_right = 0.0
-	label.offset_bottom = -gap
-	label.offset_top = -gap - height
+	var height: float = label.get_theme_font("font").get_height(font_size) + outline
+	return Vector2(-gap - height, -gap)
 
 
 func _initial_title_layout() -> void:
@@ -1240,6 +1281,8 @@ func _apply_ui_layout() -> void:
 		var ra_slot: int = wardrobe_slot + (1 if MusicManager.has_any_cosmetic() else 0)
 		_ensure_pause_wardrobe_btn(bl, br, bh, bs + (bh + gap_ls) * wardrobe_slot, btn_font_ls)
 		_ensure_pause_remove_ads_btn(bl, br, bh, bs + (bh + gap_ls) * ra_slot, btn_font_ls)
+	_snap_to_pixels([resume_btn, settings_btn, restart_btn, $PauseScreen.get_node_or_null("WardrobePauseBtn"),
+		$PauseScreen.get_node_or_null("RemoveAdsPauseBtn")])
 
 	# ── PAUSE BUTTON ──────────────────────────────────────────────────────
 	var pause_btn := $CanvasLayer/TouchScreenButtonPause

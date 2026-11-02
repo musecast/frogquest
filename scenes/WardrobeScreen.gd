@@ -36,6 +36,7 @@ var _resize_timer: SceneTreeTimer = null
 var _froggy_link = null  # DesktopFrogLink.gd, loaded on first use
 var _froggy_busy_until := 0  # msec; LET OUT / CALL IN waits while froggy starts up or heads home
 var _froggy_refresh_in := 0.0
+var _built_for := []  # [screen size, room] the panel was last built for
 
 func _compute_action_button_size(base_size: Vector2, font_size: int) -> Vector2:
 	var button_font := load("res://assets/fibberish.ttf") as Font
@@ -80,6 +81,9 @@ func _on_viewport_resized() -> void:
 	await _resize_timer.timeout
 	if not is_inside_tree():
 		return
+	var vp := get_viewport().get_visible_rect().size
+	if [vp, load("res://scripts/UIStyle.gd").room(vp)] == _built_for:
+		return  # (a banner came again, same room: built afresh, the list lost its place)
 	for child in get_children():
 		child.queue_free()
 	_item_buttons.clear()
@@ -107,20 +111,23 @@ func _build_ui() -> void:
 	var font_size_title: int = ui.px(vp.x / 10.0) if is_portrait else 16
 	var font_size_body:  int = ui.px(vp.x / 15.0) if is_portrait else 16
 	# Buttons and pictures scale with the room so they fit any phone.
-	var btn_min := Vector2(room.size.x * 0.27, maxf(room.size.y * 0.05, font_size_body * 1.9)) if is_portrait else Vector2(70, 20)
+	# (whole pixels, so their words land dead in the middle)
+	var btn_min := Vector2(room.size.x * 0.27, maxf(room.size.y * 0.05, font_size_body * 1.9)).round() if is_portrait else Vector2(70, 20)
 	var action_btn_min := _compute_action_button_size(btn_min, font_size_body)
 	var info_btn_size: float = btn_min.y
-	var icon_size: float = btn_min.y * 1.1
+	var icon_size: float = roundf(btn_min.y * 1.1)
 	var pad: float = 14.0 if is_portrait else 7.0
 
-	# Panel: a share of the room, capped, centred in it.
+	# Panel: a share of the room, capped, in the middle of the screen (UIStyle.across).
 	var panel := Panel.new()
 	panel.add_theme_stylebox_override("panel", ui.panel_box(10))
 	var margin: float = room.size.x * (0.05 if is_portrait else 0.017)
-	var pw: float = minf(room.size.x - margin * 2.0, 440.0)
+	var across: Vector2 = ui.across(vp, room, minf(room.size.x - margin * 2.0, 440.0))
+	var pw: float = floorf(across.y)
 	var ph: float = room.size.y * (0.88 if is_portrait else 0.92)
-	panel.position = (room.position + (room.size - Vector2(pw, ph)) * 0.5).floor()
+	panel.position = Vector2(across.x, room.position.y + (room.size.y - ph) * 0.5).floor()
 	panel.size = Vector2(pw, ph)
+	_built_for = [vp, room]
 	add_child(panel)
 
 	# Outer VBox: title | scroll-area | hint | close  (title & close never scroll off)
@@ -185,6 +192,7 @@ func _build_ui() -> void:
 			none_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			ui.style_label(none_lbl, font_size_body, ui.CREAM.darkened(0.3))
 			vbox.add_child(none_lbl)
+	ui.finger_scroll(scroll)  # (the rows and their buttons kept every touch: only the bar scrolled it)
 
 	# ── HINT (shown when an info button is pressed) ──────────────────────
 	_hint_box = PanelContainer.new()

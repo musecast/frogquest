@@ -6,7 +6,10 @@ extends SceneTree
 ## Remove Ads, Muse account, settings, privacy policy and wardrobe screens (with every hat and skin)
 ## between both banners, since the ads draw over everything (a banner over the privacy policy's Close
 ## left no way out); and the notifications that drop in. Nothing may hang off the screen or sit under a banner, and the pixel
-## font's words must be crisp (whole steps of its grid, 1:1, a one-pixel outline). Each screen is laid
+## font's words must be crisp (whole steps of its grid, 1:1, a one-pixel outline). The menus sit in the
+## middle of the screen across, even beside an upright iPhone Duo's side strip (and clear of it); a
+## finger slides their lists from anywhere on them; and nothing on the title moves when its banner's
+## asked for or turns up, its logo just where the loading screen put its own. Each screen is laid
 ## out in a SubViewport the size the game's stretch settings (viewport, expand) would give that window.
 ## The story climb saves to scratch files meanwhile, so yours is never touched.
 ##   Godot --headless --path . --script res://tools/validate_layout_fit.gd
@@ -26,7 +29,12 @@ const WINDOWS := {  # window sizes, in points
 	"square": Vector2(1000, 1000),
 	"computer": Vector2(1280, 720),
 	"ultrawide": Vector2(2560, 1080),
+	"iPhone Duo upright": Vector2(1375, 2000),
 }
+## Screens whose safe area stops short of a strip down one side (a share of the width): an upright
+## iPhone Duo's, its camera at the top of it. Menus go in the middle of the screen all the same, clear
+## of the strip.
+const STRIPS := {"iPhone Duo upright": 0.18}
 const LONG_EMAIL := "someone.with.a.really.long.name@example.com"
 const SCRATCH_SAVE := "user://test_layout_save_game.save"
 const SCRATCH_WARDROBE := "user://test_layout_wardrobe.save"
@@ -34,6 +42,8 @@ const SCRATCH_WARDROBE := "user://test_layout_wardrobe.save"
 var _failures: Array[String] = []
 var _checked := 0  # buttons, labels and text boxes looked at
 var _script_errors := ScriptErrors.new()
+var _strip := 0.0  # (the screen shape being checked: its side strip, a share of the width)
+var _camera := Rect2()  # (and the camera at the top of it, which nothing may be under)
 
 
 ## Script errors while it runs, any at all: a player.gd that didn't parse once left the story's
@@ -95,6 +105,7 @@ func _run() -> void:
 
 	for shape in WINDOWS:
 		var window: Vector2 = WINDOWS[shape]
+		_strip = STRIPS.get(shape, 0.0)
 		var endless_vp := _viewport_for(window, ENDLESS_BASE)
 		var story_vp := _viewport_for(window, STORY_BASE)
 		var up := window.y > window.x
@@ -140,6 +151,7 @@ func _run() -> void:
 		f.close()
 		_failures.append("the test wrote your real wardrobe save (put back as it was): find what saved it")
 	root.get_node("AdsManager").test_banner_clearance = Vector2(-1.0, -1.0)
+	root.get_node("AdsManager").test_safe_insets = Vector4(-1.0, -1.0, -1.0, -1.0)
 	for _i in 3:
 		await process_frame
 	for e in _script_errors.errors:
@@ -158,6 +170,7 @@ func _run() -> void:
 func _check_game_over(shape: String, vp: Vector2, upright: bool) -> void:
 	var banner := _banner_height(vp, upright)
 	root.get_node("AdsManager").test_banner_clearance = Vector2(banner + 6.0, banner + 6.0)
+	var room := _room(vp, banner, banner)
 	var view := _view(vp)
 	var endless: Node = load("res://scenes/EndlessMode.tscn").instantiate()
 	var screen: CanvasLayer = endless.get_node("GameOverScreen")
@@ -189,7 +202,9 @@ func _check_game_over(shape: String, vp: Vector2, upright: bool) -> void:
 	screen._apply_layout()
 	for _i in 3:
 		await process_frame
-	_check_inside(box, Rect2(0.0, banner, vp.x, vp.y - banner * 2.0), "%s: game over" % shape)
+	_check_inside(box, room, "%s: game over" % shape)
+	if absf(box.get_global_rect().get_center().x - vp.x * 0.5) > 1.0:
+		_failures.append("%s: game over: its column isn't in the middle of the screen" % shape)
 	view.queue_free()
 	endless.free()
 	await process_frame
@@ -209,18 +224,20 @@ func _check_story_menus() -> void:
 	var pause: CanvasLayer = player.get_node("PauseScreen")
 	for shape in WINDOWS:
 		var window: Vector2 = WINDOWS[shape]
+		_strip = STRIPS.get(shape, 0.0)
 		var vp := _viewport_for(window, STORY_BASE)
 		var banner := _banner_height(vp, window.y > window.x)
 		ads.test_banner_clearance = Vector2(0.0, banner + 6.0)  # (AdsManager adds 6 of breathing room)
-		var room := Rect2(0.0, 0.0, vp.x, vp.y - banner)
+		var room := _room(vp, 0.0, banner)
 		# (paused with the screen wider than tall, the game takes the banner down)
-		var pause_room := room if vp.x < vp.y else Rect2(Vector2.ZERO, vp)
+		var pause_room := room if vp.x < vp.y else _room(vp, 0.0, 0.0)
 		view.size = Vector2i(vp)
 		pause.visible = false
 		title.visible = true
 		player._apply_ui_layout()
 		await _frames(3)
 		_check_inside(title, room, "%s: title screen" % shape)
+		await _expect_title_steady(player, vp, shape)
 		var menu: Control = title.get_node("TitleMenu")
 		for button in ["PlayButton", "EndlessButton", "WardrobeButton", "MuseButton", "SettingsButton"]:
 			if not menu.get_node(button).visible:
@@ -255,6 +272,40 @@ func _check_story_menus() -> void:
 		DirAccess.remove_absolute(SCRATCH_SAVE)
 
 
+## Nothing on the title moves when its banner's asked for, or when it turns up (its room's kept from
+## the very first frame: the menu and "made by muse" jumped as the ad came in), and the loading screen
+## puts its logo just where the title's is (it had drifted, and the logo jumped up as the title came).
+func _expect_title_steady(player: Node, vp: Vector2, shape: String) -> void:
+	var ads := root.get_node("AdsManager")
+	var title: CanvasLayer = player.get_node("titlescreen")
+	var real := [ads.test_banner_clearance, ads._ads_active, ads._banner_show_bottom,
+		ads._native_bottom_banner_loaded, title.visible]
+	ads.test_banner_clearance = Vector2(-1.0, -1.0)  # (AdsManager's own reckoning, a phone's with ads)
+	ads._ads_active = true
+	title.visible = false  # (so it's placed straight there, not in a glide)
+	var seen := []
+	for state in [[false, false], [true, false], [true, true]]:  # (asked for yet, turned up yet)
+		ads._banner_show_bottom = state[0]
+		ads._native_bottom_banner_loaded = state[1]
+		player._apply_ui_layout()
+		await _frames(2)
+		var menu: Control = title.get_node("TitleMenu")
+		seen.append([title.get_node("Title").position, menu.position, menu.size, title.get_node("by muse").offset_top])
+	if seen[1] != seen[0] or seen[2] != seen[0]:
+		_failures.append("%s: the title moves as its banner's asked for and turns up: %s" % [shape, seen])
+	var spot: Vector2 = load("res://scripts/UIStyle.gd").title_spots(vp).logo
+	if not spot.is_equal_approx(title.get_node("Title").position):
+		_failures.append("%s: the loading screen puts its logo at %s, the title at %s" % [shape, spot,
+			title.get_node("Title").position])
+	ads.test_banner_clearance = real[0]
+	ads._ads_active = real[1]
+	ads._banner_show_bottom = real[2]
+	ads._native_bottom_banner_loaded = real[3]
+	title.visible = real[4]
+	player._apply_ui_layout()
+	await _frames(2)
+
+
 func _frames(n: int) -> void:
 	for _i in n:
 		await process_frame
@@ -263,6 +314,7 @@ func _frames(n: int) -> void:
 func _check_panel(what: String, script: GDScript, vp: Vector2, upright: bool, prepare := Callable()) -> void:
 	var banner := _banner_height(vp, upright)
 	root.get_node("AdsManager").test_banner_clearance = Vector2(banner + 6.0, banner + 6.0)
+	var room := _room(vp, banner, banner)
 	var view := _view(vp)
 	var screen: CanvasLayer = script.new()
 	view.add_child(screen)
@@ -272,9 +324,56 @@ func _check_panel(what: String, script: GDScript, vp: Vector2, upright: bool, pr
 			screen._show_state()
 	for _i in 4:
 		await process_frame
-	_check_inside(screen, Rect2(0.0, banner, vp.x, vp.y - banner * 2.0), what)
+	_check_inside(screen, room, what)
+	_expect_centred(screen, vp, what)
+	_expect_finger_scroll(screen, what)
 	view.queue_free()
 	await process_frame
+
+
+## The room on a screen of the shape being checked, clear of banners top and bottom this tall. If it
+## has a side strip, AdsManager's safe area is set to stop short of it, and nothing may be under the
+## camera at the top end of it (_camera, UIStyle.camera_corner); the rest of the strip's clear.
+func _room(vp: Vector2, top_banner: float, bottom_banner: float) -> Rect2:
+	var inset := Vector4(0.0, 0.0, vp.x * _strip, 0.0)
+	root.get_node("AdsManager").test_safe_insets = inset
+	var strip := vp.x * _strip
+	_camera = Rect2(vp.x - strip, 0.0, strip, strip) if strip > 0.0 else Rect2()
+	return Rect2(0.0, top_banner, vp.x, vp.y - top_banner - bottom_banner)
+
+
+## The menu's panel (the biggest one on its screen) is in the middle of the screen across, side strip
+## or not: on an upright iPhone Duo every menu sat off to one side, centred in the room left of its
+## strip.
+func _expect_centred(screen: Node, vp: Vector2, what: String) -> void:
+	var panel: Control = null
+	for child in screen.get_children():
+		if (child is Panel or child is PanelContainer) and child.visible:
+			if panel == null or child.get_global_rect().get_area() > panel.get_global_rect().get_area():
+				panel = child
+	if panel == null:
+		_failures.append("%s: no panel to check" % what)
+		return
+	var r := panel.get_global_rect()
+	if absf(r.get_center().x - vp.x * 0.5) > 1.0:
+		_failures.append("%s: its panel's middle is at %.1f, not the screen's %.1f" % [what, r.get_center().x, vp.x * 0.5])
+	if r.intersects(_camera):
+		_failures.append("%s: its panel at %s is under the camera at the top of the side strip" % [what, r])
+
+
+## Everything in a scroll box lets a finger slide it from anywhere (UIStyle.finger_scroll): in the
+## wardrobe the rows and their buttons kept every touch, and only the bar moved the list.
+func _expect_finger_scroll(node: Node, what: String) -> void:
+	for scroll in node.find_children("*", "ScrollContainer", true, false):
+		if not (scroll as ScrollContainer).is_visible_in_tree():
+			continue
+		if scroll.scroll_deadzone <= 0:
+			_failures.append("%s: its scroll box has no dead zone: a tap that wobbles would scroll instead" % what)
+		for c in scroll.find_children("*", "Control", true, false):
+			if c.mouse_filter == Control.MOUSE_FILTER_STOP and not (c is LineEdit or c is TextEdit or c is ScrollBar):
+				_failures.append("%s: %s \"%s\" keeps a finger's touch to itself: the list won't slide under it" % [
+					what, c.name, str(c.get("text")).left(24)])
+				return
 
 
 ## The widest notification there is (a picture, a long title and a second line), once it's dropped in,
@@ -285,9 +384,13 @@ func _check_toast(what: String, vp: Vector2, upright: bool) -> void:
 	root.get_node("AdsManager").test_banner_clearance = Vector2(banner + 6.0, banner + 6.0)
 	var view := _view(vp)
 	mm.toast_host = view
+	var room := _room(vp, banner, banner)
 	mm.show_unlock_notification("hat", "blackcrown")
 	await create_timer(0.75).timeout
-	_check_inside(view, Rect2(0.0, banner, vp.x, vp.y - banner * 2.0), "%s: notification" % what)
+	_check_inside(view, room, "%s: notification" % what)
+	for layer in view.get_children():
+		if layer is CanvasLayer:
+			_expect_centred(layer, vp, "%s: notification" % what)
 	view.queue_free()
 	mm.toast_host = null
 	mm._toasts.clear()
@@ -318,6 +421,10 @@ func _expect_inside(node: Node, room: Rect2, what: String) -> void:
 			if not room.grow(2.0).encloses(r):
 				_failures.append("%s: %s \"%s\" at %s is outside %s" % [what, child.name,
 					str(child.get("text")).left(24).replace("\n", " "), r, room])
+				return
+			if r.intersects(_camera):
+				_failures.append("%s: %s \"%s\" at %s is under the camera at the top of the side strip" % [
+					what, child.name, str(child.get("text")).left(24).replace("\n", " "), r])
 				return
 			if _cut_off(child):
 				_failures.append("%s: %s \"%s\" doesn't fit its %.0f px: its words are cut off" % [what,

@@ -91,7 +91,7 @@ func _build() -> void:
 	var aim_row := _row("Sensitivity")
 	for aim in AIMS:
 		var b := _button(aim[0], _set_aim.bind(aim[1]))
-		b.custom_minimum_size.x = BTN_HEIGHT * 1.3
+		b.custom_minimum_size.x = roundf(BTN_HEIGHT * 1.3)  # (whole pixels: the words land dead in the middle)
 		aim_row.add_child(b)
 		_aims.append(b)
 	_upright_rule = ui.rule()
@@ -135,7 +135,7 @@ func _row(words: String) -> HBoxContainer:
 
 func _toggle_row(words: String, on_press: Callable) -> Button:
 	var b := _button("", on_press)
-	b.custom_minimum_size.x = BTN_HEIGHT * 2.4
+	b.custom_minimum_size.x = roundf(BTN_HEIGHT * 2.4)
 	_row(words).add_child(b)
 	return b
 

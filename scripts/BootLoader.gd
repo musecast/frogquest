@@ -33,6 +33,9 @@ func _ready() -> void:
 		return
 	_trace("BootLoader start")
 	_started_at = Time.get_ticks_msec() / 1000.0
+	# The story's own scale (player.gd's), so the logo comes out the size the title's will be: at the
+	# project's 480x180, sideways, it was bigger, and shrank as the title took over.
+	get_tree().root.content_scale_size = Vector2i(480, 270)
 	_build_ui()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
@@ -46,6 +49,7 @@ func _trace(label: String) -> void:
 func _process(_delta: float) -> void:
 	if _loading_failed or _swap_queued:
 		return
+	_layout()  # (every frame: the safe area, and so the title's spot, can settle after the first)
 	if _loading:
 		_poll_threaded_load()
 	var elapsed := Time.get_ticks_msec() / 1000.0 - _started_at
@@ -101,14 +105,16 @@ func _build_ui() -> void:
 	add_child(_status_label)
 
 
-## Same spot and size as player.gd's title screen layout.
+## The very spot and size the title screen gives its logo (UIStyle.title_spots, which player.gd lays
+## the title out by: it had drifted from a copy of the numbers here, and the logo jumped up as the
+## title arrived).
 func _layout() -> void:
 	if not is_inside_tree():
 		return
 	var vp := get_viewport().get_visible_rect().size
-	var portrait := vp.y > vp.x * 1.3
-	_title.position = Vector2(vp.x * 0.5, vp.y * 0.25 if portrait else 85.0)
-	_title.scale = Vector2.ONE * (0.5 if portrait else 0.3)
+	var spots: Dictionary = load("res://scripts/UIStyle.gd").title_spots(vp)
+	_title.position = spots.logo
+	_title.scale = Vector2.ONE * spots.logo_scale
 	_status_label.position = Vector2(0.0, vp.y * 0.62)
 	_status_label.size = Vector2(vp.x, 40.0)
 
@@ -180,6 +186,12 @@ func _start_scene(packed: PackedScene) -> void:
 		await tree.process_frame
 	var reveal := create_tween()
 	reveal.tween_property(_bg, "modulate:a", 0.0, REVEAL_TIME).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	if their_logo and is_instance_valid(their_logo):
+		# (they're in the same spot; if the screen's changed under it, this one glides onto theirs)
+		reveal.parallel().tween_property(_title, "position", their_logo.position, REVEAL_TIME) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		reveal.parallel().tween_property(_title, "scale", their_logo.scale, REVEAL_TIME) \
+			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 	await reveal.finished
 	cover.queue_free()
 
