@@ -21,13 +21,14 @@ const ANIMS := {
 	"air": [5.0, [["res://assets/frog_airborne.png", 1.0]]],
 	"sad": [5.0, [["res://assets/frogsad.png", 1.0], ["res://assets/frogsad2.png", 1.0]]],
 }
-# Each hat's art and its size next to his sprite, as player.tscn wears them: the wiz hat is drawn
-# at his own pixel size, the others are 64 px art at 0.71.
+# Each hat's art, its size next to his sprite and how far it's lifted (art pixels), as player.tscn
+# wears them: the crown and the wiz hat are drawn at his own pixel size (the crown on his pixel grid,
+# its top-left at his (2, -9)), the cake hat is 64 px art at 0.71.
 const HATS := {
-	"froggycrown": ["res://assets/froggycrown.png", 0.71],
-	"blackcrown": ["res://assets/froggycrown.png", 0.71],
-	"wizhat": ["res://assets/froggywizhat.png", 1.0],
-	"cakehat": ["res://assets/froggycakehat.png", 0.71],
+	"froggycrown": ["res://assets/froggycrown.png", 1.0, -7.25],
+	"blackcrown": ["res://assets/froggycrown.png", 1.0, -7.25],
+	"wizhat": ["res://assets/froggywizhat.png", 1.0, 0.0],
+	"cakehat": ["res://assets/froggycakehat.png", 0.71, 0.0],
 }
 const PIXELS_SHADER := "res://scripts/froggy_pixels.gdshader"  # the game's chunky pixels, on just him
 const PIXEL_BLOCK := 2.0  # his art pixels per game pixel (the game's 480 px view at its widescreen zoom)
@@ -1501,6 +1502,7 @@ func _dress_up() -> void:
 	var hat := MusicManager.equipped_hat if randf() < HAT_CHANCE else ""  # (only once in a while)
 	_hat.texture = _solid_hat(HATS[hat][0]) if HATS.has(hat) else null
 	_hat.scale = Vector2.ONE * (HATS[hat][1] if HATS.has(hat) else 1.0)
+	_hat.offset = Vector2(0.0, HATS[hat][2] if HATS.has(hat) else 0.0)
 	_hat.visible = _hat.texture != null
 	if hat == "blackcrown":
 		_hat.material = _tint(Color(0.0, 0.0, 0.0), 1.0)

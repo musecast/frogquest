@@ -630,8 +630,9 @@ script = ExtResource("1_o2au2")
 [node name="Froggycrown" type="Sprite2D" parent="." unique_id=1060501851]
 visible = false
 position = Vector2(1.42109e-14, -9.16667)
-scale = Vector2(0.54, 0.54)
+scale = Vector2(0.76, 0.76)
 texture = ExtResource("2_c8w13")
+offset = Vector2(0, -7.254)
 
 [node name="FroggyWizHat" type="Sprite2D" parent="." unique_id=845240182]
 visible = false
