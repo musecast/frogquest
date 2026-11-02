@@ -81,21 +81,37 @@ static func style_label(lbl: Label, font_size: int, colour := CREAM) -> void:
 	lbl.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
 
 
-## A slot for an item's picture, size across: a little tile of light wood, so dark things show on it.
+## A slot for an item's picture, about size across: a little tile of light wood, so dark things show on
+## it. A pixel-art picture is shown at a whole multiple of its own size, so its pixels stay square.
 static func slot(icon: Control, size: float) -> PanelContainer:
+	var margin := maxf(2.0, roundf(size * 0.1))
 	var box := StyleBoxFlat.new()
 	box.bg_color = Color(0.42, 0.30, 0.19)
 	box.border_color = Color(0.17, 0.10, 0.05)
 	box.set_border_width_all(2)
 	box.set_corner_radius_all(6)
-	box.set_content_margin_all(maxf(2.0, roundf(size * 0.1)))
+	box.set_content_margin_all(margin)
 	var tile := PanelContainer.new()
 	tile.add_theme_stylebox_override("panel", box)
 	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	icon.custom_minimum_size = Vector2.ONE * maxf(1.0, size - box.content_margin_left * 2.0)
+	var inner := maxf(1.0, size - margin * 2.0)
+	if icon is TextureRect and icon.texture:
+		inner = pixel_size(icon.texture, inner)
+	icon.custom_minimum_size = Vector2.ONE * inner
 	tile.add_child(icon)
 	return tile
+
+
+## The size to show a pixel-art picture near target: a whole multiple of its own size (or a half or a
+## quarter), so each of its pixels comes out the same size on screen.
+static func pixel_size(texture: Texture2D, target: float) -> float:
+	var own := float(maxi(texture.get_width(), texture.get_height()))
+	var best := own * 0.25
+	for k in [0.25, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0]:
+		if own * k <= target * 1.1:
+			best = own * k
+	return best
 
 
 ## A thin gold scroll bar.

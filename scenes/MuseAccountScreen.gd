@@ -5,10 +5,10 @@ extends CanvasLayer
 
 signal closed
 
-const BTN_HEIGHT := 38
-const BTN_FONT_SZ := 16
-const TITLE_FONT_SZ := 22
-const BODY_FONT_SZ := 14
+const BTN_HEIGHT := 28
+const BTN_FONT_SZ := 16  # (the pixel font is drawn on a 16-pixel grid)
+const TITLE_FONT_SZ := 24
+const BODY_FONT_SZ := 16
 const GOLD := Color(0.95, 0.88, 0.65)
 const GREEN := Color(0.5, 1.0, 0.5)
 const RED := Color(1.0, 0.6, 0.5)
@@ -48,9 +48,10 @@ func _build_ui() -> void:
 	_panel.add_theme_stylebox_override("panel", load("res://scripts/UIStyle.gd").panel_box(10))
 	add_child(_panel)  # (placed by _fit)
 
+	_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20 if side in ["left", "right"] else 16)
+		margin.add_theme_constant_override("margin_" + side, 12 if side in ["left", "right"] else 10)
 	_panel.add_child(margin)
 
 	var box := VBoxContainer.new()
@@ -105,7 +106,7 @@ func _show_state() -> void:
 		_body.text = "Muse emailed a code to\n%s" % _sent_to
 		_ask("Code from the email", LineEdit.KEYBOARD_TYPE_NUMBER, 10)
 		_primary.text = "Sign In"
-		_secondary.text = "Use a Different Email"
+		_secondary.text = "Different Email"
 		_secondary.visible = true
 	else:
 		_body.text = "Sign in with your Muse account, the one from Muse Shelf. With Muse Pro, this is Frog Quest+: %s." % _perks()
@@ -204,19 +205,24 @@ func _process(_delta: float) -> void:
 	_fit()
 
 
-## Centres the panel and shrinks it, all together, when the screen is too short or narrow for it
-## (every frame: wrapped text settles a frame late, and the keyboard comes and goes). On a phone it
-## also lifts it so what you're typing, and the button under it, stay above the keyboard.
+## Centres the panel in the room the screen has (clear of the notch and the ad banners, which are
+## drawn over everything) at a whole size, twice as big upright on a phone, so the pixel font and the
+## pictures stay on their pixel grid. Only if that's too big for the room does it shrink, and then
+## with square pixels (nearest filtering on the panel), never smeared. Every frame: wrapped text
+## settles a frame late, and banners come and go.
+## On a phone it also lifts it so what you're typing, and the button under it, stay above the keyboard.
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	if vp.x < 50.0 or vp.y < 50.0:
 		return
 	var room: Rect2 = load("res://scripts/UIStyle.gd").room(vp)  # (clear of the notch and the ad banners)
 	var portrait := vp.y > vp.x * 1.3
-	var zoom := 1.4 if portrait else 1.0  # (upright on a phone: laid out narrower, shown bigger)
-	_panel.custom_minimum_size = Vector2(room.size.x * (0.82 if portrait else 0.42) / zoom, 0)
+	var zoom := 2.0 if portrait else 1.0
+	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.42) / zoom, 0)
 	var need := _panel.get_combined_minimum_size()
 	var s := minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))
+	if s >= 1.0:
+		s = floorf(s)
 	_panel.size = need
 	_panel.scale = Vector2(s, s)
 	var pos := room.position + (room.size - need * s) / 2.0
@@ -225,7 +231,7 @@ func _fit() -> void:
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var primary_bottom := (_panel.get_global_transform().affine_inverse() * _primary.get_global_rect().end).y
 		pos.y -= maxf(0.0, pos.y + primary_bottom * s + 8.0 - keyboard_top)
-	_panel.position = pos
+	_panel.position = pos.round()
 
 
 func _label(text: String, font_size: int, color: Color, _outline: int) -> Label:

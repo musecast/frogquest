@@ -9,9 +9,9 @@ var _status_label: Label
 var _panel: PanelContainer = null
 var _secret_tap_count := 0
 
-const BTN_HEIGHT := 38
-const BTN_FONT_SZ := 16
-const TITLE_FONT_SZ := 22
+const BTN_HEIGHT := 28
+const BTN_FONT_SZ := 16  # (the pixel font is drawn on a 16-pixel grid)
+const TITLE_FONT_SZ := 24
 const SECRET_TAPS_REQUIRED := 10
 const GOLD := Color(0.95, 0.88, 0.65)
 const BLACK := Color(0.0, 0.0, 0.0, 1.0)
@@ -37,9 +37,10 @@ func _build_ui() -> void:
 	_panel = panel
 	add_child(panel)  # (placed by _fit)
 
+	_panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 20 if side in ["left", "right"] else 16)
+		margin.add_theme_constant_override("margin_" + side, 12 if side in ["left", "right"] else 10)
 	panel.add_child(margin)
 
 	_main_panel = VBoxContainer.new()
@@ -54,7 +55,7 @@ func _build_ui() -> void:
 	frog_btn.self_modulate = Color.WHITE
 	frog_btn.ignore_texture_size = true
 	frog_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	frog_btn.custom_minimum_size = Vector2(64, 64)
+	frog_btn.custom_minimum_size = Vector2(32, 32)  # (the frog's own size: twice that upright on a phone)
 	frog_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	frog_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	frog_btn.pressed.connect(_on_secret_pressed)
@@ -73,7 +74,7 @@ func _build_ui() -> void:
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if fibberish:
 		_status_label.add_theme_font_override("font", fibberish)
-	_status_label.add_theme_font_size_override("font_size", 14)
+	_status_label.add_theme_font_size_override("font_size", 16)
 	_status_label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.5))
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status_label.visible = false
@@ -82,7 +83,7 @@ func _build_ui() -> void:
 	if not MusicManager.ads_removed:
 		var store_ready := AdsManager.has_purchase_backend()
 
-		var buy_btn := _make_button("$0.99 - Remove Ads Forever", fibberish, "go")
+		var buy_btn := _make_button("Remove Ads - $0.99", fibberish, "go")
 		buy_btn.name = "BuyButton"
 		buy_btn.disabled = not store_ready
 		buy_btn.pressed.connect(_on_buy_pressed)
@@ -94,7 +95,7 @@ func _build_ui() -> void:
 		restore_btn.pressed.connect(_on_restore_pressed)
 		_main_panel.add_child(restore_btn)
 
-		var muse_btn := _make_button("Have Muse Pro? Sign In", fibberish)
+		var muse_btn := _make_button("Muse Pro? Sign In", fibberish)
 		muse_btn.name = "MuseProButton"
 		muse_btn.pressed.connect(_on_muse_pro_pressed)
 		_main_panel.add_child(muse_btn)
@@ -106,7 +107,7 @@ func _build_ui() -> void:
 			backend_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			if fibberish:
 				backend_note.add_theme_font_override("font", fibberish)
-			backend_note.add_theme_font_size_override("font_size", 12)
+			backend_note.add_theme_font_size_override("font_size", 16)
 			backend_note.add_theme_color_override("font_color", Color(0.95, 0.88, 0.65, 0.85))
 			_main_panel.add_child(backend_note)
 	else:
@@ -115,7 +116,7 @@ func _build_ui() -> void:
 		already.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if fibberish:
 			already.add_theme_font_override("font", fibberish)
-		already.add_theme_font_size_override("font_size", 14)
+		already.add_theme_font_size_override("font_size", 16)
 		already.add_theme_color_override("font_color", Color(0.5, 1.0, 0.5))
 		_main_panel.add_child(already)
 
@@ -186,21 +187,25 @@ func _process(_delta: float) -> void:
 
 
 ## Centres the panel in the room the screen has (clear of the notch and the ad banners, which are
-## drawn over everything) and shrinks it, all together, when that's too short or narrow for it (every
-## frame, since wrapped text settles a frame late, and banners come and go).
+## drawn over everything) at a whole size, twice as big upright on a phone, so the pixel font and the
+## pictures stay on their pixel grid. Only if that's too big for the room does it shrink, and then
+## with square pixels (nearest filtering on the panel), never smeared. Every frame: wrapped text
+## settles a frame late, and banners come and go.
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	if _panel == null or vp.x < 50.0 or vp.y < 50.0:
 		return
 	var room: Rect2 = load("res://scripts/UIStyle.gd").room(vp)
 	var portrait := vp.y > vp.x * 1.3
-	var zoom := 1.4 if portrait else 1.0  # (upright on a phone: laid out narrower, shown bigger)
-	_panel.custom_minimum_size = Vector2(room.size.x * (0.82 if portrait else 0.38) / zoom, 0)
+	var zoom := 2.0 if portrait else 1.0
+	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.4) / zoom, 0)
 	var need := _panel.get_combined_minimum_size()
 	var s := minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))
+	if s >= 1.0:
+		s = floorf(s)
 	_panel.size = need
 	_panel.scale = Vector2(s, s)
-	_panel.position = room.position + (room.size - need * s) / 2.0
+	_panel.position = (room.position + (room.size - need * s) / 2.0).round()
 
 
 func _on_buy_pressed() -> void:

@@ -102,8 +102,9 @@ func _build_ui() -> void:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
+	# (the pixel font is drawn on a 16-pixel grid: smaller and its strokes start to drop out)
 	var font_size_title: int = 32 if is_portrait else 16
-	var font_size_body:  int = 22 if is_portrait else 11
+	var font_size_body:  int = 22 if is_portrait else 16
 	# Buttons and pictures scale with the room so they fit any phone.
 	var btn_min := Vector2(room.size.x * 0.27, maxf(room.size.y * 0.05, font_size_body * 1.9)) if is_portrait else Vector2(70, 20)
 	var action_btn_min := _compute_action_button_size(btn_min, font_size_body)
@@ -135,7 +136,8 @@ func _build_ui() -> void:
 	var title_row := HBoxContainer.new()
 	title_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	title_row.add_theme_constant_override("separation", 8)
-	var crown := item_icon("froggycrown", font_size_title * 1.2)
+	var crown := item_icon("froggycrown", 0.0)
+	crown.custom_minimum_size = Vector2.ONE * ui.pixel_size(crown.texture, font_size_title * 1.2)
 	title_row.add_child(crown)
 	var title := Label.new()
 	title.text = "WARDROBE"

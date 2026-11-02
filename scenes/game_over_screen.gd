@@ -55,8 +55,9 @@ func _apply_layout() -> void:
 
 ## The column's sizes for portrait or landscape, times fit (1 is full size).
 func _size_column(is_portrait: bool, fit: float) -> void:
-	var score_size := maxi(8, roundi((80.0 if is_portrait else 34.0) * fit))
-	var label_size := maxi(8, roundi((44.0 if is_portrait else 16.0) * fit))
+	# (the pixel font is drawn on a 16-pixel grid: smaller and its strokes start to drop out)
+	var score_size := maxi(16, roundi((80.0 if is_portrait else 34.0) * fit))
+	var label_size := maxi(16, roundi((44.0 if is_portrait else 16.0) * fit))
 	var btn_min := (Vector2(200, 64) if is_portrait else Vector2(80, 22)) * fit
 	# Zero out minimum sizes on text nodes so only their text decides how wide they are (the fit
 	# above measures that; NewBadge, on a new best, makes that row the widest).
@@ -74,7 +75,7 @@ func _size_column(is_portrait: bool, fit: float) -> void:
 	var kgb := $MarginContainer.get_node_or_null("KeepGoingButton")
 	if kgb:
 		kgb.custom_minimum_size = btn_min
-		ui.style_button(kgb, int(label_size * 0.75), "gold")
+		ui.style_button(kgb, maxi(16, int(label_size * 0.75)), "gold")
 	$MarginContainer/BottomRow/ExitButton.custom_minimum_size = btn_min
 	ui.style_button($MarginContainer/BottomRow/ExitButton, label_size, "wood")
 	var wb := $MarginContainer/BottomRow.get_node_or_null("WardrobeButton")
@@ -87,7 +88,7 @@ func _size_column(is_portrait: bool, fit: float) -> void:
 			wb_badge.add_theme_font_size_override("font_size", int(btn_min.y * 0.33))
 	var rab := $MarginContainer.get_node_or_null("RemoveAdsButton")
 	if rab:
-		ui.style_button(rab, int(label_size * 0.6), "quiet")
+		ui.style_button(rab, maxi(16, int(label_size * 0.6)), "quiet")
 
 
 func show_scores(score: int, high_score: int, is_new_record: bool) -> void:

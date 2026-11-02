@@ -143,6 +143,7 @@ func _ready():
 	_ensure_title_wardrobe_button()
 	_ensure_muse_button()
 	_show_logo()
+	$PauseScreen/settingsContainer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # (it's shown scaled: keep the pixel font square)
 
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	$PauseScreen.visibility_changed.connect(_on_pause_screen_visibility_changed)
@@ -906,6 +907,7 @@ func _ensure_muse_button() -> void:
 	mb.name = "MuseAccountButton"
 	mb.focus_mode = Control.FOCUS_NONE
 	mb.icon = _account_icon()
+	mb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # (the little person stays in square pixels)
 	mb.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
 	# The same dark, see-through box as the title's other buttons, with a thin gold edge.
 	for state in [["normal", 0.55], ["hover", 0.72], ["pressed", 0.85], ["hover_pressed", 0.85]]:
@@ -951,10 +953,10 @@ func _place_muse_button(vp: Vector2, is_portrait: bool) -> void:
 	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
 	if mb == null:
 		return
-	var font_size := 24 if is_portrait else 13
+	var font_size := 24 if is_portrait else 16
 	mb.add_theme_font_size_override("font_size", font_size)
 	mb.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
-	mb.add_theme_constant_override("icon_max_width", roundi(font_size * 0.9))
+	mb.add_theme_constant_override("icon_max_width", 9 * maxi(1, roundi(font_size * 0.9 / 9.0)))  # (whole pixels)
 	mb.add_theme_constant_override("h_separation", roundi(font_size * 0.35))
 	for state in ["normal", "hover", "pressed", "hover_pressed"]:
 		var box: StyleBoxFlat = mb.get_theme_stylebox(state)

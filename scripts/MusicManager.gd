@@ -122,7 +122,8 @@ func _next_toast() -> void:
 	var vp := host.get_viewport().get_visible_rect().size
 	var room: Rect2 = ui.room(vp)  # (clear of the notch and any banner)
 	var portrait: bool = vp.y > vp.x * 1.3
-	var title_size: int = clampi(roundi(minf(vp.y * 0.032, vp.x * 0.058)), 14, 32) if portrait else clampi(roundi(vp.y * 0.055), 10, 24)
+	# (the pixel font is drawn on a 16-pixel grid: smaller and its strokes start to drop out)
+	var title_size: int = clampi(roundi(minf(vp.y * 0.032, vp.x * 0.058)), 16, 32) if portrait else clampi(roundi(vp.y * 0.07), 16, 24)
 
 	var box: StyleBoxFlat = ui.panel_box(10)
 	box.content_margin_left = title_size * 0.7
@@ -132,6 +133,7 @@ func _next_toast() -> void:
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", box)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # (if it ever has to shrink: square pixels)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", roundi(title_size * 0.5))
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -151,7 +153,7 @@ func _next_toast() -> void:
 	if toast[2] != "":
 		var detail := Label.new()
 		detail.text = toast[2]
-		ui.style_label(detail, roundi(title_size * 0.72), ui.CREAM)
+		ui.style_label(detail, maxi(16, roundi(title_size * 0.72)), ui.CREAM)
 		words.add_child(detail)
 	cl.add_child(panel)
 
