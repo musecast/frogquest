@@ -110,7 +110,7 @@ func start_link() -> String:
 		_link_token += 1
 		_wait_for_link(_link_token)
 		return ""
-	if r.code == 404:
+	if r.code == 404 or r.code == 503:  # (no such route yet, or the Muse API's not set up for it)
 		return "Signing in through Muse Shelf isn't ready yet. Use your email for now."
 	return _problem(r, "link")
 
@@ -145,7 +145,8 @@ func poll_link(code: String, secret: String) -> String:
 	if r.code == 410 or r.code == 404:
 		return "expired"
 	if r.code != 200:
-		return _problem(r, "link")
+		var said := str(d.get("error", ""))  # (the Muse API's own words, when it has them)
+		return said if said != "" and r.code != 429 else _problem(r, "link")
 	if str(d.get("status", "")) != "approved":
 		return "pending"
 	var v: Dictionary = await _call("/auth/v1/verify", {"type": "email", "token_hash": str(d.get("token_hash", ""))})
@@ -187,12 +188,21 @@ func _end_link(token: int, result: String) -> void:
 	link_ended.emit(result)
 
 
-## What Muse Shelf shows for this device when it asks to be let in.
+## What Muse Shelf shows for this device when it asks to be let in: the kind of device only, nothing
+## that identifies it (the privacy policy says so).
 static func _device_name() -> String:
-	var model := OS.get_model_name()
-	if model != "" and model != "GenericDevice":
-		return "%s (%s)" % [OS.get_name(), model]
-	return OS.get_name()
+	match OS.get_name():
+		"iOS":
+			return "iPhone or iPad"
+		"Android":
+			return "Android"
+		"macOS":
+			return "Mac"
+		"Windows":
+			return "Windows PC"
+		"Linux":
+			return "Linux PC"
+	return "Computer"
 
 
 func _signed_in(address: String, d: Dictionary) -> void:

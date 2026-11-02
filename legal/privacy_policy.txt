@@ -1,6 +1,6 @@
 FROG QUEST — PRIVACY POLICY
 
-Effective date: 1 November 2026
+Effective date: 2 November 2026
 
 This Privacy Policy describes how MUSE (“we”, “us”, “our”) handles information when you use the application Frog Quest (the “App”), including Frog Quest+, which is what the App becomes for Muse Pro members. By using the App, you agree to this policy alongside our Terms of Use.
 
@@ -11,7 +11,7 @@ The App is published for phones, tablets and computers. If you use the App, this
 You can play without any account. Data is processed mainly on your device and by service providers integrated into the App.
 
 • Gameplay and preferences: progression, high scores where applicable, settings (sound, cosmetics, unlocked items where relevant), and similar data may be saved locally on your device (for example via Godot/OS user storage).
-• Optional Muse account: if you choose to sign in with a Muse account you already have (the account Muse apps such as Muse Shelf use), the App sends your email address, and then the one-time code emailed to you, to the Muse account service, which runs on Supabase. The App keeps the resulting sign-in session on your device, encrypted to that device, and asks the service whether your account has Muse Pro so it can turn on Frog Quest+. The App does not create Muse accounts and does not upload your game progress.
+• Optional Muse account: if you choose to sign in with a Muse account you already have (the account Muse apps such as Muse Shelf use), you can do it through Muse Shelf or by email. Through Muse Shelf: the App asks the Muse API for a short code, telling it the kind of device it's on (for example “iPhone or iPad”) so Muse Shelf can show what's asking; you type the code into Muse Shelf, where you're already signed in, and the App then receives a one-time sign-in for your account. By email: the App sends your email address, and then the one-time code emailed to you, to the Muse account service, which runs on Supabase. Either way, the App keeps the resulting sign-in session on your device, encrypted to that device, and asks the service whether your account has Muse Pro so it can turn on Frog Quest+. The App does not create Muse accounts and does not upload your game progress.
 • Advertising: we use Google AdMob to show advertisements. AdMob may use identifiers permitted by your device and platform settings (such as privacy‑friendly signals on newer OS versions where available, advertising identifiers subject to consent, IP address, coarse location, diagnostics, fraud prevention signals, interaction with ads). Muse Pro members and players who bought Remove Ads see no ads.
 • Payments: purchases (such as “Remove Ads”) are processed by Apple. We do not receive your full payment card number. Apple may provide minimal purchase‑related identifiers and status so we can deliver your entitlement.
 • Consent tools: in regions where Google’s consent framework applies, Google’s User Messaging Platform (UMP) may present choices about ads and cookies or similar mechanisms as required locally.
@@ -36,7 +36,7 @@ Industry‑standard safeguards at the SDK and platform level reduce risk but no 
 
 7. SHARING WITH THIRD PARTIES
 We integrate third‑party processors. Key categories:
-• Muse accounts (only if you sign in): Supabase, Inc., which hosts the Muse account service — supabase.com/privacy
+• Muse accounts (only if you sign in): Supabase, Inc., which hosts the Muse account service — supabase.com/privacy; and Cloudflare, Inc., which runs the Muse API used to sign in through Muse Shelf — cloudflare.com/privacypolicy
 • Advertising: Google LLC (Google AdMob) — google.com/privacy
 • Store & payments / platform services: Apple Inc. — apple.com/legal/privacy/en‑ww/
 
