@@ -299,6 +299,7 @@ func _physics_process(delta):
 				$sadTimer.start()
 				bestRun = 0
 				save_game()  # persist bestRun=0 now so a reset mid-song won't retrigger
+				AdsManager.on_story_break()  # (a big fall: a natural break for a full-screen ad, now and then)
 			
 			if $sadTimer.is_stopped():
 				$Sprite2D.play("default")
@@ -467,6 +468,7 @@ func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, lo
 func _on_restart_button_pressed():
 	$frogaim.play()
 	Engine.time_scale = 1.0
+	AdsManager.on_story_break()  # (leaving for the title: a natural break for a full-screen ad, now and then)
 	get_tree().reload_current_scene()
 	
 
@@ -902,14 +904,19 @@ func _ensure_muse_button() -> void:
 		return
 	var mb := Button.new()
 	mb.name = "MuseAccountButton"
-	mb.flat = true
 	mb.focus_mode = Control.FOCUS_NONE
+	mb.icon = _account_icon()
 	mb.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
-	mb.add_theme_color_override("font_color", Color("#FFD966"))
-	mb.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
-	mb.add_theme_color_override("font_pressed_color", Color("#FFD966"))
+	# The same dark, see-through box as the title's other buttons, with a thin gold edge.
+	for state in [["normal", 0.55], ["hover", 0.72], ["pressed", 0.85], ["hover_pressed", 0.85]]:
+		var box := StyleBoxFlat.new()
+		box.bg_color = Color(0.08, 0.07, 0.09, state[1])
+		box.border_color = Color(1.0, 0.86, 0.42, 0.45)
+		box.set_border_width_all(1)
+		box.set_corner_radius_all(8)
+		mb.add_theme_stylebox_override(state[0], box)
+	mb.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	mb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-	mb.add_theme_constant_override("outline_size", 6)
 	mb.pressed.connect(_on_muse_button_pressed)
 	$titlescreen.add_child(mb)
 	_refresh_muse_button()
@@ -917,8 +924,26 @@ func _ensure_muse_button() -> void:
 
 func _refresh_muse_button() -> void:
 	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
-	if mb:
-		mb.text = "MUSE PRO" if MuseAccount.has_pro() else "MUSE ACCOUNT"
+	if mb == null:
+		return
+	var pro := MuseAccount.has_pro()
+	mb.text = "MUSE PRO" if pro else "MUSE ACCOUNT"
+	var colour := Color(1.0, 0.86, 0.42) if pro else Color(0.97, 0.92, 0.80)
+	for state in ["font_color", "font_pressed_color", "font_hover_pressed_color", "icon_normal_color", "icon_pressed_color"]:
+		mb.add_theme_color_override(state, colour)
+	mb.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
+	mb.add_theme_color_override("icon_hover_color", Color(1.0, 1.0, 1.0))
+
+
+## A little person: the account.
+static func _account_icon() -> ImageTexture:
+	var rows := ["...###...", "..#####..", "..#####..", "..#####..", "...###...", ".........", ".#######.", "#########", "#########"]
+	var img := Image.create(rows[0].length(), rows.size(), false, Image.FORMAT_RGBA8)
+	for y in rows.size():
+		for x in rows[y].length():
+			if rows[y][x] == "#":
+				img.set_pixel(x, y, Color.WHITE)
+	return ImageTexture.create_from_image(img)
 
 
 ## Top right, clear of the notch and the status bar.
@@ -926,7 +951,17 @@ func _place_muse_button(vp: Vector2, is_portrait: bool) -> void:
 	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
 	if mb == null:
 		return
-	mb.add_theme_font_size_override("font_size", 26 if is_portrait else 14)
+	var font_size := 24 if is_portrait else 13
+	mb.add_theme_font_size_override("font_size", font_size)
+	mb.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
+	mb.add_theme_constant_override("icon_max_width", roundi(font_size * 0.9))
+	mb.add_theme_constant_override("h_separation", roundi(font_size * 0.35))
+	for state in ["normal", "hover", "pressed", "hover_pressed"]:
+		var box: StyleBoxFlat = mb.get_theme_stylebox(state)
+		box.content_margin_left = font_size * 0.5
+		box.content_margin_right = font_size * 0.55
+		box.content_margin_top = font_size * 0.22
+		box.content_margin_bottom = font_size * 0.22
 	mb.size = mb.get_combined_minimum_size()
 	var inset: Vector4 = AdsManager.get_viewport_safe_insets()
 	mb.position = Vector2(vp.x - inset.z - mb.size.x - 6.0, inset.y + 4.0)

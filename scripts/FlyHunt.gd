@@ -1,12 +1,14 @@
 ## The little flies hiding around the World Tree (like the ones Lil Froggy hunts on the desktop).
-## Catch one by touching it; it stays caught (MusicManager.flies_caught, in the wardrobe save, so a
-## new climb doesn't bring them back). Catch every one of them and the Golden Frog skin is yours.
+## Get close and the frog's tongue snaps one up (Fly.gd); it stays caught (MusicManager.flies_caught,
+## in the wardrobe save, so a new climb doesn't bring them back). Catch every one of them and the
+## Golden Frog skin is yours.
 
 const REWARD := "golden_skin"
 const CATCH_SOUND := "res://assets/pickupCoin.wav"
 # Where they buzz, in the story level's coordinates (Main.tscn): one tucked-in spot (a corner, under
 # an overhang, on a side ledge) for every stretch of the climb, from the cave at the bottom to just
-# under the top. Each hovers a little over a real ledge; tools/validate_flies.gd keeps it that way.
+# under the top. Each hovers a little over a real ledge the frog can get to; tools/validate_flies.gd
+# keeps it that way (it jumps the climb the way he does).
 const SPOTS := [
 	Vector2(-134.0, 89.0),
 	Vector2(749.0, -333.0),
@@ -15,8 +17,8 @@ const SPOTS := [
 	Vector2(2918.0, -1696.0),
 	Vector2(2957.0, -2176.0),
 	Vector2(3782.0, -2484.0),
-	Vector2(2419.0, -2983.0),
-	Vector2(2899.0, -3328.0),
+	Vector2(2486.0, -3082.0),
+	Vector2(2966.0, -3350.0),
 	Vector2(3130.0, -3847.0),
 	Vector2(2477.0, -4154.0),
 	Vector2(3110.0, -4480.0),
@@ -47,7 +49,7 @@ static func spawn_into(level: Node) -> void:
 	for i in total():
 		if id_of(i) in MusicManager.flies_caught:
 			continue
-		var fly: Area2D = fly_script.new()
+		var fly: Node2D = fly_script.new()
 		fly.fly_id = id_of(i)
 		fly.position = SPOTS[i]
 		fly.name = "HiddenFly%d" % i

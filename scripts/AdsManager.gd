@@ -7,6 +7,8 @@ const SECRET_CODE := "3125"
 const ADS_ENABLED := true
 const DEBUG_DISABLE_ADS := false
 const INTERSTITIAL_EVERY := 3
+const STORY_AD_GAP := 180.0  # seconds: in the story, a full-screen ad at most this often
+const STORY_AD_SETTLE := 90.0  # and none in the first minute and a half of playing
 const TEST_BANNER_ID := "ca-app-pub-3940256099942544/2934735716"
 const TEST_INTERSTITIAL_ID := "ca-app-pub-3940256099942544/4411468910"
 ## Rewarded unit for the Endless "keep going" revive (AdMob: Frog Quest+ > FQrewarded, 1 Revive).
@@ -303,6 +305,7 @@ var _iap
 var _iap_backend_name := ""
 var _iap_uses_pending_events := false
 var _gameover_count := 0
+var _last_full_screen_ad_ms := -1  # when one last showed (Time.get_ticks_msec), -1 never
 var _ads_active := false
 var _mobile_ads_ready := false
 var _banner_view_bottom
@@ -580,7 +583,23 @@ func on_game_over() -> void:
 	if _interstitial_ready and (_gameover_count % INTERSTITIAL_EVERY == 0):
 		_interstitial_ready = false
 		if _interstitial_ad:
+			_last_full_screen_ad_ms = Time.get_ticks_msec()
 			_interstitial_ad.show()
+		return
+	preload_interstitial()
+
+
+## A natural break in the story (a big fall, or leaving for the title): a full-screen ad, at most every
+## STORY_AD_GAP seconds and not in the first STORY_AD_SETTLE. Too soon, it just gets one ready.
+func on_story_break() -> void:
+	if not _ads_active:
+		return
+	var now := Time.get_ticks_msec()
+	var too_soon := now < STORY_AD_SETTLE * 1000.0 		or (_last_full_screen_ad_ms >= 0 and now - _last_full_screen_ad_ms < STORY_AD_GAP * 1000.0)
+	if not too_soon and _interstitial_ready and _interstitial_ad:
+		_interstitial_ready = false
+		_last_full_screen_ad_ms = now
+		_interstitial_ad.show()
 		return
 	preload_interstitial()
 
