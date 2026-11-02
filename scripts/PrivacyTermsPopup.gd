@@ -1,111 +1,120 @@
 extends CanvasLayer
-## Displays bundled plain-text legal docs from res://legal/
+## The privacy policy or the terms of use (bundled plain text, res://legal/), over everything. It stays
+## in the room clear of the ad banners and the notch: a banner drawn over its Close button left no way
+## out. The words scroll with a finger (they used to get selected instead), and Close or a tap outside
+## the panel puts it away. Dressed like the other menus (UIStyle); the long text itself is in the
+## plain font, easier to read than the pixel one.
 
 enum Doc { PRIVACY, TERMS }
 
 const PATH_PRIVACY := "res://legal/privacy_policy.txt"
 const PATH_TERMS := "res://legal/terms_of_use.txt"
 
-static func present(tree: SceneTree, doc: Doc) -> void:
+var doc := Doc.PRIVACY
+var _panel: PanelContainer
+var _title: Label
+var _body: Label
+var _close: Button
+var _laid_out_for := Vector2.ZERO
+
+
+static func present(tree: SceneTree, which: Doc) -> void:
 	if tree == null or tree.root == null:
 		return
-	var layer := new()
-	tree.root.add_child(layer)
-	layer._build(doc)
+	var popup := new()
+	popup.doc = which
+	tree.root.add_child(popup)
 
 
-func _build(doc: Doc) -> void:
-	layer = 125
+func _ready() -> void:
+	layer = 125  # (over every other menu)
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_build()
+	_fit()
 
-	var vp: Vector2 = get_viewport().get_visible_rect().size
-	var panel_w := clampf(vp.x * 0.92, 280.0, 560.0)
-	var panel_h := clampf(vp.y * 0.82, 280.0, 720.0)
 
+func _build() -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var backdrop := ColorRect.new()
 	backdrop.color = Color(0, 0, 0, 0.76)
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	backdrop.gui_input.connect(_on_backdrop_clicked)
+	backdrop.gui_input.connect(_on_backdrop_input)
 	add_child(backdrop)
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-
-	var shell := PanelContainer.new()
-	var pstyle := StyleBoxFlat.new()
-	pstyle.bg_color = Color(0.09, 0.11, 0.1, 0.98)
-	pstyle.border_color = Color(0.52, 0.82, 0.41, 0.9)
-	pstyle.border_width_left = 2
-	pstyle.border_width_top = 2
-	pstyle.border_width_right = 2
-	pstyle.border_width_bottom = 2
-	pstyle.corner_radius_top_left = 10
-	pstyle.corner_radius_top_right = 10
-	pstyle.corner_radius_bottom_left = 10
-	pstyle.corner_radius_bottom_right = 10
-	shell.add_theme_stylebox_override("panel", pstyle)
-	shell.custom_minimum_size = Vector2(panel_w, panel_h)
-	shell.mouse_filter = Control.MOUSE_FILTER_STOP
-	center.add_child(shell)
-
+	_panel = PanelContainer.new()
+	_panel.add_theme_stylebox_override("panel", ui.panel_box(10))
+	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_panel)  # (placed by _fit)
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		var n := 14 if side in ["left", "right"] else 12
-		margin.add_theme_constant_override("margin_" + side, n)
-	shell.add_child(margin)
+		margin.add_theme_constant_override("margin_" + side, 12 if side in ["left", "right"] else 10)
+	_panel.add_child(margin)
+	var frame := VBoxContainer.new()
+	frame.add_theme_constant_override("separation", 8)
+	margin.add_child(frame)
 
-	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
-	margin.add_child(vb)
+	_title = Label.new()
+	_title.text = "Privacy Policy" if doc == Doc.PRIVACY else "Terms of Use"
+	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	frame.add_child(_title)
 
-	var title_txt := "Privacy Policy" if doc == Doc.PRIVACY else "Terms of Use"
-	var title := Label.new()
-	title.text = title_txt
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	title.add_theme_font_size_override("font_size", clampi(int(vp.y * 0.045), 16, 26))
-	vb.add_child(title)
+	var scroll := ScrollContainer.new()  # (a finger drags it; the words don't get selected)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	ui.style_scrollbar(scroll.get_v_scroll_bar())
+	frame.add_child(scroll)
+	_body = Label.new()
+	_body.text = _read(PATH_PRIVACY if doc == Doc.PRIVACY else PATH_TERMS)
+	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_body.add_theme_color_override("font_color", ui.CREAM)
+	scroll.add_child(_body)
 
-	var path := PATH_PRIVACY if doc == Doc.PRIVACY else PATH_TERMS
-	var body_txt := "(This document could not be loaded from the app data.)"
-	if FileAccess.file_exists(path):
-		var f := FileAccess.open(path, FileAccess.READ)
-		if f:
-			body_txt = f.get_as_text()
-			f.close()
-
-	var rtl := RichTextLabel.new()
-	rtl.bbcode_enabled = false
-	rtl.text = body_txt
-	rtl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rtl.scroll_active = true
-	rtl.custom_minimum_size = Vector2(panel_w - 56.0, panel_h - 110.0)
-	rtl.selection_enabled = true
-	rtl.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vb.add_child(rtl)
-
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_END
-	vb.add_child(row)
-
-	var close_btn := Button.new()
-	close_btn.text = "Close"
-	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	close_btn.focus_mode = Control.FOCUS_CLICK
-	close_btn.size_flags_horizontal = Control.SIZE_SHRINK_END
-	var btn_w := minf(220.0, panel_w - 48.0)
-	var btn_h := maxf(40.0, vp.y * 0.068)
-	close_btn.custom_minimum_size = Vector2(btn_w, btn_h)
-	close_btn.pressed.connect(_close_self)
-	row.add_child(close_btn)
+	_close = Button.new()
+	_close.text = "Close"
+	_close.focus_mode = Control.FOCUS_NONE
+	_close.pressed.connect(queue_free)
+	frame.add_child(_close)
 
 
-func _on_backdrop_clicked(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_close_self()
+static func _read(path: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return "(This document could not be loaded from the app data.)"
+	var text := f.get_as_text()
+	f.close()
+	return text
 
 
-func _close_self() -> void:
-	queue_free()
+## Most of the room there is (UIStyle.room: clear of the notch and the ad banners, which are drawn over
+## everything), centred in it. Every frame: banners come and go, and the phone turns.
+func _process(_delta: float) -> void:
+	_fit()
+
+
+func _fit() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	if vp.x < 50.0 or vp.y < 50.0:
+		return
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var room: Rect2 = ui.room(vp)
+	var portrait := vp.y > vp.x * 1.3
+	if vp != _laid_out_for:
+		_laid_out_for = vp
+		var size: int = ui.px(vp.x / 15.0) if portrait else 16
+		ui.style_label(_title, size, ui.GOLD)
+		ui.style_button(_close, size, "wood")
+		_close.custom_minimum_size = Vector2(0, size * 1.75)
+		_body.add_theme_font_size_override("font_size", 16 if vp.y >= 300.0 else 12)
+	var w := minf(room.size.x * (0.94 if portrait else 0.8), 640.0)
+	var h := room.size.y * 0.94
+	_panel.size = Vector2(w, h)
+	_panel.position = (room.position + (room.size - _panel.size) / 2.0).round()
+
+
+func _on_backdrop_input(event: InputEvent) -> void:
+	var tap: bool = (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT) \
+		or event is InputEventScreenTouch
+	if tap and event.pressed:
+		queue_free()

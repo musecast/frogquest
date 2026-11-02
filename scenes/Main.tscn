@@ -3330,7 +3330,6 @@ rotation = 0.06837231
 scale = Vector2(0.4995536, 0.5006711)
 texture = ExtResource("157_w0c4r")
 
-[connection signal="pressed" from="Player/titlescreen/TitleRow2/endlessmodebutton" to="Player" method="_on_endlessmodebutton_pressed"]
 [connection signal="body_entered" from="finale/finale sprites/Exit-entrance/FINALEEXIT" to="." method="_on_finaleexit_body_entered"]
 [connection signal="body_shape_entered" from="finale/Control/FROG KING2/frogking2" to="." method="_on_frogking_2_body_shape_entered"]
 [connection signal="body_shape_entered" from="finale/Control/FROG KING3/frogking3" to="." method="_on_frogking_3_body_shape_entered"]

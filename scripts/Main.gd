@@ -94,15 +94,12 @@ func _process(delta):
 		if $Player._active_wardrobe and is_instance_valid($Player._active_wardrobe):
 			$Player._active_wardrobe.closed.emit()
 			return
+		var settings: Node = $Player.get_node_or_null("SettingsScreen")
+		if settings:
+			settings.closed.emit()  # (back to the pause menu, or the title)
+			return
 		if Engine.time_scale != 1.0:
 			#GAME IS UNPAUSED HERE
-
-			$Player/PauseScreen/RestartButton.visible = true
-			$Player/PauseScreen/ResumeButton.visible = true
-			$Player/PauseScreen/SettingsButton.visible = true
-			$Player/PauseScreen/RestartConfirmContainer.visible = false
-			$Player/PauseScreen/settingsContainer.visible = false
-			$Player/PauseScreen/BackfromSettingsButton.visible = false
 
 			$Player/PauseScreen.visible=false
 			Engine.time_scale = 1.0

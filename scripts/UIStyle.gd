@@ -19,7 +19,14 @@ const KINDS := {
 	"go": [Color(0.30, 0.58, 0.28), Color(0.37, 0.68, 0.34), Color(0.23, 0.47, 0.22), Color(0.09, 0.23, 0.09)],
 	"gold": [Color(0.84, 0.60, 0.19), Color(0.93, 0.70, 0.27), Color(0.70, 0.49, 0.14), Color(0.36, 0.22, 0.05)],
 	"quiet": [Color(0.24, 0.17, 0.11), Color(0.32, 0.23, 0.15), Color(0.18, 0.12, 0.08), Color(0.10, 0.07, 0.04)],
+	"danger": [Color(0.58, 0.19, 0.14), Color(0.68, 0.25, 0.18), Color(0.46, 0.13, 0.10), Color(0.24, 0.06, 0.04)],
 }
+
+## Little pictures for buttons, as rows of "#" (drawn white: the button's icon colours tint them).
+const PERSON := ["...###...", "..#####..", "..#####..", "..#####..", "...###...", ".........", ".#######.",
+	"#########", "#########"]
+const GEAR := ["..#.#.#..", ".#######.", "#########", ".##...##.", "###...###", ".##...##.", "#########",
+	".#######.", "..#.#.#.."]
 
 
 static func font() -> Font:
@@ -72,6 +79,57 @@ static func style_button(btn: Button, font_size: int, kind := "wood") -> void:
 	btn.add_theme_color_override("font_outline_color", INK)
 	btn.add_theme_constant_override("outline_size", outline_px(font_size))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+
+## A picture and words together in the middle of btn (a button's own icon sits off at its edge, away
+## from its words), on its face above the lip: a pixel-art picture (pixel) at a whole multiple of its
+## size in square pixels, a smooth one (the infinity sign, the crown) at the size it'll fit. The words
+## are a label in the menus' style; the button's own text is left empty. Again on the same button, it
+## just updates.
+static func button_face(btn: Button, texture: Texture2D, pixel: bool, words: String, font_size: int) -> void:
+	font_size = px(font_size)
+	var face := btn.get_node_or_null("Face") as HBoxContainer
+	if face == null:
+		face = HBoxContainer.new()
+		face.name = "Face"
+		face.alignment = BoxContainer.ALIGNMENT_CENTER
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		face.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var picture := TextureRect.new()
+		picture.name = "Picture"
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		picture.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		face.add_child(picture)
+		var label := Label.new()
+		label.name = "Words"
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		face.add_child(label)
+		btn.add_child(face)
+	btn.text = ""
+	face.offset_bottom = -maxi(3, roundi(font_size * 0.22))  # (style_button's lip)
+	face.add_theme_constant_override("separation", roundi(font_size * 0.4))
+	var pic: TextureRect = face.get_node("Picture")
+	pic.texture = texture
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if pixel else CanvasItem.TEXTURE_FILTER_LINEAR
+	var w := texture.get_width()
+	var side: float = w * maxi(1, roundi(font_size * 0.9 / w)) if pixel else roundf(font_size * 0.9)
+	pic.custom_minimum_size = Vector2(side, side)
+	var lbl: Label = face.get_node("Words")
+	lbl.text = words
+	style_label(lbl, font_size, CREAM)
+
+
+## A picture drawn from rows of "#" (PERSON, GEAR), white.
+static func pixel_icon(rows: Array) -> ImageTexture:
+	var img := Image.create(rows[0].length(), rows.size(), false, Image.FORMAT_RGBA8)
+	for y in rows.size():
+		for x in rows[y].length():
+			if rows[y][x] == "#":
+				img.set_pixel(x, y, Color.WHITE)
+	return ImageTexture.create_from_image(img)
 
 
 static func _button_box(fill: Color, rim: Color, lip: int, pressed: bool) -> StyleBoxFlat:
@@ -164,16 +222,22 @@ static func rule() -> HSeparator:
 	return line
 
 
-## Puts panel in the middle of room at the biggest whole size up to zoom that fits (2 upright on a
-## phone, so it isn't tiny), and never below 1:1: shrunk, the pixel font drops pixels and its words go
-## to mush (sideways on a phone they did). If it's too tall for the room even at 1:1, scroll (the
-## ScrollContainer holding what's in it) is cut to fit and the rest scrolls. Nearest filtering on the
-## panel keeps 2x square. Returns the size it's drawn at.
-static func fit_panel(panel: Control, scroll: ScrollContainer, room: Rect2, zoom: float) -> float:
-	var content := scroll.get_child(0) as Control
-	scroll.custom_minimum_size.y = content.get_combined_minimum_size().y
+## How many times as big a menu panel is drawn: twice upright on a phone, where the room's tall
+## enough for it (an upright iPad's isn't: its settings came out a narrow strip), else 1:1.
+static func panel_zoom(vp: Vector2, room: Rect2) -> float:
+	return 2.0 if vp.y > vp.x * 1.3 and room.size.y >= 760.0 else 1.0
+
+
+## Puts panel in the middle of room, drawn zoom times as big (panel_zoom; a whole number, so with
+## nearest filtering on the panel its pixels stay square) and share of the room's width across. Never
+## shrunk to fit: the pixel font drops pixels and its words go to mush (sideways on a phone they did).
+## If it's too tall, scroll (the ScrollContainer holding what's in it) is cut to fit and the rest
+## scrolls.
+static func fit_panel(panel: Control, scroll: ScrollContainer, room: Rect2, zoom: float, share: float) -> void:
+	var s := maxf(1.0, floorf(zoom))
+	panel.custom_minimum_size = Vector2(room.size.x * share / s, 0)
+	scroll.custom_minimum_size.y = (scroll.get_child(0) as Control).get_combined_minimum_size().y
 	var need := panel.get_combined_minimum_size()
-	var s := clampf(floorf(minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))), 1.0, maxf(1.0, zoom))
 	var over := need.y * s - room.size.y * 0.94
 	if over > 0.0:
 		scroll.custom_minimum_size.y = maxf(0.0, scroll.custom_minimum_size.y - over / s)
@@ -181,7 +245,6 @@ static func fit_panel(panel: Control, scroll: ScrollContainer, room: Rect2, zoom
 	panel.size = need
 	panel.scale = Vector2(s, s)
 	panel.position = (room.position + (room.size - need * s) / 2.0).round()
-	return s
 
 
 ## The room a menu has on screen: in from the notch and the home indicator, and clear of the ad banners

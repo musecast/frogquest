@@ -1,10 +1,11 @@
 extends SceneTree
 ## Headless check that the menus fit every screen shape the game meets (phones, foldables, iPads and
 ## computers, upright and sideways): the Endless game over screen with every button it can have,
-## squeezed between both banners; the story's title screen, pause menu, settings and reset question
-## (in the whole world, over the bottom banner); the Remove Ads, Muse account and wardrobe screens
-## (with every hat and skin) between both banners, since the ads draw over everything; and the
-## notifications that drop in. Nothing may hang off the screen or sit under a banner, and the pixel
+## squeezed between both banners; the story's title screen (its whole menu), pause menu, settings
+## from both and the delete-everything question (in the whole world, over the bottom banner); the
+## Remove Ads, Muse account, settings, privacy policy and wardrobe screens (with every hat and skin)
+## between both banners, since the ads draw over everything (a banner over the privacy policy's Close
+## left no way out); and the notifications that drop in. Nothing may hang off the screen or sit under a banner, and the pixel
 ## font's words must be crisp (whole steps of its grid, 1:1, a one-pixel outline). Each screen is laid
 ## out in a SubViewport the size the game's stretch settings (viewport, expand) would give that window.
 ## The story climb saves to scratch files meanwhile, so yours is never touched.
@@ -32,9 +33,22 @@ const SCRATCH_WARDROBE := "user://test_layout_wardrobe.save"
 
 var _failures: Array[String] = []
 var _checked := 0  # buttons, labels and text boxes looked at
+var _script_errors := ScriptErrors.new()
+
+
+## Script errors while it runs, any at all: a player.gd that didn't parse once left the story's
+## menus unchecked, and the test said it passed.
+class ScriptErrors extends Logger:
+	var errors: Array[String] = []
+
+	func _log_error(function: String, file: String, line: int, code: String, rationale: String,
+			_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type == ERROR_TYPE_SCRIPT:
+			errors.append("%s:%d %s %s %s" % [file, line, function, code, rationale])
 
 
 func _initialize() -> void:
+	OS.add_logger(_script_errors)
 	_run.call_deferred()
 
 
@@ -102,6 +116,10 @@ func _run() -> void:
 		await _check_panel("%s: Muse account, signed in" % shape, muse, story_vp, up, signed_in)
 		await _check_toast("%s, story" % shape, story_vp, up)
 		await _check_toast("%s, Endless" % shape, endless_vp, up)
+		await _check_panel("%s: settings" % shape, load("res://scenes/SettingsScreen.gd"), story_vp, up)
+		var popup: GDScript = load("res://scripts/PrivacyTermsPopup.gd")
+		await _check_panel("%s, story: privacy policy" % shape, popup, story_vp, up)
+		await _check_panel("%s, Endless: privacy policy" % shape, popup, endless_vp, up)
 		acct.email = real_session[0]
 		acct._refresh_token = real_session[1]
 		acct._pro = real_session[2]
@@ -124,6 +142,8 @@ func _run() -> void:
 	root.get_node("AdsManager").test_banner_clearance = Vector2(-1.0, -1.0)
 	for _i in 3:
 		await process_frame
+	for e in _script_errors.errors:
+		_failures.append("script error: " + e)
 	if _failures.is_empty():
 		print("Layout fit test passed (%d screen shapes, %d buttons and labels)." % [WINDOWS.size(), _checked])
 	else:
@@ -201,18 +221,32 @@ func _check_story_menus() -> void:
 		player._apply_ui_layout()
 		await _frames(3)
 		_check_inside(title, room, "%s: title screen" % shape)
+		var menu: Control = title.get_node("TitleMenu")
+		for button in ["PlayButton", "EndlessButton", "WardrobeButton", "MuseButton", "SettingsButton"]:
+			if not menu.get_node(button).visible:
+				_failures.append("%s: the title's %s isn't showing" % [shape, button])
+		var settings: CanvasLayer = player._open_settings()  # (from the title)
+		await _frames(4)
+		_check_inside(settings, room, "%s: settings from the title" % shape)
+		settings._ask_first("all")  # (only asks; nothing's deleted unless YES)
+		await _frames(4)
+		_check_inside(settings, room, "%s: delete all data?" % shape)
+		settings.closed.emit()
 		title.visible = false
 		pause.visible = true  # (lays itself out)
 		await _frames(3)
 		_check_inside(pause, pause_room, "%s: pause menu" % shape)
+		if (pause.get_node("RestartButton") as Button).text != "MAIN MENU":
+			_failures.append("%s: the pause menu's way back to the title doesn't say MAIN MENU" % shape)
 		player._on_settings_button_pressed()
-		await _frames(3)
-		_check_inside(pause, pause_room, "%s: settings" % shape)
-		player._on_reset_all_data_btn_pressed()  # (only asks; nothing's deleted unless YES)
-		await _frames(3)
-		_check_inside(pause, pause_room, "%s: delete all data?" % shape)
-		player._on_restart_no_pressed()
-		player._on_backfrom_settings_button_pressed()
+		await _frames(4)
+		settings = player.get_node_or_null("SettingsScreen")
+		if settings == null:
+			_failures.append("%s: SETTINGS in the pause menu opened nothing" % shape)
+		else:
+			_check_inside(settings, room, "%s: settings from the pause menu" % shape)
+			settings.closed.emit()
+		await _frames(2)
 	pause.visible = false
 	ads.test_banner_clearance = Vector2(-1.0, -1.0)
 	view.queue_free()
@@ -315,8 +349,7 @@ func _expect_words_fit(node: Node, what: String) -> void:
 ## whole number of times, square: nearest filtering), with a one-pixel outline (UIStyle.outline_px)
 ## or none: anything else and its pixels come out uneven, some one wide and some two, and the words
 ## look lumpy (they did, in the wardrobe on an iPad; shrunk, sideways on a phone, they went to mush).
-## False if not. (The pause menu's settings and its reset question are still drawn scaled as a whole,
-## so they're let off.)
+## False if not.
 func _expect_crisp(c: Control, what: String) -> bool:
 	if not (c is Label or c is Button or c is LineEdit):
 		return true
@@ -327,9 +360,6 @@ func _expect_crisp(c: Control, what: String) -> bool:
 	if font is FontVariation:
 		font = font.base_font
 	if font == null or font.resource_path != PIXEL_FONT:
-		return true
-	var path := str(c.get_path())
-	if path.contains("/settingsContainer/") or path.contains("/RestartConfirmContainer/"):
 		return true
 	var size: int = c.get_theme_font_size("font_size")
 	var scale: Vector2 = c.get_global_transform_with_canvas().get_scale()

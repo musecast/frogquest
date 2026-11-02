@@ -112,7 +112,7 @@ alignment = 1
 [node name="ExitButton" type="Button" parent="GameOverScreen/MarginContainer/BottomRow" unique_id=309111767]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "EXIT"
+text = "MAIN MENU"
 
 [connection signal="pressed" from="GameOverScreen/MarginContainer/TryAgainButton" to="GameOverScreen" method="_on_try_again_button_pressed"]
 [connection signal="pressed" from="GameOverScreen/MarginContainer/BottomRow/ExitButton" to="GameOverScreen" method="_on_exit_button_pressed"]

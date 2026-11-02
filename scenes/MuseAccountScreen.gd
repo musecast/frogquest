@@ -305,10 +305,9 @@ func _fit() -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var room: Rect2 = ui.room(vp)  # (clear of the notch and the ad banners)
 	var portrait := vp.y > vp.x * 1.3
-	var zoom := 2.0 if portrait else 1.0
+	var s: float = ui.panel_zoom(vp, room)
 	# (sideways, wider: the words wrap onto fewer lines, so less of it has to scroll)
-	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.62) / zoom, 0)
-	var s: float = ui.fit_panel(_panel, _scroll, room, zoom)
+	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
 	var keyboard := float(DisplayServer.virtual_keyboard_get_height())
 	if keyboard > 0.0 and _input.visible and _input.has_focus():
 		_scroll.ensure_control_visible(_input)

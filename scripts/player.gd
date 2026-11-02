@@ -17,11 +17,6 @@ func _init() -> void:
 @export var debug_unlock_cakehat: bool = false
 @export var debug_beat_game: bool = false
 
-@export_group("Settings Panel Nudge")
-@export var settings_nudge_landscape: Vector2 = Vector2(0, 0)
-@export var settings_nudge_portrait: Vector2 = Vector2(0, 0)
-@export_group("")
-
 const SPEED = 300.0
 const JUMP_VELOCITY = -400.0
 var bestRun = 1
@@ -47,7 +42,6 @@ var hours = 0
 var lanternbool = 0
 
 var save_path = "user://save_game.save"
-var _pending_reset_type: String = ""
 var was_airborne = false
 var key_node = null
 var key_trail_pos = Vector2.ZERO
@@ -91,9 +85,6 @@ func _ready():
 	_trace("Player ready after load_game")
 	get_tree().create_timer(2.5, true, false, true).timeout.connect(func(): _just_loaded = false)
 
-	if FileAccess.file_exists(save_path):
-		$titlescreen/HBoxContainer/Button.text = "Continue"
-
 	# Debug unlocks — toggle in the Godot Inspector
 	if debug_unlock_crown:
 		MusicManager.froggyCrown = 1
@@ -132,21 +123,8 @@ func _ready():
 	if wiz_area and not wiz_area.body_exited.is_connected(_on_wiz_area_2d_body_exited):
 		wiz_area.body_exited.connect(_on_wiz_area_2d_body_exited)
 
-	# Move endless button into a dedicated row2 container so portrait can use a 2-row layout
-	var _row2 := HBoxContainer.new()
-	_row2.name = "TitleRow2"
-	_row2.alignment = BoxContainer.ALIGNMENT_CENTER
-	_row2.anchor_left = 0.5; _row2.anchor_top = 0.5
-	_row2.anchor_right = 0.5; _row2.anchor_bottom = 0.5
-	_row2.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_row2.grow_vertical = Control.GROW_DIRECTION_BOTH
-	$titlescreen.add_child(_row2)
-	$titlescreen/HBoxContainer/endlessmodebutton.reparent(_row2)
-
-	_ensure_title_wardrobe_button()
-	_ensure_muse_button()
+	_build_title_menu()
 	_show_logo()
-	$PauseScreen/settingsContainer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # (it's shown scaled: keep the pixel font square)
 
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	$PauseScreen.visibility_changed.connect(_on_pause_screen_visibility_changed)
@@ -464,15 +442,9 @@ func _on_restart_button_pressed():
 	get_tree().reload_current_scene()
 	
 
-func _on_mute_button_pressed():
-	$frogaim.play()
-	#MUTE MUSIC
-	AudioServer.set_bus_mute(1, not AudioServer.is_bus_mute(1))
-
-
-func _on_speedrun_mode_button_pressed():
-	$frogaim.play()
-	SpeedrunMode = !SpeedrunMode
+## The speedrun timer (height, time and jumps up in the corner) on or off, kept in the save.
+func set_speedrun(on: bool) -> void:
+	SpeedrunMode = on
 	save_game()
 	_apply_speedrun_visibility()
 
@@ -481,9 +453,6 @@ func _apply_speedrun_visibility() -> void:
 	$"CanvasLayer/MarginContainer/VBoxContainer/current height".visible = SpeedrunMode
 	$CanvasLayer/MarginContainer/VBoxContainer/time.visible = SpeedrunMode
 	$CanvasLayer/MarginContainer/VBoxContainer/jumpcount.visible = SpeedrunMode
-	var smb := $PauseScreen/settingsContainer.get_node_or_null("SpeedrunModeButton")
-	if smb:
-		smb.button_pressed = SpeedrunMode
 
 
 
@@ -527,31 +496,28 @@ func _on_thanksforplaying_button_pressed():
 	Engine.time_scale = 1.0
 
 
+## SETTINGS in the pause menu: SettingsScreen.gd over it (it stays as it is, behind).
 func _on_settings_button_pressed():
 	$frogaim.play()
-	$PauseScreen/RestartButton.visible=false
-	$PauseScreen/SettingsButton.visible=false
-	$PauseScreen/ResumeButton.visible=false
-	var _wpb = $PauseScreen.get_node_or_null("WardrobePauseBtn")
-	if _wpb: _wpb.visible = false
-	var _rapb = $PauseScreen.get_node_or_null("RemoveAdsPauseBtn")
-	if _rapb: _rapb.visible = false
-	$PauseScreen/settingsContainer.visible=true
-	$PauseScreen/BackfromSettingsButton.visible = true
-	
+	_open_settings()
 
 
-func _on_backfrom_settings_button_pressed():
+## SETTINGS on the title screen: the title comes back when they're closed.
+func _on_title_settings_pressed() -> void:
 	$frogaim.play()
-	$PauseScreen/RestartButton.visible=true
-	$PauseScreen/SettingsButton.visible=true
-	$PauseScreen/ResumeButton.visible=true
-	var _wpb = $PauseScreen.get_node_or_null("WardrobePauseBtn")
-	if _wpb: _wpb.visible = true
-	var _rapb = $PauseScreen.get_node_or_null("RemoveAdsPauseBtn")
-	if _rapb: _rapb.visible = not AdsManager.is_ad_free()
-	$PauseScreen/settingsContainer.visible=false
-	$PauseScreen/BackfromSettingsButton.visible = false
+	$titlescreen.visible = false
+	_open_settings().closed.connect(func() -> void:
+		$titlescreen.visible = true
+		_apply_ui_layout()
+	)
+
+
+func _open_settings() -> CanvasLayer:
+	var screen: CanvasLayer = load("res://scenes/SettingsScreen.gd").new()
+	screen.player = self
+	add_child(screen)
+	screen.closed.connect(screen.queue_free)
+	return screen
 
 
 func _on_resume_button_pressed():
@@ -562,29 +528,18 @@ func _on_resume_button_pressed():
 	$PauseScreen.visible=false
 	Engine.time_scale = 1.0
 
-#CHANGE SENSITIVITY
-#CHANGE SENSITIVITY
-#CHANGE SENSITIVITY
-func _on_l_pressed():
-	$frogaim.play()
-	$Trajectory.sensitivity = 3.5
+## How hard a drag throws him: the aim's L, M and H in the settings (3.5, 4 and 4.5).
+func set_aim(sensitivity: float) -> void:
+	$Trajectory.sensitivity = sensitivity
 
 
-func _on_m_pressed():
-	$frogaim.play()
-	$Trajectory.sensitivity = 4
-
-
-func _on_h_pressed():
-	$frogaim.play()
-	$Trajectory.sensitivity = 4.5
-
-
-func _on_restart_yes_pressed():
+## Starts over, once the settings have asked: "climb" deletes the save (back to the bottom), "all" the
+## wardrobe and Endless's best scores too. Then the game starts again, at the title.
+func reset_progress(kind: String) -> void:
 	$frogaim.play()
 	if FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(save_path)
-	if _pending_reset_type == "all":
+	if kind == "all":
 		if FileAccess.file_exists(MusicManager.wardrobe_path):
 			DirAccess.remove_absolute(MusicManager.wardrobe_path)
 		const ENDLESS_SCORE_PATH := "user://endless_highscore.dat"
@@ -597,39 +552,8 @@ func _on_restart_yes_pressed():
 		MusicManager.seen_cosmetics = []
 		MusicManager.game_beaten = false
 		MusicManager.desktop_frog_unlocked = false
-	_pending_reset_type = ""
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
-
-
-func _on_restart_no_pressed():
-	$frogaim.play()
-	$PauseScreen/RestartConfirmContainer.visible = false
-	# Return to settings (this confirm is only reachable from there now)
-	$PauseScreen/settingsContainer.visible = true
-	$PauseScreen/BackfromSettingsButton.visible = true
-
-
-func _on_reset_climb_btn_pressed() -> void:
-	$frogaim.play()
-	_pending_reset_type = "climb"
-	$PauseScreen/settingsContainer.visible = false
-	$PauseScreen/BackfromSettingsButton.visible = false
-	var lbl = $PauseScreen/RestartConfirmContainer.get_node_or_null("Paused2")
-	if lbl:
-		lbl.text = "RESET\nCLIMB?"
-	$PauseScreen/RestartConfirmContainer.visible = true
-
-
-func _on_reset_all_data_btn_pressed() -> void:
-	$frogaim.play()
-	_pending_reset_type = "all"
-	$PauseScreen/settingsContainer.visible = false
-	$PauseScreen/BackfromSettingsButton.visible = false
-	var lbl = $PauseScreen/RestartConfirmContainer.get_node_or_null("Paused2")
-	if lbl:
-		lbl.text = "DELETE ALL\nDATA?"
-	$PauseScreen/RestartConfirmContainer.visible = true
 
 
 func _on_pause_wardrobe_pressed() -> void:
@@ -646,12 +570,6 @@ func _on_pause_wardrobe_pressed() -> void:
 		$PauseScreen.visible = false
 		Engine.time_scale = 1.0
 	)
-
-
-func _on_mute_button_2_pressed():
-	$frogaim.play()
-	#MUTE MUSIC
-	AudioServer.set_bus_mute(2, not AudioServer.is_bus_mute(2))
 
 
 func setup_key_trail():
@@ -867,113 +785,103 @@ func _on_wardrobe_button_pressed() -> void:
 		remove_child(ws)
 		_apply_equipped_cosmetics()
 		$titlescreen.visible = title_was_visible
+		_refresh_title_menu()
 		if title_was_visible:
 			_apply_ui_layout()
-		for container in [$titlescreen.get_node_or_null("TitleRow2"), $titlescreen/HBoxContainer]:
-			if not container:
-				continue
-			var wb = container.get_node_or_null("WardrobeButton")
-			if wb:
-				wb.visible = MusicManager.has_any_cosmetic()
-				_refresh_new_badge(wb)
 	)
 
 
-## The crown (wardrobe) button next to ENDLESS, once there's something in the wardrobe. It can turn
-## up mid-game too: Muse Pro brings Lil Froggy on a computer.
-func _ensure_title_wardrobe_button() -> void:
-	if not MusicManager.has_any_cosmetic() or _find_title_button("WardrobeButton"):
+## The title's menu, in the menus' chunky buttons (UIStyle): CONTINUE (START with no climb saved),
+## ENDLESS, WARDROBE (once there's something in it: it can turn up mid-game, Muse Pro brings Lil
+## Froggy on a computer), MUSE ACCOUNT and SETTINGS. _layout_title places it. (It took over from the
+## scene's own buttons and from MUSE ACCOUNT up in the corner.)
+func _build_title_menu() -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var menu := VBoxContainer.new()
+	menu.name = "TitleMenu"
+	$titlescreen.add_child(menu)
+	var play := _title_button(menu, "PlayButton", _on_button_pressed)
+	play.text = "CONTINUE" if FileAccess.file_exists(save_path) else "START"
+	_title_button(menu, "EndlessButton", _on_endlessmodebutton_pressed).set_meta("words", "ENDLESS")
+	var wardrobe := _title_button(menu, "WardrobeButton", _on_wardrobe_button_pressed)
+	wardrobe.set_meta("words", "WARDROBE")
+	_attach_new_badge(wardrobe)
+	_title_button(menu, "MuseButton", _on_muse_button_pressed)
+	_title_button(menu, "SettingsButton", _on_title_settings_pressed).set_meta("words", "SETTINGS")
+	for b in menu.get_children():  # (each one's picture, next to its words: UIStyle.button_face)
+		b.set_meta("icon", {"EndlessButton": [load("res://assets/infinity.png"), false],
+			"WardrobeButton": [load("res://assets/crownicon.png"), false],
+			"MuseButton": [ui.pixel_icon(ui.PERSON), true],
+			"SettingsButton": [ui.pixel_icon(ui.GEAR), true]}.get(str(b.name), []))
+	_refresh_title_menu()
+
+
+func _title_button(menu: Control, button_name: String, on_press: Callable) -> Button:
+	var b := Button.new()
+	b.name = button_name
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(on_press)
+	menu.add_child(b)
+	return b
+
+
+## What the title's menu shows: WARDROBE once there's something in it (and NEW on it), MUSE PRO in gold
+## with Muse Pro.
+func _refresh_title_menu() -> void:
+	var menu := $titlescreen.get_node_or_null("TitleMenu")
+	if menu == null:
 		return
-	var ref_btn := _find_title_button("endlessmodebutton")
-	var wb := Button.new()
-	wb.name = "WardrobeButton"
-	wb.theme = ref_btn.theme
-	wb.add_theme_font_override("font", ref_btn.get_theme_font("font"))
-	wb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-	wb.add_theme_constant_override("outline_size", 5)
-	wb.text = "   "
-	wb.icon = load("res://assets/crownicon.png")
-	wb.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wb.expand_icon = true
-	ref_btn.get_parent().add_child(wb)  # (row 2 in portrait, the one row in landscape)
-	wb.pressed.connect(_on_wardrobe_button_pressed)
-	_attach_new_badge(wb)
+	menu.get_node("WardrobeButton").visible = MusicManager.has_any_cosmetic()
+	_refresh_new_badge(menu.get_node("WardrobeButton"))
+	menu.get_node("MuseButton").set_meta("words", "MUSE PRO" if MuseAccount.has_pro() else "MUSE ACCOUNT")  # (shown by _layout_title)
 
 
-func _find_title_button(btn_name: String) -> Button:
-	for container in [$titlescreen.get_node_or_null("TitleRow2"), $titlescreen/HBoxContainer]:
-		if container and container.get_node_or_null(btn_name):
-			return container.get_node(btn_name)
-	return null
-
-
-## MUSE ACCOUNT, up in the title screen's corner: sign in with your Muse account (MuseAccount.gd).
-func _ensure_muse_button() -> void:
-	if $titlescreen.get_node_or_null("MuseAccountButton"):
-		return
-	var mb := Button.new()
-	mb.name = "MuseAccountButton"
-	mb.focus_mode = Control.FOCUS_NONE
-	mb.icon = _account_icon()
-	mb.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # (the little person stays in square pixels)
-	mb.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
-	# The same dark, see-through box as the title's other buttons, with a thin gold edge.
-	for state in [["normal", 0.55], ["hover", 0.72], ["pressed", 0.85], ["hover_pressed", 0.85]]:
-		var box := StyleBoxFlat.new()
-		box.bg_color = Color(0.08, 0.07, 0.09, state[1])
-		box.border_color = Color(1.0, 0.86, 0.42, 0.45)
-		box.set_border_width_all(1)
-		box.set_corner_radius_all(8)
-		mb.add_theme_stylebox_override(state[0], box)
-	mb.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-	mb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-	mb.pressed.connect(_on_muse_button_pressed)
-	$titlescreen.add_child(mb)
-	_refresh_muse_button()
-
-
-func _refresh_muse_button() -> void:
-	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
-	if mb == null:
-		return
-	var pro := MuseAccount.has_pro()
-	mb.text = "MUSE PRO" if pro else "MUSE ACCOUNT"
-	var colour := Color(1.0, 0.86, 0.42) if pro else Color(0.97, 0.92, 0.80)
-	for state in ["font_color", "font_pressed_color", "font_hover_pressed_color", "icon_normal_color", "icon_pressed_color"]:
-		mb.add_theme_color_override(state, colour)
-	mb.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
-	mb.add_theme_color_override("icon_hover_color", Color(1.0, 1.0, 1.0))
-
-
-## A little person: the account.
-static func _account_icon() -> ImageTexture:
-	var rows := ["...###...", "..#####..", "..#####..", "..#####..", "...###...", ".........", ".#######.", "#########", "#########"]
-	var img := Image.create(rows[0].length(), rows.size(), false, Image.FORMAT_RGBA8)
-	for y in rows.size():
-		for x in rows[y].length():
-			if rows[y][x] == "#":
-				img.set_pixel(x, y, Color.WHITE)
-	return ImageTexture.create_from_image(img)
-
-
-## Top right, clear of the notch and the status bar.
-func _place_muse_button(vp: Vector2, is_portrait: bool) -> void:
-	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
-	if mb == null:
-		return
-	var font_size := 32 if is_portrait else 16
-	_text_size(mb, font_size)
-	mb.add_theme_constant_override("icon_max_width", 9 * maxi(1, roundi(font_size * 0.9 / 9.0)))  # (whole pixels)
-	mb.add_theme_constant_override("h_separation", roundi(font_size * 0.35))
-	for state in ["normal", "hover", "pressed", "hover_pressed"]:
-		var box: StyleBoxFlat = mb.get_theme_stylebox(state)
-		box.content_margin_left = font_size * 0.5
-		box.content_margin_right = font_size * 0.55
-		box.content_margin_top = font_size * 0.22
-		box.content_margin_bottom = font_size * 0.22
-	mb.size = mb.get_combined_minimum_size()
-	var inset: Vector4 = AdsManager.get_viewport_safe_insets()
-	mb.position = Vector2(vp.x - inset.z - mb.size.x - 6.0, inset.y + 4.0)
+## The title: the logo, then its menu under it upright (or beside it sideways), and "made by muse"
+## at the bottom, all in the room clear of the notch and the bottom banner. The buttons are the
+## biggest that fit: on a short screen (an upright iPad, a foldable) they come down a size.
+func _layout_title(vp: Vector2, is_portrait: bool) -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var title := $titlescreen/Title
+	var by_muse := $"titlescreen/by muse"
+	var menu: VBoxContainer = $titlescreen/TitleMenu
+	var room: Rect2 = ui.room(vp)
+	_pin_to_bottom(by_muse, 32 if is_portrait else 16, 0.0 if is_portrait else 6.0)
+	var bottom: float = vp.y + by_muse.offset_top - 8.0  # (just over "made by muse")
+	var shown: Array = menu.get_children().filter(func(b: Control) -> bool: return b.visible)
+	var count := shown.size()
+	# [words, first button's height, the others', gap]
+	var sizes := [[32, 72.0, 60.0, 10.0], [32, 56.0, 48.0, 8.0], [16, 44.0, 38.0, 6.0], [16, 34.0, 30.0, 4.0]] \
+		if is_portrait else [[16, 40.0, 34.0, 6.0], [16, 34.0, 28.0, 4.0]]
+	var top: float
+	var width: float
+	if is_portrait:
+		title.scale = Vector2(0.5, 0.5)
+		title.position = Vector2(vp.x * 0.5, room.position.y + 375.0 * 0.25 + vp.y * 0.06)
+		top = title.position.y + 375.0 * 0.25 + 16.0
+		width = minf(vp.x * 0.84, 420.0)
+	else:
+		title.scale = Vector2(0.3, 0.3)
+		title.position = Vector2(vp.x * 0.29, (room.position.y + bottom) * 0.5)
+		top = room.position.y + 8.0
+		width = minf(vp.x * 0.4, 260.0)
+	var pick: Array = sizes[-1]
+	for each in sizes:
+		if each[1] + (count - 1) * (each[2] + each[3]) <= bottom - top:
+			pick = each
+			break
+	var height: float = pick[1] + (count - 1) * (pick[2] + pick[3])
+	menu.add_theme_constant_override("separation", int(pick[3]))
+	for b: Button in shown:
+		var first: bool = b == shown[0]
+		ui.style_button(b, pick[0], "go" if first else ("gold" if b.name == "MuseButton" and MuseAccount.has_pro() else
+			("wood" if b.name in ["EndlessButton", "WardrobeButton"] else "quiet")))
+		b.custom_minimum_size = Vector2(0, pick[1] if first else pick[2])
+		var icon: Array = b.get_meta("icon", [])
+		if not icon.is_empty():
+			ui.button_face(b, icon[0], icon[1], b.get_meta("words", ""), pick[0])
+	menu.size = Vector2(width, height)
+	var x: float = (vp.x - width) * 0.5 if is_portrait else vp.x * 0.72 - width * 0.5
+	menu.position = Vector2(x, top + (bottom - top - height) * 0.5).round()
 
 
 func _on_muse_button_pressed() -> void:
@@ -992,8 +900,7 @@ func _on_muse_button_pressed() -> void:
 
 
 func _on_muse_account_changed() -> void:
-	_ensure_title_wardrobe_button()
-	_refresh_muse_button()
+	_refresh_title_menu()
 	if $titlescreen.visible:
 		_show_logo(true)
 		_apply_ui_layout()
@@ -1246,137 +1153,27 @@ func _apply_ui_layout() -> void:
 
 
 	# ── TITLE SCREEN ─────────────────────────────────────────────────────
-	var title    := $titlescreen/Title
-	var fx3      := $titlescreen/earthboundbattleFX3
-	var by_muse  := $"titlescreen/by muse"
-	var hbox     := $titlescreen/HBoxContainer
-
 	$titlescreen.layer = AdsManager.canvas_layer_above_banner_placeholder()
-	by_muse.z_index = 8
-	by_muse.z_as_relative = false
-
-	var row2 = $titlescreen.get_node_or_null("TitleRow2")
-	if is_portrait:
-		title.position    = Vector2(cx, vp.y * 0.25)
-		title.scale       = Vector2(0.5, 0.5)
-		fx3.position      = Vector2(cx, vp.y * 0.75)
-		# "by muse" pinned near bottom, above the banner when one is up; layer above ad placeholder
-		_pin_to_bottom(by_muse, 32)
-		if row2:
-			row2.visible = true
-			# Move endlessmodebutton/WardrobeButton back from hbox if landscape moved them there
-			for _btn_name in ["endlessmodebutton", "WardrobeButton"]:
-				var _btn = hbox.get_node_or_null(_btn_name)
-				if _btn:
-					_btn.reparent(row2)
-			# Two-row: START alone on row1 (full width), ENDLESS+WARDROBE on row2
-			hbox.offset_left   = -(cx - 10.0)
-			hbox.offset_top    = vp.y * 0.50 - cy
-			hbox.offset_right  = cx - 10.0
-			hbox.offset_bottom = hbox.offset_top + 80.0
-			$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_text_size($titlescreen/HBoxContainer/Button, 46)
-			row2.offset_left   = -(cx - 10.0)
-			row2.offset_top    = hbox.offset_bottom + 8.0
-			row2.offset_right  = cx - 10.0
-			row2.offset_bottom = row2.offset_top + 80.0
-			var eb_p = row2.get_node_or_null("endlessmodebutton")
-			if eb_p:
-				eb_p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				_text_size(eb_p, 46)
-			var wb_p = row2.get_node_or_null("WardrobeButton")
-			if wb_p:
-				wb_p.visible = MusicManager.has_any_cosmetic()
-				wb_p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				_text_size(wb_p, 46)
-		else:
-			hbox.offset_left   = -(cx - 10.0)
-			hbox.offset_top    = vp.y * 0.50 - cy
-			hbox.offset_right  = cx - 10.0
-			hbox.offset_bottom = hbox.offset_top + 80.0
-			$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_text_size($titlescreen/HBoxContainer/Button, 46)
-			$titlescreen/HBoxContainer/endlessmodebutton.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_text_size($titlescreen/HBoxContainer/endlessmodebutton, 46)
-	else:
-		title.position    = Vector2(cx, 85.0)
-		title.scale       = Vector2(0.3, 0.3)
-		fx3.position      = Vector2(cx, 238.0)
-		# "by muse" — landscape: smaller type, tucked a touch lower toward the banner strip when there is one
-		_pin_to_bottom(by_muse, 22, 6.0)
-		# All title buttons in one hbox for uniform gaps in landscape
-		var ls_half: float = vp.x * 0.34
-		if row2:
-			row2.visible = false
-			# Move endlessmodebutton/WardrobeButton into hbox so spacing is handled by HBoxContainer
-			for _btn_name in ["endlessmodebutton", "WardrobeButton"]:
-				var _btn = row2.get_node_or_null(_btn_name)
-				if _btn:
-					_btn.reparent(hbox)
-		hbox.offset_left   = -ls_half
-		hbox.offset_top    = 16.0
-		hbox.offset_right  = ls_half
-		hbox.offset_bottom = 64.0
-		$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_text_size($titlescreen/HBoxContainer/Button, 32)
-		$titlescreen/HBoxContainer/Button.remove_theme_stylebox_override("normal")
-		$titlescreen/HBoxContainer/Button.remove_theme_stylebox_override("hover")
-		for _state in ["normal", "hover"]:
-			var _sb: StyleBox = $titlescreen/HBoxContainer/Button.get_theme_stylebox(_state)
-			if _sb:
-				var _dup := _sb.duplicate()
-				var _cur_l: float = _dup.get_content_margin(SIDE_LEFT)
-				var _cur_r: float = _dup.get_content_margin(SIDE_RIGHT)
-				_dup.set_content_margin(SIDE_LEFT,  (0.0 if _cur_l < 0 else _cur_l)  + 14)
-				_dup.set_content_margin(SIDE_RIGHT, (0.0 if _cur_r < 0 else _cur_r) + 14)
-				$titlescreen/HBoxContainer/Button.add_theme_stylebox_override(_state, _dup)
-		var eb_l = hbox.get_node_or_null("endlessmodebutton")
-		if eb_l:
-			eb_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_text_size(eb_l, 32)
-		var wb_l = hbox.get_node_or_null("WardrobeButton")
-		if wb_l:
-			wb_l.visible = MusicManager.has_any_cosmetic()
-			wb_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			_text_size(wb_l, 32)
-
-	_place_muse_button(vp, is_portrait)
+	$"titlescreen/by muse".z_index = 8
+	$"titlescreen/by muse".z_as_relative = false
+	$titlescreen/earthboundbattleFX3.position = Vector2(cx, vp.y * 0.75 if is_portrait else 238.0)
+	_layout_title(vp, is_portrait)
 
 	# ── PAUSE SCREEN ──────────────────────────────────────────────────────
 	var overlay      := $PauseScreen/MeshInstance2D
 	var paused_lbl   := $PauseScreen/Paused
 	var resume_btn   := $PauseScreen/ResumeButton
 	var settings_btn := $PauseScreen/SettingsButton
-	var restart_btn  := $PauseScreen/RestartButton
-	var back_btn     := $PauseScreen/BackfromSettingsButton
-	var settings_c   := $PauseScreen/settingsContainer
-	var confirm_c    := $PauseScreen/RestartConfirmContainer
+	var restart_btn  := $PauseScreen/RestartButton  # (MAIN MENU: back to the title)
 	var eb_fx        := $PauseScreen/earthboundbattleFX2
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	restart_btn.text = "MAIN MENU"
 
 	# Overlay always covers the full viewport regardless of aspect ratio
 	overlay.position = Vector2(cx, cy)
 	overlay.scale    = Vector2(vp.x + 4.0, vp.y + 4.0)
 	eb_fx.position = Vector2(cx, cy)
 	eb_fx.scale    = Vector2(vp.x * 1.3 / 320.0, vp.y * 1.18 / 180.0)
-
-	# Always restore settings children to .tscn values before any container scaling
-	# so the scaled layout starts from the correct baseline every time
-	$PauseScreen/settingsContainer/MuteButton.offset_left   = -100.0
-	$PauseScreen/settingsContainer/MuteButton.offset_top    = -1.0
-	$PauseScreen/settingsContainer/MuteButton.offset_right  = -56.0
-	$PauseScreen/settingsContainer/MuteButton.offset_bottom = 23.0
-	$PauseScreen/settingsContainer/MuteButton2.offset_left   = -101.0
-	$PauseScreen/settingsContainer/MuteButton2.offset_top    = 24.0
-	$PauseScreen/settingsContainer/MuteButton2.offset_right  = -57.0
-	$PauseScreen/settingsContainer/MuteButton2.offset_bottom = 48.0
-	$PauseScreen/settingsContainer/SpeedrunModeButton.offset_left   = 41.0
-	$PauseScreen/settingsContainer/SpeedrunModeButton.offset_top    = -1.0
-	$PauseScreen/settingsContainer/SpeedrunModeButton.offset_right  = 85.0
-	$PauseScreen/settingsContainer/SpeedrunModeButton.offset_bottom = 23.0
-	$PauseScreen/settingsContainer/Sensitivity.offset_left   = 65.0
-	$PauseScreen/settingsContainer/Sensitivity.offset_top    = 2.00001
-	$PauseScreen/settingsContainer/Sensitivity.offset_right  = 375.0
-	$PauseScreen/settingsContainer/Sensitivity.offset_bottom = 47.0
 
 	if is_portrait:
 		paused_lbl.offset_left   = 10.0
@@ -1394,42 +1191,18 @@ func _apply_ui_layout() -> void:
 
 		resume_btn.offset_left   = bl;  resume_btn.offset_top    = bs
 		resume_btn.offset_right  = br;  resume_btn.offset_bottom = bs + bh
-		_text_size(resume_btn, 42)
+		ui.style_button(resume_btn, 32, "go")
 		settings_btn.offset_left  = bl;  settings_btn.offset_top    = bs + bh + 8.0
 		settings_btn.offset_right = br;  settings_btn.offset_bottom = bs + bh * 2.0 + 8.0
-		_text_size(settings_btn, 38)
+		ui.style_button(settings_btn, 32, "wood")
 		restart_btn.offset_left  = bl;  restart_btn.offset_top    = bs + (bh + 8.0) * 2.0
 		restart_btn.offset_right = br;  restart_btn.offset_bottom = bs + (bh + 8.0) * 2.0 + bh
-		_text_size(restart_btn, 38)
-		back_btn.offset_left  = bl;  back_btn.offset_top    = bs
-		back_btn.offset_right = br;  back_btn.offset_bottom = bs + bh
-		_text_size(back_btn, 38)
+		ui.style_button(restart_btn, 32, "wood")
 
-		# Scale settings: fit width AND ensure reset buttons (local y=102) stay on screen.
-		# settingsContainer content spans local y -7..102 (total height 109).
-		var settings_top_p: float = bs + bh + 14.0 + settings_nudge_portrait.y
-		var avail_h_p: float = vp.y - settings_top_p - 4.0
-		var sc: float = clamp(min((vp.x - 32.0) / 294.0, avail_h_p / 109.0), 0.3, 1.5)
-		settings_c.anchor_left = 0.0; settings_c.anchor_top = 0.0
-		settings_c.anchor_right = 0.0; settings_c.anchor_bottom = 0.0
-		settings_c.offset_left   = cx - 44.0 * sc + settings_nudge_portrait.x
-		settings_c.offset_top    = settings_top_p
-		settings_c.offset_right  = settings_c.offset_left + 40.0
-		settings_c.offset_bottom = settings_c.offset_top + 40.0
-		settings_c.scale         = Vector2(sc, sc)
-		settings_c.pivot_offset  = Vector2(0.0, 0.0)
-
-		# Confirm dialog: full scale, centered on cx (YES/NO local centers at 97.5 and 228.5)
-		confirm_c.offset_left   = cx - 163.0
-		confirm_c.offset_top    = vp.y * 0.25
-		confirm_c.offset_right  = cx - 123.0
-		confirm_c.offset_bottom = vp.y * 0.75
-		confirm_c.scale         = Vector2(1.0, 1.0)
-		confirm_c.pivot_offset  = Vector2(0.0, 0.0)
 		var wardrobe_slot_p: int = 3
 		var ra_slot_p: int = wardrobe_slot_p + (1 if MusicManager.has_any_cosmetic() else 0)
-		_ensure_pause_wardrobe_btn(bl, br, bh, bs + (bh + 8.0) * wardrobe_slot_p, 26)
-		_ensure_pause_remove_ads_btn(bl, br, bh, bs + (bh + 8.0) * ra_slot_p, 26)
+		_ensure_pause_wardrobe_btn(bl, br, bh, bs + (bh + 8.0) * wardrobe_slot_p, 32)
+		_ensure_pause_remove_ads_btn(bl, br, bh, bs + (bh + 8.0) * ra_slot_p, 32)
 	else:
 		# All positions scale with vp so any aspect ratio works
 		var num_btns_ls: int = 3 + (1 if MusicManager.has_any_cosmetic() else 0) + (1 if not AdsManager.is_ad_free() else 0)
@@ -1456,47 +1229,17 @@ func _apply_ui_layout() -> void:
 		var btn_font_ls: int = load("res://scripts/UIStyle.gd").px(maxf(12.0, bh * 0.55))
 		resume_btn.offset_left   = bl;  resume_btn.offset_top    = bs
 		resume_btn.offset_right  = br;  resume_btn.offset_bottom = bs + bh
-		_text_size(resume_btn, btn_font_ls)
+		ui.style_button(resume_btn, btn_font_ls, "go")
 		settings_btn.offset_left  = bl;  settings_btn.offset_top    = bs + bh + gap_ls
 		settings_btn.offset_right = br;  settings_btn.offset_bottom = bs + bh * 2.0 + gap_ls
-		_text_size(settings_btn, btn_font_ls)
+		ui.style_button(settings_btn, btn_font_ls, "wood")
 		restart_btn.offset_left  = bl;  restart_btn.offset_top    = bs + (bh + gap_ls) * 2.0
 		restart_btn.offset_right = br;  restart_btn.offset_bottom = bs + (bh + gap_ls) * 2.0 + bh
-		_text_size(restart_btn, btn_font_ls)
-		var settings_top_ls: float = bs + bh + gap_ls + settings_nudge_landscape.y
-		var back_top_ls: float = paused_bottom_ls + gap_ls * -1.5
-		back_btn.offset_left  = bl;  back_btn.offset_top    = back_top_ls
-		back_btn.offset_right = br;  back_btn.offset_bottom = back_top_ls + bh
-		_text_size(back_btn, btn_font_ls)
-
-		# Settings container: fit width AND height so reset buttons (local y=102) stay on screen.
-		# settingsContainer content spans local y -7..102 (total height 109).
-		var avail_h_ls: float = vp.y - settings_top_ls - 4.0
-		var sc_ls: float = clamp(min((vp.x - 32.0) / 294.0, avail_h_ls / 109.0), 0.3, 1.5)
-		settings_c.anchor_left = 0.0; settings_c.anchor_top = 0.0
-		settings_c.anchor_right = 0.0; settings_c.anchor_bottom = 0.0
-		settings_c.offset_left   = cx - 44.0 * sc_ls + settings_nudge_landscape.x
-		settings_c.offset_top    = settings_top_ls
-		settings_c.offset_right  = settings_c.offset_left + 40.0
-		settings_c.offset_bottom = settings_c.offset_top + 40.0
-		settings_c.scale         = Vector2(sc_ls, sc_ls)
-		settings_c.pivot_offset  = Vector2(0.0, 0.0)
-
-		# Confirm dialog: centered
-		confirm_c.offset_left   = cx - 100.0
-		confirm_c.offset_top    = vp.y * 0.25
-		confirm_c.offset_right  = cx - 60.0
-		confirm_c.offset_bottom = vp.y * 0.75
-		confirm_c.scale         = Vector2(0.6, 0.6)
-		confirm_c.pivot_offset  = Vector2(0.0, 0.0)
+		ui.style_button(restart_btn, btn_font_ls, "wood")
 		var wardrobe_slot: int = 3
 		var ra_slot: int = wardrobe_slot + (1 if MusicManager.has_any_cosmetic() else 0)
-		_ensure_pause_wardrobe_btn(bl, br, bh, bs + (bh + gap_ls) * wardrobe_slot, max(12, int(bh * 0.5)))
-		_ensure_pause_remove_ads_btn(bl, br, bh, bs + (bh + gap_ls) * ra_slot, max(12, int(bh * 0.5)))
-
-	# ── COMMON (both orientations) ────────────────────────────────────────
-	restart_btn.text = "EXIT"
-	_ensure_reset_progress_btn()
+		_ensure_pause_wardrobe_btn(bl, br, bh, bs + (bh + gap_ls) * wardrobe_slot, btn_font_ls)
+		_ensure_pause_remove_ads_btn(bl, br, bh, bs + (bh + gap_ls) * ra_slot, btn_font_ls)
 
 	# ── PAUSE BUTTON ──────────────────────────────────────────────────────
 	var pause_btn := $CanvasLayer/TouchScreenButtonPause
@@ -1552,22 +1295,18 @@ func _ensure_pause_wardrobe_btn(bl: float, br: float, bh: float, btn_top: float,
 	if wpb == null:
 		wpb = Button.new()
 		wpb.name = "WardrobePauseBtn"
-		wpb.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
-		wpb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-		wpb.add_theme_constant_override("outline_size", 8)
+		wpb.focus_mode = Control.FOCUS_NONE
 		wpb.pressed.connect(_on_pause_wardrobe_pressed)
 		$PauseScreen.add_child(wpb)
 		_attach_new_badge(wpb)
 	wpb.text = "WARDROBE"
 	_refresh_new_badge(wpb)
-	_text_size(wpb, font_sz)
-	wpb.add_theme_color_override("font_color", Color("#FFD966"))
+	load("res://scripts/UIStyle.gd").style_button(wpb, font_sz, "gold")
 	wpb.offset_left   = bl
 	wpb.offset_top    = btn_top
 	wpb.offset_right  = br
 	wpb.offset_bottom = btn_top + bh
-	var _settings_open: bool = $PauseScreen/settingsContainer.visible or $PauseScreen/RestartConfirmContainer.visible
-	wpb.visible = not _settings_open
+	wpb.visible = true
 
 
 func _ensure_pause_remove_ads_btn(bl: float, br: float, bh: float, btn_top: float, font_sz: int) -> void:
@@ -1579,19 +1318,15 @@ func _ensure_pause_remove_ads_btn(bl: float, br: float, bh: float, btn_top: floa
 	if rapb == null:
 		rapb = Button.new()
 		rapb.name = "RemoveAdsPauseBtn"
-		rapb.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
-		rapb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-		rapb.add_theme_constant_override("outline_size", 8)
+		rapb.focus_mode = Control.FOCUS_NONE
 		rapb.pressed.connect(_on_pause_remove_ads_pressed)
 		$PauseScreen.add_child(rapb)
 	rapb.text = "REMOVE ADS"
-	_text_size(rapb, font_sz)
+	load("res://scripts/UIStyle.gd").style_button(rapb, font_sz, "quiet")
 	rapb.offset_left   = bl
 	rapb.offset_top    = btn_top
 	rapb.offset_right  = br
 	rapb.offset_bottom = btn_top + bh
-	var _settings_open: bool = $PauseScreen/settingsContainer.visible or $PauseScreen/RestartConfirmContainer.visible
-	rapb.visible = not _settings_open
 
 
 func _on_pause_remove_ads_pressed() -> void:
@@ -1602,49 +1337,6 @@ func _on_pause_remove_ads_pressed() -> void:
 		# Refresh layout in case ads were removed
 		_apply_ui_layout()
 	)
-
-
-func _ensure_reset_progress_btn() -> void:
-	var sc := $PauseScreen/settingsContainer
-	# Remove old single-button if upgrading from older code
-	var old := sc.get_node_or_null("ResetProgressBtn")
-	if old:
-		old.queue_free()
-	var font := load("res://assets/fibberish.ttf")
-	# Left: reset current climb only
-	var rcb: Button = sc.get_node_or_null("ResetClimbBtn")
-	if rcb == null:
-		rcb = Button.new()
-		rcb.name = "ResetClimbBtn"
-		rcb.text = "RESET\nCLIMB"
-		rcb.add_theme_font_override("font", font)
-		rcb.add_theme_color_override("font_color", Color(1.0, 0.65, 0.1))
-		rcb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-		rcb.add_theme_constant_override("outline_size", 3)
-		rcb.pressed.connect(_on_reset_climb_btn_pressed)
-		sc.add_child(rcb)
-	_text_size(rcb, 15)
-	rcb.offset_left   = -103.0
-	rcb.offset_top    = 64.0
-	rcb.offset_right  = 41.0
-	rcb.offset_bottom = 102.0
-	# Right: wipe all user data (skins + scores + save)
-	var rdb: Button = sc.get_node_or_null("ResetAllDataBtn")
-	if rdb == null:
-		rdb = Button.new()
-		rdb.name = "ResetAllDataBtn"
-		rdb.text = "RESET ALL\nDATA"
-		rdb.add_theme_font_override("font", font)
-		rdb.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
-		rdb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-		rdb.add_theme_constant_override("outline_size", 3)
-		rdb.pressed.connect(_on_reset_all_data_btn_pressed)
-		sc.add_child(rdb)
-	_text_size(rdb, 15)
-	rdb.offset_left   = 47.0
-	rdb.offset_top    = 64.0
-	rdb.offset_right  = 191.0
-	rdb.offset_bottom = 102.0
 
 
 func _attach_new_badge(btn: Button) -> void:
@@ -1699,11 +1391,9 @@ func _refresh_all_wardrobe_badges() -> void:
 	var wpb := $PauseScreen.get_node_or_null("WardrobePauseBtn") as Button
 	if wpb:
 		_refresh_new_badge(wpb)
-	for path in ["titlescreen/TitleRow2/WardrobeButton", "titlescreen/HBoxContainer/WardrobeButton"]:
-		var wb := get_node_or_null(path) as Button
-		if wb:
-			_refresh_new_badge(wb)
-			break
+	var wb := get_node_or_null("titlescreen/TitleMenu/WardrobeButton") as Button
+	if wb:
+		_refresh_new_badge(wb)
 
 
 func _restore_world_pickups() -> void:

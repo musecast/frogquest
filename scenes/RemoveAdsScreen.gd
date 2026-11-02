@@ -211,10 +211,8 @@ func _fit() -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var room: Rect2 = ui.room(vp)
 	var portrait := vp.y > vp.x * 1.3
-	var zoom := 2.0 if portrait else 1.0
-	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.5) / zoom, 0)
 	_close_btn.visible = _main_panel.visible
-	ui.fit_panel(_panel, _scroll, room, zoom)
+	ui.fit_panel(_panel, _scroll, room, ui.panel_zoom(vp, room), 0.9 if portrait else 0.5)
 
 
 func _on_buy_pressed() -> void:
