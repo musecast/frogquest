@@ -102,9 +102,10 @@ func _build_ui() -> void:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
-	# (the pixel font is drawn on a 16-pixel grid: smaller and its strokes start to drop out)
-	var font_size_title: int = 32 if is_portrait else 16
-	var font_size_body:  int = 22 if is_portrait else 16
+	# (the pixel font is drawn on a 16-pixel grid, so whole steps of it only: UIStyle.px. Upright, the
+	# step that suits the width: 32 on the story's 480, 16 on Endless's 320, where 32 left room for two.)
+	var font_size_title: int = ui.px(vp.x / 10.0) if is_portrait else 16
+	var font_size_body:  int = ui.px(vp.x / 15.0) if is_portrait else 16
 	# Buttons and pictures scale with the room so they fit any phone.
 	var btn_min := Vector2(room.size.x * 0.27, maxf(room.size.y * 0.05, font_size_body * 1.9)) if is_portrait else Vector2(70, 20)
 	var action_btn_min := _compute_action_button_size(btn_min, font_size_body)
@@ -161,6 +162,13 @@ func _build_ui() -> void:
 	vbox.add_theme_constant_override("separation", 8 if is_portrait else 3)
 	scroll.add_child(vbox)
 
+	# Every row laid out the same way: if any name doesn't fit beside its buttons, they all go over them
+	# (one short name beside its buttons, among the rest over theirs, looked like a mistake).
+	var stack_rows := false
+	for id in ITEMS:
+		if _is_unlocked(id) and not _fits_beside(id, action_btn_min, font_size_body, info_btn_size, icon_size, row_width):
+			stack_rows = true
+
 	for section in [["HATS", "hat"], ["SKINS", "skin"], ["DESKTOP", "desktop"]]:
 		var ids := []
 		for id in ITEMS:
@@ -170,7 +178,7 @@ func _build_ui() -> void:
 			continue  # (computers only, once he's unlocked)
 		vbox.add_child(_section_header(section[0], font_size_body))
 		for id in ids:
-			vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size, icon_size, row_width))
+			vbox.add_child(_make_item_row(id, action_btn_min, font_size_body, info_btn_size, icon_size, row_width, stack_rows))
 		if ids.is_empty():
 			var none_lbl := Label.new()
 			none_lbl.text = "(none yet)"
@@ -231,11 +239,20 @@ func _section_header(text: String, font_size: int) -> HBoxContainer:
 	return row
 
 
-## An item: its picture, its name, its button and a "?" for how it's won. On a narrow screen the name
-## doesn't fit beside the buttons (it came out "Frog", or not at all), so it goes on a line of its own
-## over them, beside the picture.
+## Whether an item's name fits on its row beside its buttons (else it goes on a line of its own).
+func _fits_beside(id: String, btn_min: Vector2, font_size: int, info_btn_size: float, icon_size: float,
+		row_width: float) -> bool:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var name_w: float = ui.font().get_string_size(ITEMS[id]["label"], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + font_size * 0.6
+	var buttons_w: float = btn_min.x + (info_btn_size + 8.0 if ITEMS[id].get("how", "") != "" else 0.0)
+	return icon_size + 8.0 + name_w + 8.0 + buttons_w <= row_width
+
+
+## An item: its picture, its name, its button and a "?" for how it's won. On a narrow screen the names
+## don't fit beside the buttons (they came out "Frog", or not at all), so with stacked each goes on a
+## line of its own over them, beside the picture.
 func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size: float, icon_size: float,
-		row_width: float) -> PanelContainer:
+		row_width: float, stacked: bool) -> PanelContainer:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var box := PanelContainer.new()  # (lit up while you're wearing it)
 	_item_rows[id] = box
@@ -251,9 +268,7 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ui.style_label(lbl, font_size)
 	var how: String = ITEMS[id].get("how", "")
-	var name_w: float = ui.font().get_string_size(lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x + font_size * 0.6
 	var buttons_w: float = btn_min.x + (info_btn_size + 8.0 if how != "" else 0.0)
-	var stacked: bool = icon_size + 8.0 + name_w + 8.0 + buttons_w > row_width
 	var button_row: HBoxContainer = row
 	if stacked:
 		var column := VBoxContainer.new()
@@ -393,7 +408,8 @@ func _update_button_label(btn: Button, id: String) -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var font_size: int = btn.get_theme_font_size("font_size") if btn.has_theme_font_size_override("font_size") else 0
 	if font_size == 0:
-		font_size = 22 if get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x * 1.3 else 11
+		var vp := get_viewport().get_visible_rect().size
+		font_size = ui.px(vp.x / 15.0) if vp.y > vp.x * 1.3 else 16  # (as _build_ui sizes them)
 	if id == "lil_froggy":
 		var waiting := Time.get_ticks_msec() < _froggy_busy_until
 		btn.disabled = waiting

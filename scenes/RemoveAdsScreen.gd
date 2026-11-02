@@ -7,11 +7,13 @@ var _passcode_panel: VBoxContainer
 var _code_input: LineEdit
 var _status_label: Label
 var _panel: PanelContainer = null
+var _scroll: ScrollContainer = null
+var _close_btn: Button = null
 var _secret_tap_count := 0
 
 const BTN_HEIGHT := 28
 const BTN_FONT_SZ := 16  # (the pixel font is drawn on a 16-pixel grid)
-const TITLE_FONT_SZ := 24
+const TITLE_FONT_SZ := 32
 const SECRET_TAPS_REQUIRED := 10
 const GOLD := Color(0.95, 0.88, 0.65)
 const BLACK := Color(0.0, 0.0, 0.0, 1.0)
@@ -42,11 +44,22 @@ func _build_ui() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 12 if side in ["left", "right"] else 10)
 	panel.add_child(margin)
+	# What's in it (it scrolls if the room's too short: _fit), then Close, always there.
+	var frame := VBoxContainer.new()
+	frame.add_theme_constant_override("separation", 10)
+	margin.add_child(frame)
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	load("res://scripts/UIStyle.gd").style_scrollbar(_scroll.get_v_scroll_bar())
+	frame.add_child(_scroll)
+	var pages := VBoxContainer.new()  # (the main page, or the passcode one)
+	pages.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(pages)
 
 	_main_panel = VBoxContainer.new()
 	_main_panel.add_theme_constant_override("separation", 10)
 	_main_panel.alignment = BoxContainer.ALIGNMENT_CENTER
-	margin.add_child(_main_panel)
+	pages.add_child(_main_panel)
 
 	var frog_btn := TextureButton.new()
 	frog_btn.texture_normal = load("res://assets/frog.png")
@@ -120,8 +133,8 @@ func _build_ui() -> void:
 		already.add_theme_color_override("font_color", Color(0.5, 1.0, 0.5))
 		_main_panel.add_child(already)
 
-	var close_btn := _make_button("Close", fibberish)
-	close_btn.pressed.connect(_on_close_pressed)
+	_close_btn = _make_button("Close", fibberish)
+	_close_btn.pressed.connect(_on_close_pressed)
 
 	var privacy_btn := _make_button("Privacy Policy", fibberish)
 	privacy_btn.name = "PrivacyPolicyButton"
@@ -133,13 +146,13 @@ func _build_ui() -> void:
 	terms_btn.pressed.connect(_on_terms_pressed)
 	_main_panel.add_child(terms_btn)
 
-	_main_panel.add_child(close_btn)
+	frame.add_child(_close_btn)  # (on the main page only: the passcode page has Back)
 
 	_passcode_panel = VBoxContainer.new()
 	_passcode_panel.add_theme_constant_override("separation", 10)
 	_passcode_panel.alignment = BoxContainer.ALIGNMENT_CENTER
 	_passcode_panel.visible = false
-	margin.add_child(_passcode_panel)
+	pages.add_child(_passcode_panel)
 
 	var secret_title := Label.new()
 	secret_title.text = "???"
@@ -149,7 +162,7 @@ func _build_ui() -> void:
 	secret_title.add_theme_font_size_override("font_size", TITLE_FONT_SZ)
 	secret_title.add_theme_color_override("font_color", GOLD)
 	secret_title.add_theme_color_override("font_outline_color", BLACK)
-	secret_title.add_theme_constant_override("outline_size", 6)
+	secret_title.add_theme_constant_override("outline_size", load("res://scripts/UIStyle.gd").outline_px(TITLE_FONT_SZ))
 	_passcode_panel.add_child(secret_title)
 
 	_code_input = LineEdit.new()
@@ -188,24 +201,20 @@ func _process(_delta: float) -> void:
 
 ## Centres the panel in the room the screen has (clear of the notch and the ad banners, which are
 ## drawn over everything) at a whole size, twice as big upright on a phone, so the pixel font and the
-## pictures stay on their pixel grid. Only if that's too big for the room does it shrink, and then
-## with square pixels (nearest filtering on the panel), never smeared. Every frame: wrapped text
-## settles a frame late, and banners come and go.
+## pictures stay on their pixel grid; never shrunk (its words went to mush sideways on a phone): if
+## it's too tall at 1:1, what's in it scrolls (UIStyle.fit_panel). Every frame: wrapped text settles
+## a frame late, and banners come and go.
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	if _panel == null or vp.x < 50.0 or vp.y < 50.0:
 		return
-	var room: Rect2 = load("res://scripts/UIStyle.gd").room(vp)
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var room: Rect2 = ui.room(vp)
 	var portrait := vp.y > vp.x * 1.3
 	var zoom := 2.0 if portrait else 1.0
-	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.4) / zoom, 0)
-	var need := _panel.get_combined_minimum_size()
-	var s := minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))
-	if s >= 1.0:
-		s = floorf(s)
-	_panel.size = need
-	_panel.scale = Vector2(s, s)
-	_panel.position = (room.position + (room.size - need * s) / 2.0).round()
+	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.5) / zoom, 0)
+	_close_btn.visible = _main_panel.visible
+	ui.fit_panel(_panel, _scroll, room, zoom)
 
 
 func _on_buy_pressed() -> void:

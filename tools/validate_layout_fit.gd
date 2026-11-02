@@ -4,11 +4,13 @@ extends SceneTree
 ## squeezed between both banners; the story's title screen, pause menu, settings and reset question
 ## (in the whole world, over the bottom banner); the Remove Ads, Muse account and wardrobe screens
 ## (with every hat and skin) between both banners, since the ads draw over everything; and the
-## notifications that drop in. Nothing may hang off the screen or sit under a banner. Each screen is laid out in a
-## SubViewport the size the game's stretch settings (viewport, expand) would give that window. The
-## story climb saves to scratch files meanwhile, so yours is never touched.
+## notifications that drop in. Nothing may hang off the screen or sit under a banner, and the pixel
+## font's words must be crisp (whole steps of its grid, 1:1, a one-pixel outline). Each screen is laid
+## out in a SubViewport the size the game's stretch settings (viewport, expand) would give that window.
+## The story climb saves to scratch files meanwhile, so yours is never touched.
 ##   Godot --headless --path . --script res://tools/validate_layout_fit.gd
 
+const PIXEL_FONT := "res://assets/fibberish.ttf"
 const ENDLESS_BASE := Vector2(320, 180)  # EndlessMode.gd's content_scale_size
 const STORY_BASE := Vector2(480, 270)  # player.gd's
 const WINDOWS := {  # window sizes, in points
@@ -276,6 +278,8 @@ func _expect_inside(node: Node, room: Rect2, what: String) -> void:
 			continue
 		if child is Control and (child is BaseButton or child is Label or child is LineEdit or child is ScrollContainer):
 			_checked += 1
+			if not _expect_crisp(child, what):
+				return
 			var r: Rect2 = _words_rect(child) if child is Label else child.get_global_rect()
 			if not room.grow(2.0).encloses(r):
 				_failures.append("%s: %s \"%s\" at %s is outside %s" % [what, child.name,
@@ -291,17 +295,65 @@ func _expect_inside(node: Node, room: Rect2, what: String) -> void:
 		_expect_inside(child, room, what)
 
 
-## Every visible label and button under node has room for its words.
+## Every visible label and button under node has room for its words, crisp ones.
 func _expect_words_fit(node: Node, what: String) -> void:
 	for child in node.get_children():
 		if child is CanvasItem and not child.visible:
 			continue
-		if child is Control and _cut_off(child):
+		if child is BaseButton or child is Label or child is LineEdit:
 			_checked += 1
+		if child is Control and _cut_off(child):
 			_failures.append("%s: %s \"%s\" doesn't fit its %.0f px: its words are cut off" % [what,
 				child.name, str(child.get("text")).left(24).replace("\n", " "), child.size.x])
 			return
+		if child is Control and not _expect_crisp(child, what):
+			return
 		_expect_words_fit(child, what)
+
+
+## The pixel font only at whole steps of its 16-pixel grid (UIStyle.px), drawn 1:1 (or blown up a
+## whole number of times, square: nearest filtering), with a one-pixel outline (UIStyle.outline_px)
+## or none: anything else and its pixels come out uneven, some one wide and some two, and the words
+## look lumpy (they did, in the wardrobe on an iPad; shrunk, sideways on a phone, they went to mush).
+## False if not. (The pause menu's settings and its reset question are still drawn scaled as a whole,
+## so they're let off.)
+func _expect_crisp(c: Control, what: String) -> bool:
+	if not (c is Label or c is Button or c is LineEdit):
+		return true
+	var words := str(c.get("text")) + (str(c.placeholder_text) if c is LineEdit else "")
+	if words.strip_edges() == "":
+		return true
+	var font: Font = c.get_theme_font("font")
+	if font is FontVariation:
+		font = font.base_font
+	if font == null or font.resource_path != PIXEL_FONT:
+		return true
+	var path := str(c.get_path())
+	if path.contains("/settingsContainer/") or path.contains("/RestartConfirmContainer/"):
+		return true
+	var size: int = c.get_theme_font_size("font_size")
+	var scale: Vector2 = c.get_global_transform_with_canvas().get_scale()
+	var outline: int = c.get_theme_constant("outline_size")
+	var label := "%s: %s \"%s\"" % [what, c.name, words.left(24).replace("\n", " ")]
+	var k := absf(scale.y)
+	var square := absf(absf(scale.x) - k) < 0.001 and absf(k - roundf(k)) < 0.001 and k > 0.999
+	if size % 16 != 0 or not square or (k > 1.001 and not _draws_nearest(c)):
+		_failures.append("%s draws the pixel font at %d x %.3f: whole steps of 16, 1:1 (or whole times, square), only" % [label, size, scale.y])
+		return false
+	if outline != 0 and outline != size / 8:
+		_failures.append("%s has a %d outline at size %d: one font pixel (%d) or none" % [label, outline, size, size / 8])
+		return false
+	return true
+
+
+## Whether c is drawn with nearest filtering (its own, a parent's, or the viewport's default).
+static func _draws_nearest(c: CanvasItem) -> bool:
+	var n: Node = c
+	while n is CanvasItem:
+		if n.texture_filter != CanvasItem.TEXTURE_FILTER_PARENT_NODE:
+			return n.texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST
+		n = n.get_parent()
+	return c.get_viewport().canvas_item_default_texture_filter == Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
 
 
 ## A label or button whose words are wider than it is: clip_text cuts them off without a sound (the

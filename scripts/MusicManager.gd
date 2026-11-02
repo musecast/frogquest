@@ -122,8 +122,8 @@ func _next_toast() -> void:
 	var vp := host.get_viewport().get_visible_rect().size
 	var room: Rect2 = ui.room(vp)  # (clear of the notch and any banner)
 	var portrait: bool = vp.y > vp.x * 1.3
-	# (the pixel font is drawn on a 16-pixel grid: smaller and its strokes start to drop out)
-	var title_size: int = clampi(roundi(minf(vp.y * 0.032, vp.x * 0.058)), 16, 32) if portrait else clampi(roundi(vp.y * 0.07), 16, 24)
+	# (the pixel font is drawn on a 16-pixel grid, so whole steps of it only: UIStyle.px)
+	var title_size: int = ui.px(clampf(minf(vp.y * 0.032, vp.x * 0.058), 16.0, 32.0) if portrait else clampf(vp.y * 0.07, 16.0, 24.0))
 
 	var box: StyleBoxFlat = ui.panel_box(10)
 	box.content_margin_left = title_size * 0.7

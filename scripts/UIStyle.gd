@@ -1,9 +1,13 @@
 extends RefCounted
 ## The look of the menus built in code (wardrobe, game over, Remove Ads, Muse account) and the little
 ## notifications that drop in: dark wood panels with a gold edge and a soft shadow, chunky buttons with
-## a lip that press down when tapped, and the fibberish pixel font with a dark outline. Load it lazily:
+## a lip that press down when tapped, and the fibberish pixel font with a thin dark outline. Load it
+## lazily:
 ##   var ui: GDScript = load("res://scripts/UIStyle.gd")
+## The font is drawn on a 16-pixel grid, so it's only ever used at 16, 32, 48... (px() picks the
+## nearest): in between, its pixels come out uneven, some one wide and some two, and the words go lumpy.
 
+const PX := 16  # the pixel font's grid
 const GOLD := Color(1.0, 0.86, 0.42)
 const CREAM := Color(0.97, 0.92, 0.80)
 const INK := Color(0.07, 0.04, 0.02)  # outlines
@@ -22,6 +26,17 @@ static func font() -> Font:
 	return load("res://assets/fibberish.ttf")
 
 
+## The size to draw the pixel font at, near size: the nearest whole step of its grid (16 at least).
+static func px(size: float) -> int:
+	return maxi(PX, roundi(size / PX) * PX)
+
+
+## Its outline at that size: one of the font's own pixels all round. (Thicker ones round off at the
+## corners and blob the letters together.)
+static func outline_px(size: int) -> int:
+	return maxi(2, size / 8)
+
+
 ## A panel's box: dark wood, a gold edge, rounded corners and a shadow under it.
 static func panel_box(radius := 10) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
@@ -36,8 +51,9 @@ static func panel_box(radius := 10) -> StyleBoxFlat:
 
 
 ## Dresses btn as a chunky button of kind ("wood", "go" for the thing to do, "gold", "quiet"), its words
-## font_size big. It has a lip underneath, and pressed it sinks into it.
+## about font_size big (px). It has a lip underneath, and pressed it sinks into it.
 static func style_button(btn: Button, font_size: int, kind := "wood") -> void:
+	font_size = px(font_size)
 	var colours: Array = KINDS.get(kind, KINDS["wood"])
 	var lip := maxi(3, roundi(font_size * 0.22))
 	btn.add_theme_stylebox_override("normal", _button_box(colours[0], colours[3], lip, false))
@@ -54,7 +70,7 @@ static func style_button(btn: Button, font_size: int, kind := "wood") -> void:
 		btn.add_theme_color_override(state, CREAM)
 	btn.add_theme_color_override("font_disabled_color", CREAM.darkened(0.4))
 	btn.add_theme_color_override("font_outline_color", INK)
-	btn.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
+	btn.add_theme_constant_override("outline_size", outline_px(font_size))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
@@ -72,13 +88,14 @@ static func _button_box(fill: Color, rim: Color, lip: int, pressed: bool) -> Sty
 	return box
 
 
-## A label in the menus' style: size, colour, and an outline to match.
+## A label in the menus' style: about font_size big (px), the colour, and an outline to match.
 static func style_label(lbl: Label, font_size: int, colour := CREAM) -> void:
+	font_size = px(font_size)
 	lbl.add_theme_font_override("font", font())
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.add_theme_color_override("font_color", colour)
 	lbl.add_theme_color_override("font_outline_color", INK)
-	lbl.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
+	lbl.add_theme_constant_override("outline_size", outline_px(font_size))
 
 
 ## A slot for an item's picture, size across: a little tile of light wood, so dark things show on it.
@@ -145,6 +162,26 @@ static func rule() -> HSeparator:
 	box.thickness = 2
 	line.add_theme_stylebox_override("separator", box)
 	return line
+
+
+## Puts panel in the middle of room at the biggest whole size up to zoom that fits (2 upright on a
+## phone, so it isn't tiny), and never below 1:1: shrunk, the pixel font drops pixels and its words go
+## to mush (sideways on a phone they did). If it's too tall for the room even at 1:1, scroll (the
+## ScrollContainer holding what's in it) is cut to fit and the rest scrolls. Nearest filtering on the
+## panel keeps 2x square. Returns the size it's drawn at.
+static func fit_panel(panel: Control, scroll: ScrollContainer, room: Rect2, zoom: float) -> float:
+	var content := scroll.get_child(0) as Control
+	scroll.custom_minimum_size.y = content.get_combined_minimum_size().y
+	var need := panel.get_combined_minimum_size()
+	var s := clampf(floorf(minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))), 1.0, maxf(1.0, zoom))
+	var over := need.y * s - room.size.y * 0.94
+	if over > 0.0:
+		scroll.custom_minimum_size.y = maxf(0.0, scroll.custom_minimum_size.y - over / s)
+		need = panel.get_combined_minimum_size()
+	panel.size = need
+	panel.scale = Vector2(s, s)
+	panel.position = (room.position + (room.size - need * s) / 2.0).round()
+	return s
 
 
 ## The room a menu has on screen: in from the notch and the home indicator, and clear of the ad banners

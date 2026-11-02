@@ -9,7 +9,7 @@ signal closed
 
 const BTN_HEIGHT := 28
 const BTN_FONT_SZ := 16  # (the pixel font is drawn on a 16-pixel grid)
-const TITLE_FONT_SZ := 24
+const TITLE_FONT_SZ := 32
 const BODY_FONT_SZ := 16
 const GOLD := Color(0.95, 0.88, 0.65)
 const GREEN := Color(0.5, 1.0, 0.5)
@@ -18,6 +18,7 @@ const BLACK := Color(0.0, 0.0, 0.0, 1.0)
 
 var _font: Font
 var _panel: PanelContainer
+var _scroll: ScrollContainer  # (scrolls only if the panel's too tall for the room at 1:1: _fit)
 var _body: Label
 var _pro_note: Label
 var _input: LineEdit
@@ -61,13 +62,22 @@ func _build_ui() -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		margin.add_theme_constant_override("margin_" + side, 12 if side in ["left", "right"] else 10)
 	_panel.add_child(margin)
+	# The title, then what's in it (it scrolls if the room's too short: _fit), then Close, always there.
+	var frame := VBoxContainer.new()
+	frame.add_theme_constant_override("separation", 10)
+	margin.add_child(frame)
+	frame.add_child(_label("Muse Account", TITLE_FONT_SZ, load("res://scripts/UIStyle.gd").GOLD, 6))
+	_scroll = ScrollContainer.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	load("res://scripts/UIStyle.gd").style_scrollbar(_scroll.get_v_scroll_bar())
+	frame.add_child(_scroll)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 10)
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	margin.add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(box)
 
-	box.add_child(_label("Muse Account", TITLE_FONT_SZ, load("res://scripts/UIStyle.gd").GOLD, 6))
 	_body = _label("", BODY_FONT_SZ, GOLD, 4)
 	box.add_child(_body)
 	_pro_note = _label("", BODY_FONT_SZ, GREEN, 4)
@@ -95,7 +105,7 @@ func _build_ui() -> void:
 	box.add_child(_status)
 
 	box.add_child(_button("Privacy Policy", ComplianceConfig.open_privacy_policy))
-	box.add_child(_button("Close", func() -> void: closed.emit()))
+	frame.add_child(_button("Close", func() -> void: closed.emit()))
 
 
 ## Fills the panel in for where you are: choosing how to sign in, typing your email, waiting on the
@@ -284,31 +294,28 @@ func _process(_delta: float) -> void:
 
 ## Centres the panel in the room the screen has (clear of the notch and the ad banners, which are
 ## drawn over everything) at a whole size, twice as big upright on a phone, so the pixel font and the
-## pictures stay on their pixel grid. Only if that's too big for the room does it shrink, and then
-## with square pixels (nearest filtering on the panel), never smeared. Every frame: wrapped text
-## settles a frame late, and banners come and go.
+## pictures stay on their pixel grid; never shrunk (its words went to mush sideways on a phone): if
+## it's too tall at 1:1, what's in it scrolls (UIStyle.fit_panel). Every frame: wrapped text settles
+## a frame late, and banners come and go.
 ## On a phone it also lifts it so what you're typing, and the button under it, stay above the keyboard.
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	if vp.x < 50.0 or vp.y < 50.0:
 		return
-	var room: Rect2 = load("res://scripts/UIStyle.gd").room(vp)  # (clear of the notch and the ad banners)
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var room: Rect2 = ui.room(vp)  # (clear of the notch and the ad banners)
 	var portrait := vp.y > vp.x * 1.3
 	var zoom := 2.0 if portrait else 1.0
-	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.42) / zoom, 0)
-	var need := _panel.get_combined_minimum_size()
-	var s := minf(zoom, minf(room.size.x * 0.96 / need.x, room.size.y * 0.94 / need.y))
-	if s >= 1.0:
-		s = floorf(s)
-	_panel.size = need
-	_panel.scale = Vector2(s, s)
-	var pos := room.position + (room.size - need * s) / 2.0
+	# (sideways, wider: the words wrap onto fewer lines, so less of it has to scroll)
+	_panel.custom_minimum_size = Vector2(room.size.x * (0.9 if portrait else 0.62) / zoom, 0)
+	var s: float = ui.fit_panel(_panel, _scroll, room, zoom)
 	var keyboard := float(DisplayServer.virtual_keyboard_get_height())
 	if keyboard > 0.0 and _input.visible and _input.has_focus():
+		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var primary_bottom := (_panel.get_global_transform().affine_inverse() * _primary.get_global_rect().end).y
-		pos.y -= maxf(0.0, pos.y + primary_bottom * s + 8.0 - keyboard_top)
-	_panel.position = pos.round()
+		_panel.position.y -= maxf(0.0, _panel.position.y + primary_bottom * s + 8.0 - keyboard_top)
+		_panel.position = _panel.position.round()
 
 
 func _label(text: String, font_size: int, color: Color, _outline: int) -> Label:

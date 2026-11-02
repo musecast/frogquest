@@ -55,9 +55,10 @@ func _apply_layout() -> void:
 
 ## The column's sizes for portrait or landscape, times fit (1 is full size).
 func _size_column(is_portrait: bool, fit: float) -> void:
-	# (the pixel font is drawn on a 16-pixel grid: smaller and its strokes start to drop out)
-	var score_size := maxi(16, roundi((80.0 if is_portrait else 34.0) * fit))
-	var label_size := maxi(16, roundi((44.0 if is_portrait else 16.0) * fit))
+	# (the pixel font is drawn on a 16-pixel grid, so whole steps of it only: UIStyle.px)
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var score_size: int = ui.px((80.0 if is_portrait else 34.0) * fit)
+	var label_size: int = ui.px((44.0 if is_portrait else 16.0) * fit)
 	var btn_min := (Vector2(200, 64) if is_portrait else Vector2(80, 22)) * fit
 	# Zero out minimum sizes on text nodes so only their text decides how wide they are (the fit
 	# above measures that; NewBadge, on a new best, makes that row the widest).
@@ -66,10 +67,11 @@ func _size_column(is_portrait: bool, fit: float) -> void:
 	$MarginContainer/HighScoreRow/HighScoreDisplay.custom_minimum_size = Vector2(0, 0)
 	$MarginContainer/HighScoreRow/NewBadge.custom_minimum_size = Vector2(0, 0)
 	$MarginContainer/ScoreDisplay.add_theme_font_size_override("font_size", score_size)
+	$MarginContainer/ScoreDisplay.add_theme_constant_override("outline_size", ui.outline_px(score_size))
 	for label in [$MarginContainer/HighScoreRow/HighScoreDisplay,
 			$MarginContainer/HighScoreRow/NewBadge]:
 		label.add_theme_font_size_override("font_size", label_size)
-	var ui: GDScript = load("res://scripts/UIStyle.gd")
+		label.add_theme_constant_override("outline_size", ui.outline_px(label_size))
 	$MarginContainer/TryAgainButton.custom_minimum_size = btn_min
 	ui.style_button($MarginContainer/TryAgainButton, label_size, "go")
 	var kgb := $MarginContainer.get_node_or_null("KeepGoingButton")
@@ -130,7 +132,6 @@ func show_scores(score: int, high_score: int, is_new_record: bool) -> void:
 	if is_new_record:
 		badge.add_theme_color_override("font_color", Color(1.0, 0.85, 0.1))
 		badge.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-		badge.add_theme_constant_override("outline_size", 15)
 		var sfx := AudioStreamPlayer.new()
 		sfx.stream = load("res://assets/coolfind.mp3")
 		add_child(sfx)

@@ -961,9 +961,8 @@ func _place_muse_button(vp: Vector2, is_portrait: bool) -> void:
 	var mb: Button = $titlescreen.get_node_or_null("MuseAccountButton")
 	if mb == null:
 		return
-	var font_size := 24 if is_portrait else 16
-	mb.add_theme_font_size_override("font_size", font_size)
-	mb.add_theme_constant_override("outline_size", maxi(3, roundi(font_size * 0.28)))
+	var font_size := 32 if is_portrait else 16
+	_text_size(mb, font_size)
 	mb.add_theme_constant_override("icon_max_width", 9 * maxi(1, roundi(font_size * 0.9 / 9.0)))  # (whole pixels)
 	mb.add_theme_constant_override("h_separation", roundi(font_size * 0.35))
 	for state in ["normal", "hover", "pressed", "hover_pressed"]:
@@ -1132,8 +1131,7 @@ func _apply_win_layout() -> void:
 		congrats.offset_right  = -8.0
 		congrats.offset_top    = congrats_top
 		congrats.offset_bottom = congrats_bottom
-		congrats.add_theme_font_size_override("font_size", 46)
-		congrats.add_theme_constant_override("outline_size", 7)
+		_text_size(congrats, 46)
 
 		# time2 — below the cave area. Cave ends roughly at title_y + 27% of vp.
 		var time_top: float = title_y + vp.y * 0.27
@@ -1145,8 +1143,7 @@ func _apply_win_layout() -> void:
 		time2_lbl.offset_right  = -8.0
 		time2_lbl.offset_top    = time_top
 		time2_lbl.offset_bottom = time_top + 60.0
-		time2_lbl.add_theme_font_size_override("font_size", 34)
-		time2_lbl.add_theme_constant_override("outline_size", 6)
+		_text_size(time2_lbl, 34)
 
 		# Button below time2 with a small gap.
 		var btn_top: float = time_top + 60.0 + 20.0
@@ -1159,9 +1156,9 @@ func _apply_win_layout() -> void:
 		btn.offset_right  = cx + hw
 		btn.offset_top    = btn_top
 		btn.offset_bottom = btn_top + 65.0
-		btn.add_theme_font_size_override("font_size", 34)
+		_text_size(btn, 34)
 
-		_pin_to_bottom(by_muse2, 26, 5)
+		_pin_to_bottom(by_muse2, 26)
 	else:
 		# Landscape — set all anchors/offsets explicitly so nothing from the
 		# scene or a prior portrait layout bleeds in.
@@ -1180,8 +1177,7 @@ func _apply_win_layout() -> void:
 		congrats.offset_right  = -8.0
 		congrats.offset_top    = c_top
 		congrats.offset_bottom = c_bot
-		congrats.add_theme_font_size_override("font_size", 28)
-		congrats.add_theme_constant_override("outline_size", 6)
+		_text_size(congrats, 28)
 
 		time2_lbl.anchor_left   = 0.0
 		time2_lbl.anchor_right  = 1.0
@@ -1191,8 +1187,7 @@ func _apply_win_layout() -> void:
 		time2_lbl.offset_right  = -8.0
 		time2_lbl.offset_top    = 0.0
 		time2_lbl.offset_bottom = 0.0
-		time2_lbl.add_theme_font_size_override("font_size", 16)
-		time2_lbl.add_theme_constant_override("outline_size", 4)
+		_text_size(time2_lbl, 16)
 
 		var hw: float = min(120.0, vp.x * 0.22)
 		btn.anchor_left   = 0.5
@@ -1203,17 +1198,27 @@ func _apply_win_layout() -> void:
 		btn.offset_right  =  hw
 		btn.offset_top    = 0.0
 		btn.offset_bottom = 40.0
-		btn.add_theme_font_size_override("font_size", 19)
+		_text_size(btn, 19)
 
-		_pin_to_bottom(by_muse2, 13, 3)
+		_pin_to_bottom(by_muse2, 13)
+
+
+## Sets a label's or button's words to about size: the nearest whole step of the pixel font's 16-pixel
+## grid (in between, its pixels come out uneven and the words go lumpy), with a one-pixel outline.
+func _text_size(c: Control, size: float) -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var px: int = ui.px(size)
+	c.add_theme_font_size_override("font_size", px)
+	c.add_theme_constant_override("outline_size", ui.outline_px(px))
 
 
 ## Pins a "made by muse" label along the bottom edge, all of it on screen: just above the bottom
 ## banner when one is showing (tuck pulls it that much closer to the banner), otherwise just
 ## above the edge and any home-indicator area.
-func _pin_to_bottom(label: Label, font_size: int, outline: int, tuck: float = 0.0) -> void:
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_constant_override("outline_size", outline)
+func _pin_to_bottom(label: Label, font_size: int, tuck: float = 0.0) -> void:
+	_text_size(label, font_size)
+	font_size = label.get_theme_font_size("font_size")
+	var outline: int = label.get_theme_constant("outline_size")
 	label.scale = Vector2.ONE
 	label.anchor_left = 0.0
 	label.anchor_right = 1.0
@@ -1256,7 +1261,7 @@ func _apply_ui_layout() -> void:
 		title.scale       = Vector2(0.5, 0.5)
 		fx3.position      = Vector2(cx, vp.y * 0.75)
 		# "by muse" pinned near bottom, above the banner when one is up; layer above ad placeholder
-		_pin_to_bottom(by_muse, 32, 5)
+		_pin_to_bottom(by_muse, 32)
 		if row2:
 			row2.visible = true
 			# Move endlessmodebutton/WardrobeButton back from hbox if landscape moved them there
@@ -1270,7 +1275,7 @@ func _apply_ui_layout() -> void:
 			hbox.offset_right  = cx - 10.0
 			hbox.offset_bottom = hbox.offset_top + 80.0
 			$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			$titlescreen/HBoxContainer/Button.add_theme_font_size_override("font_size", 46)
+			_text_size($titlescreen/HBoxContainer/Button, 46)
 			row2.offset_left   = -(cx - 10.0)
 			row2.offset_top    = hbox.offset_bottom + 8.0
 			row2.offset_right  = cx - 10.0
@@ -1278,27 +1283,27 @@ func _apply_ui_layout() -> void:
 			var eb_p = row2.get_node_or_null("endlessmodebutton")
 			if eb_p:
 				eb_p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				eb_p.add_theme_font_size_override("font_size", 46)
+				_text_size(eb_p, 46)
 			var wb_p = row2.get_node_or_null("WardrobeButton")
 			if wb_p:
 				wb_p.visible = MusicManager.has_any_cosmetic()
 				wb_p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				wb_p.add_theme_font_size_override("font_size", 46)
+				_text_size(wb_p, 46)
 		else:
 			hbox.offset_left   = -(cx - 10.0)
 			hbox.offset_top    = vp.y * 0.50 - cy
 			hbox.offset_right  = cx - 10.0
 			hbox.offset_bottom = hbox.offset_top + 80.0
 			$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			$titlescreen/HBoxContainer/Button.add_theme_font_size_override("font_size", 46)
+			_text_size($titlescreen/HBoxContainer/Button, 46)
 			$titlescreen/HBoxContainer/endlessmodebutton.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			$titlescreen/HBoxContainer/endlessmodebutton.add_theme_font_size_override("font_size", 46)
+			_text_size($titlescreen/HBoxContainer/endlessmodebutton, 46)
 	else:
 		title.position    = Vector2(cx, 85.0)
 		title.scale       = Vector2(0.3, 0.3)
 		fx3.position      = Vector2(cx, 238.0)
 		# "by muse" — landscape: smaller type, tucked a touch lower toward the banner strip when there is one
-		_pin_to_bottom(by_muse, 22, 5, 6.0)
+		_pin_to_bottom(by_muse, 22, 6.0)
 		# All title buttons in one hbox for uniform gaps in landscape
 		var ls_half: float = vp.x * 0.34
 		if row2:
@@ -1313,7 +1318,7 @@ func _apply_ui_layout() -> void:
 		hbox.offset_right  = ls_half
 		hbox.offset_bottom = 64.0
 		$titlescreen/HBoxContainer/Button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		$titlescreen/HBoxContainer/Button.add_theme_font_size_override("font_size", 32)
+		_text_size($titlescreen/HBoxContainer/Button, 32)
 		$titlescreen/HBoxContainer/Button.remove_theme_stylebox_override("normal")
 		$titlescreen/HBoxContainer/Button.remove_theme_stylebox_override("hover")
 		for _state in ["normal", "hover"]:
@@ -1328,12 +1333,12 @@ func _apply_ui_layout() -> void:
 		var eb_l = hbox.get_node_or_null("endlessmodebutton")
 		if eb_l:
 			eb_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			eb_l.add_theme_font_size_override("font_size", 32)
+			_text_size(eb_l, 32)
 		var wb_l = hbox.get_node_or_null("WardrobeButton")
 		if wb_l:
 			wb_l.visible = MusicManager.has_any_cosmetic()
 			wb_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			wb_l.add_theme_font_size_override("font_size", 32)
+			_text_size(wb_l, 32)
 
 	_place_muse_button(vp, is_portrait)
 
@@ -1379,7 +1384,7 @@ func _apply_ui_layout() -> void:
 		paused_lbl.offset_right  = vp.x - 10.0
 		paused_lbl.offset_bottom = paused_lbl.offset_top + 60.0
 		paused_lbl.pivot_offset  = Vector2((vp.x - 20.0) / 2.0, 30.0)
-		paused_lbl.add_theme_font_size_override("font_size", 56)
+		_text_size(paused_lbl, 56)
 
 		var bl: float = cx - 110.0
 		var br: float = cx + 110.0
@@ -1389,16 +1394,16 @@ func _apply_ui_layout() -> void:
 
 		resume_btn.offset_left   = bl;  resume_btn.offset_top    = bs
 		resume_btn.offset_right  = br;  resume_btn.offset_bottom = bs + bh
-		resume_btn.add_theme_font_size_override("font_size", 42)
+		_text_size(resume_btn, 42)
 		settings_btn.offset_left  = bl;  settings_btn.offset_top    = bs + bh + 8.0
 		settings_btn.offset_right = br;  settings_btn.offset_bottom = bs + bh * 2.0 + 8.0
-		settings_btn.add_theme_font_size_override("font_size", 38)
+		_text_size(settings_btn, 38)
 		restart_btn.offset_left  = bl;  restart_btn.offset_top    = bs + (bh + 8.0) * 2.0
 		restart_btn.offset_right = br;  restart_btn.offset_bottom = bs + (bh + 8.0) * 2.0 + bh
-		restart_btn.add_theme_font_size_override("font_size", 38)
+		_text_size(restart_btn, 38)
 		back_btn.offset_left  = bl;  back_btn.offset_top    = bs
 		back_btn.offset_right = br;  back_btn.offset_bottom = bs + bh
-		back_btn.add_theme_font_size_override("font_size", 38)
+		_text_size(back_btn, 38)
 
 		# Scale settings: fit width AND ensure reset buttons (local y=102) stay on screen.
 		# settingsContainer content spans local y -7..102 (total height 109).
@@ -1429,7 +1434,7 @@ func _apply_ui_layout() -> void:
 		# All positions scale with vp so any aspect ratio works
 		var num_btns_ls: int = 3 + (1 if MusicManager.has_any_cosmetic() else 0) + (1 if not AdsManager.is_ad_free() else 0)
 		var gap_ls: float = max(3.0, vp.y * 0.03)
-		var paused_font_ls: int = max(20, int(vp.y * 0.18))
+		var paused_font_ls: int = load("res://scripts/UIStyle.gd").px(maxf(20.0, vp.y * 0.18))
 		var paused_top_ls: float = vp.y * 0.08
 		var paused_bottom_ls: float = paused_top_ls + paused_font_ls * 1.3
 		var avail_ls: float = vp.y - paused_bottom_ls - gap_ls
@@ -1446,22 +1451,23 @@ func _apply_ui_layout() -> void:
 		paused_lbl.offset_right  = vp.x
 		paused_lbl.offset_bottom = paused_top_ls + float(paused_font_ls) * 1.3
 		paused_lbl.pivot_offset  = Vector2(vp.x * 0.5, float(paused_font_ls) * 0.65)
-		paused_lbl.add_theme_font_size_override("font_size", paused_font_ls)
+		_text_size(paused_lbl, paused_font_ls)
 
-		var btn_font_ls: int = max(12, int(bh * 0.55))
+		var btn_font_ls: int = load("res://scripts/UIStyle.gd").px(maxf(12.0, bh * 0.55))
 		resume_btn.offset_left   = bl;  resume_btn.offset_top    = bs
 		resume_btn.offset_right  = br;  resume_btn.offset_bottom = bs + bh
-		resume_btn.add_theme_font_size_override("font_size", btn_font_ls)
+		_text_size(resume_btn, btn_font_ls)
 		settings_btn.offset_left  = bl;  settings_btn.offset_top    = bs + bh + gap_ls
 		settings_btn.offset_right = br;  settings_btn.offset_bottom = bs + bh * 2.0 + gap_ls
-		settings_btn.add_theme_font_size_override("font_size", btn_font_ls)
+		_text_size(settings_btn, btn_font_ls)
 		restart_btn.offset_left  = bl;  restart_btn.offset_top    = bs + (bh + gap_ls) * 2.0
 		restart_btn.offset_right = br;  restart_btn.offset_bottom = bs + (bh + gap_ls) * 2.0 + bh
-		restart_btn.add_theme_font_size_override("font_size", btn_font_ls)
+		_text_size(restart_btn, btn_font_ls)
 		var settings_top_ls: float = bs + bh + gap_ls + settings_nudge_landscape.y
 		var back_top_ls: float = paused_bottom_ls + gap_ls * -1.5
 		back_btn.offset_left  = bl;  back_btn.offset_top    = back_top_ls
 		back_btn.offset_right = br;  back_btn.offset_bottom = back_top_ls + bh
+		_text_size(back_btn, btn_font_ls)
 
 		# Settings container: fit width AND height so reset buttons (local y=102) stay on screen.
 		# settingsContainer content spans local y -7..102 (total height 109).
@@ -1510,7 +1516,7 @@ func _apply_ui_layout() -> void:
 	if vbox:
 		for child in vbox.get_children():
 			if child is Label:
-				child.add_theme_font_size_override("font_size", hud_font_size)
+				_text_size(child, hud_font_size)
 
 	# ── WIN SCREEN ────────────────────────────────────────────────────────
 	_apply_win_layout()
@@ -1554,7 +1560,7 @@ func _ensure_pause_wardrobe_btn(bl: float, br: float, bh: float, btn_top: float,
 		_attach_new_badge(wpb)
 	wpb.text = "WARDROBE"
 	_refresh_new_badge(wpb)
-	wpb.add_theme_font_size_override("font_size", font_sz)
+	_text_size(wpb, font_sz)
 	wpb.add_theme_color_override("font_color", Color("#FFD966"))
 	wpb.offset_left   = bl
 	wpb.offset_top    = btn_top
@@ -1579,7 +1585,7 @@ func _ensure_pause_remove_ads_btn(bl: float, br: float, bh: float, btn_top: floa
 		rapb.pressed.connect(_on_pause_remove_ads_pressed)
 		$PauseScreen.add_child(rapb)
 	rapb.text = "REMOVE ADS"
-	rapb.add_theme_font_size_override("font_size", font_sz)
+	_text_size(rapb, font_sz)
 	rapb.offset_left   = bl
 	rapb.offset_top    = btn_top
 	rapb.offset_right  = br
@@ -1617,7 +1623,7 @@ func _ensure_reset_progress_btn() -> void:
 		rcb.add_theme_constant_override("outline_size", 3)
 		rcb.pressed.connect(_on_reset_climb_btn_pressed)
 		sc.add_child(rcb)
-	rcb.add_theme_font_size_override("font_size", 15)
+	_text_size(rcb, 15)
 	rcb.offset_left   = -103.0
 	rcb.offset_top    = 64.0
 	rcb.offset_right  = 41.0
@@ -1634,7 +1640,7 @@ func _ensure_reset_progress_btn() -> void:
 		rdb.add_theme_constant_override("outline_size", 3)
 		rdb.pressed.connect(_on_reset_all_data_btn_pressed)
 		sc.add_child(rdb)
-	rdb.add_theme_font_size_override("font_size", 15)
+	_text_size(rdb, 15)
 	rdb.offset_left   = 47.0
 	rdb.offset_top    = 64.0
 	rdb.offset_right  = 191.0

@@ -97,7 +97,7 @@ func _build_ui() -> void:
 	_status_label.add_theme_font_size_override("font_size", 16)
 	_status_label.add_theme_color_override("font_color", Color(0.95, 0.88, 0.65))
 	_status_label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0))
-	_status_label.add_theme_constant_override("outline_size", 4)
+	_status_label.add_theme_constant_override("outline_size", 2)  # (one of the font's pixels: UIStyle.outline_px)
 	add_child(_status_label)
 
 

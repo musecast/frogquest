@@ -113,6 +113,7 @@ func _save_high_score() -> void:
 
 
 func _ready() -> void:
+	set_process(false)  # (until it's all set up below: the HUD comes a frame in, and _process uses it)
 	_zones = load("res://scripts/EndlessZones.gd")
 	_platform_script = load("res://scenes/EndlessPlatform.gd")
 	_fly_script = load("res://scripts/Fly.gd")
@@ -150,6 +151,7 @@ func _ready() -> void:
 	fade_rect.color.a = 1.0
 	_fade(1.0, 0.0, 0.6)
 	_show_banner(_zones.ZONES[0]["name"], "Climb as high as you can!")
+	set_process(true)
 	_request_ads_after_first_frames()
 	await get_tree().process_frame
 	if is_inside_tree():
@@ -250,23 +252,23 @@ func _fit_to_viewport() -> void:
 	cleanup_distance_below_player = maxf(1400.0, viewport_size.y / zoom_val * 1.3)
 	for wall in _walls:
 		wall.position.x = float(wall.get_meta("side")) * (half_world + 20.0)
-	score_label.add_theme_font_size_override("font_size", 48 if is_portrait else 24)
+	# (the pixel font in whole steps of its 16-pixel grid only, with a one-pixel outline: UIStyle)
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var big := 48 if is_portrait else 16
+	var small := 32 if is_portrait else 16
+	score_label.add_theme_font_size_override("font_size", big)
+	score_label.add_theme_constant_override("outline_size", ui.outline_px(big))
 	if is_portrait:
 		score_label.offset_top = viewport_size.y * 0.1
 		score_label.offset_bottom = score_label.offset_top + 24.0
 	else:
 		score_label.offset_top = 10.0
 		score_label.offset_bottom = 21.0
-	var small := 24 if is_portrait else 16
 	_height_label.add_theme_font_size_override("font_size", small)
-	_height_label.add_theme_constant_override("outline_size", 8)
-	_height_label.offset_top = score_label.offset_top + (52.0 if is_portrait else 26.0)
-	_banner.add_theme_font_size_override("font_size", 48 if is_portrait else 32)
-	_banner.add_theme_constant_override("outline_size", 14)
+	_height_label.add_theme_constant_override("outline_size", ui.outline_px(small))
+	_height_label.offset_top = score_label.offset_top + (52.0 if is_portrait else 20.0)
 	_banner.offset_top = viewport_size.y * (0.3 if is_portrait else 0.32)
-	_banner_sub.add_theme_font_size_override("font_size", small)
-	_banner_sub.add_theme_constant_override("outline_size", 8)
-	_banner_sub.offset_top = _banner.offset_top + (58.0 if is_portrait else 38.0)
+	_fit_banner()  # (and the line under it, just under it)
 
 	var cam := player.get_node_or_null("Camera2D")
 	if cam:
@@ -313,6 +315,24 @@ func _follow(delta: float) -> void:
 		wall.position.y = _cam_y
 
 
+## The zone's banner and the line under it, each as big as fits across the screen (in whole steps of
+## the pixel font's grid: "Climb as high as you can!" ran off an upright phone).
+func _fit_banner() -> void:
+	var vp := get_viewport().get_visible_rect().size
+	var room: float = vp.x * 0.92
+	var portrait := vp.y > vp.x * 1.3
+	for each in [[_banner, 48 if portrait else 32], [_banner_sub, 32 if portrait else 16]]:
+		var lbl: Label = each[0]
+		var size: int = each[1]
+		var font := lbl.get_theme_font("font")
+		while size > 16 and font.get_string_size(lbl.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 28.0 > room:
+			size -= 16
+		lbl.add_theme_font_size_override("font_size", size)
+		lbl.add_theme_constant_override("outline_size", load("res://scripts/UIStyle.gd").outline_px(size))
+	var title_size: int = _banner.get_theme_font_size("font_size")
+	_banner_sub.offset_top = _banner.offset_top + _banner.get_theme_font("font").get_height(title_size) + title_size * 0.25
+
+
 ## He's higher than he's been this run: the height readout, a new zone's banner, passing his best.
 func _climbed() -> void:
 	var metres := int(-highest_player_y / 10.0)
@@ -331,13 +351,7 @@ func _climbed() -> void:
 func _show_banner(title: String, sub: String) -> void:
 	_banner.text = title
 	_banner_sub.text = sub
-	# (as big as fits across the screen)
-	var room: float = get_viewport().get_visible_rect().size.x * 0.92
-	var font := _banner.get_theme_font("font")
-	var size := 48 if get_viewport().get_visible_rect().size.y > get_viewport().get_visible_rect().size.x * 1.3 else 32
-	while size > 16 and font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 28.0 > room:
-		size -= 4
-	_banner.add_theme_font_size_override("font_size", size)
+	_fit_banner()
 	for lbl in [_banner, _banner_sub]:
 		var tw: Tween = lbl.create_tween()
 		tw.tween_property(lbl, "modulate:a", 1.0, 0.35)

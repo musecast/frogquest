@@ -1467,8 +1467,9 @@ func _bounds(local: Rect2) -> Rect2:
 	return r
 
 
+## (a whole step of the pixel font's 16-pixel grid: in between, its letters go lumpy)
 func _bubble_font_size() -> int:
-	return 6 * px
+	return load("res://scripts/UIStyle.gd").px(6 * px)
 
 
 func _bubble_rect() -> Rect2:
