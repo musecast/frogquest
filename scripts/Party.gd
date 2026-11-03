@@ -16,8 +16,11 @@ signal ended(why: String)  # the party's over for you: why, in words ("" when yo
 signal frog_moved(peer: int, state: Array)  # a friend's frog: [x, y, animation, frame, flip, turn, score, metres]
 
 const PORT := 47850
-const MAX_PLAYERS := 8
+const MAX_PLAYERS := 16
 const SEND_EVERY := 1.0 / 15.0  # seconds between your frog's updates to the others
+const SEND_EVERY_BIG := 1.0 / 10.0  # (in a big party, a bit less often: the host passes every frog on to
+                                     # everyone, so its load grows with the square of the party)
+const BIG_PARTY := 9
 const SETTINGS_PATH := "user://party.cfg"
 ## Party colours, to tell frogs apart (0: his own green).
 const COLORS := [Color(0, 0, 0, 0), Color(1.0, 0.42, 0.42), Color(1.0, 0.66, 0.28), Color(1.0, 0.9, 0.3),
@@ -75,7 +78,7 @@ func my_info() -> Dictionary:
 func host() -> String:
 	leave()
 	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(PORT, MAX_PLAYERS - 1)
+	var err := peer.create_server(PORT, MAX_PLAYERS)  # (one spare place, to tell a latecomer it's full)
 	if err != OK:
 		return "Couldn't start a party on this Wi-Fi (%s)." % error_string(err)
 	multiplayer.multiplayer_peer = peer
@@ -129,7 +132,7 @@ func send_frog(state: Array, delta: float) -> void:
 		return
 	if _send_left > 0.0:
 		return
-	_send_left = SEND_EVERY
+	_send_left = SEND_EVERY if players.size() < BIG_PARTY else SEND_EVERY_BIG
 	_last_state = state
 	_frog.rpc(state)
 
@@ -253,10 +256,21 @@ func _hello(info: Dictionary) -> void:
 		return
 	var who := multiplayer.get_remote_sender_id()
 	var new := not players.has(who)
+	if new and players.size() >= MAX_PLAYERS:
+		_full.rpc_id(who)
+		get_tree().create_timer(0.5).timeout.connect(func() -> void:
+			if is_host():
+				multiplayer.multiplayer_peer.disconnect_peer(who))
+		return
 	players[who] = _clean(info)
 	_roster.rpc(players)
 	if new and in_run:
 		_start.rpc_id(who, run_seed, Time.get_ticks_msec() - run_started_ms)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _full() -> void:
+	_end("That party's full: %d frogs is the most." % MAX_PLAYERS)
 
 
 @rpc("authority", "call_local", "reliable")

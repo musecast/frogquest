@@ -1,5 +1,5 @@
 extends CanvasLayer
-## PLAY TOGETHER: a party of up to 8 frogs climbing the same Endless tower, each on their own phone.
+## PLAY TOGETHER: a party of up to 16 frogs (Party.MAX_PLAYERS) climbing the same Endless tower, each on their own phone.
 ## Host one (and read out its code) or join one by its code, on the same Wi-Fi; pick your party colour
 ## and the name over your frog (your Muse @handle when you have one), and turn name tags on or off.
 ## Opened from the title's PLAY TOGETHER. Party.gd does the networking; built in code and dressed like
@@ -103,7 +103,7 @@ func _show() -> void:
 			_box.add_child(_label("Waiting for the host to start the climb...", BODY_FONT_SZ, DIM))
 			_say_note()
 		_:
-			_box.add_child(_label("Climb Endless with friends: up to 8 frogs on the same tower, each on their own phone. On the same Wi-Fi, one hosts and the others join with the host's code. (Online parties are on their way.)", BODY_FONT_SZ, GOLD))
+			_box.add_child(_label("Climb Endless with friends: up to %d frogs on the same tower, each on their own phone. On the same Wi-Fi, one hosts and the others join with the host's code. (Online parties are on their way.)" % Party.MAX_PLAYERS, BODY_FONT_SZ, GOLD))
 			_box.add_child(_button("Host a Party", _host, "go"))
 			_box.add_child(_button("Join a Party", func() -> void: _go("join")))
 			_say_note()

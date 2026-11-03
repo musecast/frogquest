@@ -59,6 +59,29 @@ func _run() -> void:
 	await _until(func() -> bool: return why[0] != "", 5.0)
 	_expect(why[0] != "" and not friend.is_on(), "the host leaving ends the party for the friend (%s)" % why[0])
 
+	# A full party: the host and 15 friends all see all 16; a 17th is turned away.
+	var big_host := _phone("PhoneH")
+	_expect(big_host.host() == "", "a second party starts")
+	var guests: Array = []
+	for i in big_host.MAX_PLAYERS - 1:
+		var guest := _phone("PhoneJ%d" % i)
+		guest.join("127.0.0.1")
+		guests.append(guest)
+	await _until(func() -> bool: return guests.all(func(g) -> bool: return g.players.size() == big_host.MAX_PLAYERS), 15.0)
+	_expect(big_host.players.size() == big_host.MAX_PLAYERS and guests.all(func(g) -> bool: return g.players.size() == big_host.MAX_PLAYERS),
+		"a full party of %d: everyone sees everyone (the host sees %d)" % [big_host.MAX_PLAYERS, big_host.players.size()])
+	var extra := _phone("PhoneJx")
+	var turned_away := [""]
+	extra.ended.connect(func(w: String) -> void: turned_away[0] = w)
+	extra.join("127.0.0.1")
+	await _until(func() -> bool: return turned_away[0] != "", 8.0)
+	_expect(turned_away[0].contains("full") and big_host.players.size() == big_host.MAX_PLAYERS,
+		"one more than a full party is told it's full (%s)" % turned_away[0])
+	big_host.leave()
+	for guest in guests:
+		guest.leave()
+	await process_frame
+
 	# Codes: the last two numbers of the host's address, back to the same address.
 	var party: Node = root.get_node("Party")
 	var mine: String = party.local_ip()
@@ -69,9 +92,12 @@ func _run() -> void:
 
 	await _same_tower(party)
 
-	for f in ["user://test_party_PhoneA.cfg", "user://test_party_PhoneB.cfg", SCORES, WARDROBE]:
+	for f in [SCORES, WARDROBE]:
 		if FileAccess.file_exists(f):
 			DirAccess.remove_absolute(f)
+	for f in DirAccess.get_files_at("user://"):
+		if f.begins_with("test_party_Phone") and f.ends_with(".cfg"):
+			DirAccess.remove_absolute("user://" + f)
 	mm.wardrobe_path = real_wardrobe
 	if _failures.is_empty():
 		print("Party test passed.")
