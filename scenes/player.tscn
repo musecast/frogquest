@@ -119,10 +119,10 @@ tracks/0/path = NodePath(".:position")
 tracks/0/interp = 1
 tracks/0/loop_wrap = false
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.1, 10, 12.133333, 12.533334, 14.033334),
-"transitions": PackedFloat32Array(1, 2, 1.18921, 1, 1, 0.732043),
+"times": PackedFloat32Array(0, 0.1, 10, 11.6, 12.3, 14.033334),
+"transitions": PackedFloat32Array(1, 2, -2, 1, -2, 0.732043),
 "update": 0,
-"values": [Vector2(0, 0), Vector2(0, 200), Vector2(0, 6350), Vector2(-2380, 6700), Vector2(-2300, 7100), Vector2(-1350, 7184.04)]
+"values": [Vector2(0, 0), Vector2(0, 200), Vector2(0, 6350), Vector2(-903.33, 6585), Vector2(-903.33, 6585), Vector2(-1260.67, 7204)]
 }
 tracks/1/type = "value"
 tracks/1/imported = false

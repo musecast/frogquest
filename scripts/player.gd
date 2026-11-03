@@ -19,6 +19,10 @@ func _init() -> void:
 
 const SPEED = 300.0
 const JUMP_VELOCITY = -400.0
+## Where the ending's camera comes to rest under the win screen (from where he's held up top, in his own
+## scale: 1.2): his bedroom, framed as the game frames him when he wakes up there again after "Thanks for
+## playing!". The ending's last keyframe (the "end" animation) is the same.
+const END_IN_BEDROOM := Vector2(-1260.67, 7204)
 var bestRun = 1
 var jumpCount = 0
 var time_elapsed
@@ -1025,7 +1029,7 @@ func _on_end_animation_finished() -> void:
 		$winscreen/thanksforplayingButton.visible = false
 		$winscreen/thanksforplayingTimer.start()
 		finalbuttonBool = 1
-		$Camera2D.position = Vector2(-1770.67, 7144.045)
+		$Camera2D.position = END_IN_BEDROOM
 		_apply_win_layout()
 		_maybe_let_desktop_frog_out()
 
@@ -1083,7 +1087,7 @@ func _apply_win_layout() -> void:
 		congrats.offset_right  = -8.0
 		congrats.offset_top    = congrats_top
 		congrats.offset_bottom = congrats_bottom
-		_text_size(congrats, 46)
+		_fit_text_size(congrats, 46, vp.x - 16.0)
 
 		# time2 — below the cave area. Cave ends roughly at title_y + 27% of vp.
 		var time_top: float = title_y + vp.y * 0.27
@@ -1095,7 +1099,7 @@ func _apply_win_layout() -> void:
 		time2_lbl.offset_right  = -8.0
 		time2_lbl.offset_top    = time_top
 		time2_lbl.offset_bottom = time_top + 60.0
-		_text_size(time2_lbl, 34)
+		_fit_text_size(time2_lbl, 34, vp.x - 16.0)
 
 		# Button below time2 with a small gap.
 		var btn_top: float = time_top + 60.0 + 20.0
@@ -1129,7 +1133,7 @@ func _apply_win_layout() -> void:
 		congrats.offset_right  = -8.0
 		congrats.offset_top    = c_top
 		congrats.offset_bottom = c_bot
-		_text_size(congrats, 28)
+		_fit_text_size(congrats, 28, vp.x - 16.0)
 
 		time2_lbl.anchor_left   = 0.0
 		time2_lbl.anchor_right  = 1.0
@@ -1170,6 +1174,23 @@ func _snap_to_pixels(buttons: Array) -> void:
 func _text_size(c: Control, size: float) -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var px: int = ui.px(size)
+	c.add_theme_font_size_override("font_size", px)
+	c.add_theme_constant_override("outline_size", ui.outline_px(px))
+
+
+## The biggest of the font's sizes from about size down at which every line of the label fits across width,
+## outline and all. ("you have completed the" ran off both sides of a phone held upright.)
+func _fit_text_size(c: Label, size: float, width: float) -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var font: Font = c.get_theme_font("font")
+	var px: int = ui.px(size)
+	while px > ui.PX:
+		var widest := 0.0
+		for line in c.text.split("\n"):
+			widest = maxf(widest, font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x)
+		if widest + 2.0 * ui.outline_px(px) <= width:
+			break
+		px -= ui.PX
 	c.add_theme_font_size_override("font_size", px)
 	c.add_theme_constant_override("outline_size", ui.outline_px(px))
 

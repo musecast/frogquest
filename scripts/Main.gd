@@ -11,6 +11,31 @@ var jokeCheck = 0
 var foreshadowBool = 0
 var gateDestroyed = 0
 
+## Coming back down past a frog he'd already climbed well above: what they say then, a few each, in turn.
+const FELL_LINES := {
+	1: ["back so soon..?", "the tree is patient...\nare you?", "falling is just part\nof the climb...",
+		"i'd have given up\nby now... heheh"],
+	2: ["hehehe... i saw that", "gravity: 1\nfroggy: 0... hehehe", "the petals won't jump\nfor you, young froggy...",
+		"now that was a\nleap of failure... hehehe"],
+	3: ["even the froggy of fate\nfalls sometimes...", "warm up by the fire,\nthen try again...",
+		"the gods are still\nwatching, lil froggy..."],
+	4: ["you're lost too..?", "welcome back...\ni'm still lost", "maybe we should stick\ntogether..."],
+	5: ["o ho ho ho...\nback again?", "that fall was the real\njoke... hehehehe",
+		"o ho ho... the ground\nmissed you, i bet"],
+}
+const FELL_BY := 25.0  # (in currentHeight, a tenth of a pixel: 250 px above them, since the game started)
+## The TV at home, through the static, before he's ever won: why he's going.
+const TV_LINES := ["...bzzt...", "...a froggy of fate will\nrise from below...",
+	"...and reach the top of\nthe world tree...", "...bzzzzt..."]
+const LOST_FROG_TOP := Vector2(2950, -5626)  # (where the lost frog turns up once the gate's open: the castle hall)
+const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
+var _fell_turn := {}
+var _tv_bubble: Label
+var _tv_done := false
+var _lost_frog_up := false
+var _lost_frog_thanked := false
+var _no_gods: Label
+
 #top of script
 @onready var previous_window = DisplayServer.window_get_mode()
 @onready var current_window = DisplayServer.window_get_mode()
@@ -50,6 +75,15 @@ func _ready():
 	# the lantern offer replays on the next visit — prevents a softlock.
 	if npc3 != 0 and not $Player.has_lantern:
 		npc3 = 0
+	# A conversation cut off by closing the game (saved part way through, 3) starts over, instead of never again.
+	for n in ["npc1", "npc2", "npc4", "npc5", "npc6"]:
+		if get(n) == 3:
+			set(n, 0)
+	if npc3 == 3:
+		npc3 = 1  # (he has the lantern: that part's done)
+
+	_make_tv_bubble()
+	_make_no_gods_line()
 
 	$frogNPC1.play("farmer")
 
@@ -75,9 +109,76 @@ func _request_ads_after_first_frames() -> void:
 	AdsManager.preload_interstitial()
 
 
+## What a frog says when he's back past them after a fall (he's been well above them since the game
+## started): the next of theirs each time; "" when he hasn't.
+func _fell_line(npc: int, frog: Node2D) -> String:
+	var frog_height := (-frog.global_position.y - 472.0) / 10.0
+	if $Player.highScore == null or float($Player.highScore) < frog_height + FELL_BY:
+		return ""
+	var lines: Array = FELL_LINES[npc]
+	var turn: int = _fell_turn.get(npc, 0)
+	_fell_turn[npc] = turn + 1
+	return lines[turn % lines.size()]
+
+
+## Between a frog's lines, while he's out of earshot: they wait (bubble hidden) and go on when he's back, so
+## a hop away doesn't lose the rest (the petals' secret, the lantern).
+func _while_away(area: Area2D, bubble: Label) -> void:
+	if area.overlaps_body($Player):
+		return
+	bubble.visible = false
+	while is_inside_tree() and not area.overlaps_body($Player):
+		await get_tree().process_frame
+	bubble.visible = true
+
+
+## The TV's speech bubble: a frog's (same look), over the TV.
+func _make_tv_bubble() -> void:
+	var frog_bubble: Label = $frogNPC1/npc1speechbubble
+	_tv_bubble = frog_bubble.duplicate()
+	_tv_bubble.visible = false
+	add_child(_tv_bubble)
+	_tv_bubble.scale = frog_bubble.get_global_transform().get_scale()
+	_tv_bubble.position = $Musecrtquarterview.position + Vector2(-_tv_bubble.pivot_offset.x, -100.0)
+
+
+## The TV at home, through the static.
+func _tv_talk() -> void:
+	for line in TV_LINES:
+		_tv_bubble.text = line
+		_tv_bubble.visible = true
+		await get_tree().create_timer(2.8).timeout
+		if not is_inside_tree():
+			return
+	_tv_bubble.visible = false
+
+
+## The climb's last words, in the finale's own look ("you are the"'s), just under the plank below the glass
+## (the top of what the camera shows): they come up once the glass gives.
+func _make_no_gods_line() -> void:
+	var you_are: Label = $"finale/finale sprites/frog quest2"
+	_no_gods = you_are.duplicate()
+	_no_gods.text = "no petals. no gods.\njust you..."
+	_no_gods.z_index = 5
+	_no_gods.size = Vector2(1100.0, 240.0)
+	_no_gods.pivot_offset = _no_gods.size / 2.0
+	_no_gods.scale = Vector2(0.32, 0.32)
+	_no_gods.position = NO_GODS_AT - _no_gods.size / 2.0
+	_no_gods.modulate.a = 0.0
+	add_child(_no_gods)
+
+
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
-	
+	if not _tv_done and not MusicManager.game_beaten and not $Player/titlescreen.visible \
+			and $Player.global_position.distance_to($Musecrtquarterview.global_position) < 220.0:
+		_tv_done = true
+		_tv_talk()
+	# The lost frog, let out by the gate he opened, turns up by the castle (while he's well away from both).
+	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > 400.0:
+		_lost_frog_up = true
+		$frogNPC4.position = LOST_FROG_TOP
+
 	#DELETE THIS IN FINAL PRODUCT
 	#DELETE THIS IN FINAL PRODUCT
 	#DELETE THIS IN FINAL PRODUCT
@@ -126,37 +227,47 @@ func _input(event):
 
 func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	
+	var area: Area2D = $frogNPC1/Area2D
+	var bubble: Label = $frogNPC1/npc1speechbubble
 	if npc1 == 1:
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.visible = true
-		$frogNPC1/npc1speechbubble.text = "keep it up \nlil froggy..."
+		bubble.visible = true
+		var fell := _fell_line(1, $frogNPC1)
+		bubble.text = fell if fell != "" else "keep it up \nlil froggy..."
 	if npc1 == 0:
 		npc1 = 3
 		print("npc croak")
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.visible = true
-		$frogNPC1/npc1speechbubble.text = "so... you came \nfrom below?"
+		bubble.visible = true
+		bubble.text = "so... you came \nfrom below?"
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "maybe you'll be the \none to reach the top..."
+		bubble.text = "maybe you'll be the \none to reach the top..."
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "by the way, have you \nnoticed the white petals?"
+		bubble.text = "by the way, have you \nnoticed the white petals?"
 		await get_tree().create_timer(4.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "some say they are \nsigns of the gods"
+		bubble.text = "some say they are \nsigns of the gods"
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "signs to jump as \nas hard as you can"
+		bubble.text = "signs to jump as \nhard as you can"
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "whether you believe \nthat, is up to you"
+		bubble.text = "whether you believe \nthat, is up to you"
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "never had the courage \nfor a leap of faith myself"
+		bubble.text = "never had the courage \nfor a leap of faith myself"
 		await get_tree().create_timer(4.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC1/npc1talk.play()
-		$frogNPC1/npc1speechbubble.text = "keep it up \nlil froggy..."
+		bubble.text = "keep it up \nlil froggy..."
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC1/npc1speechbubble.visible = false
 		npc1 = 1
@@ -170,26 +281,38 @@ func _on_area_2d_body_shape_exited(_body_rid, body, _body_shape_index, local_sha
 
 func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	
+		var area: Area2D = $frogNPC2/Area2D2
+		var bubble: Label = $frogNPC2/npc2speechbubble
 		if npc2 == 1:
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.visible = true
-			$frogNPC2/npc2speechbubble.text = "don't forget to jump full \npower if you see the petals..."
+			bubble.visible = true
+			var fell := _fell_line(2, $frogNPC2)
+			if fell != "":
+				bubble.text = fell
+				await get_tree().create_timer(2.5).timeout
+				if npc2 != 1 or not area.overlaps_body($Player):
+					return
+				$frogNPC2/npc2talk.play()
+			bubble.text = "don't forget to jump full \npower if you see the petals..."
 
 		if npc2 == 0:
 			npc2 = 3
 			print("npc croak")
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.visible = true
-			$frogNPC2/npc2speechbubble.text = "hehehe... good job \non the leap of faith"
+			bubble.visible = true
+			bubble.text = "hehehe... good job \non the leap of faith"
 			await get_tree().create_timer(3.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "how about \na joke..?"
+			bubble.text = "how about \na joke..?"
 			await get_tree().create_timer(3.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "what's a frog's \nfavorite year?"
+			bubble.text = "what's a frog's \nfavorite year?"
 			await get_tree().create_timer(3.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "leap year \nheheheheheh"
+			bubble.text = "leap year \nheheheheheh"
 			await get_tree().create_timer(0.75).timeout
 			$frogNPC2/npc2rimshot.play()
 			await get_tree().create_timer(0.5).timeout
@@ -205,20 +328,25 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC2.play("wiz")
 			await get_tree().create_timer(1.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "thank you for listening \nto my joke young froggy"
+			bubble.text = "thank you for listening \nto my joke young froggy"
 			await get_tree().create_timer(3.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "now i shall give you wisdom \nhanded to me from the gods..."
+			bubble.text = "now i shall give you wisdom \nhanded to me from the gods..."
 			await get_tree().create_timer(5.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "the white petals indicate \nguaranteed safety for a jump..."
+			bubble.text = "the white petals indicate \nguaranteed safety for a jump..."
 			await get_tree().create_timer(5.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "...but only if you take that \njump at your full strength."
+			bubble.text = "...but only if you take that \njump at your full strength."
 			await get_tree().create_timer(5.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC2/npc2talk.play()
-			$frogNPC2/npc2speechbubble.text = "now hop along young froggy \nand let the petals guide you..."
+			bubble.text = "now hop along young froggy \nand let the petals guide you..."
 			await get_tree().create_timer(4.0).timeout
 			$frogNPC2/npc2speechbubble.visible = false
 			npc2 = 1
@@ -232,35 +360,42 @@ func _on_area_2d_2_body_shape_exited(_body_rid, body, _body_shape_index, local_s
 
 func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 
+	var area: Area2D = $frogNPC3/Area2D3
+	var bubble: Label = $frogNPC3/npc3speechbubble
 	if npc3 == 1:
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.visible = true
-		$frogNPC3/npc3speechbubble.text = "may the gods protect \nyou on your ascent..."
-		await get_tree().create_timer(2.0).timeout
+		bubble.visible = true
+		var fell := _fell_line(3, $frogNPC3)
+		bubble.text = fell if fell != "" else "may the gods protect \nyou on your ascent..."
+		await get_tree().create_timer(2.5 if fell != "" else 2.0).timeout
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "godspeed \nlil froggy..."
+		bubble.text = "godspeed \nlil froggy..."
 
 	if npc3 == 0:
 		npc3 = 3
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.visible = true
-		$frogNPC3/npc3speechbubble.text = "the froggy of fate...\ni can't believe it"
+		bubble.visible = true
+		bubble.text = "the froggy of fate...\ni can't believe it"
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "take this with you,\nit will help"
+		bubble.text = "take this with you,\nit will help"
 		await get_tree().create_timer(2.0).timeout
 		$frogNPC3/lanternhitbox.visible = true
 		$frogNPC3/lanternhitbox.position = Vector2(0,0)
 		$frogNPC3/npc3itemspawn.play()
 		await get_tree().create_timer(2.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "with this lantern, \ndarkness fears you..."
+		bubble.text = "with this lantern, \ndarkness fears you..."
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "it shall light your \nway automatically"
+		bubble.text = "it shall light your \nway automatically"
 		await get_tree().create_timer(3.0).timeout
+		await _while_away(area, bubble)
 		$frogNPC3/npc3talk.play()
-		$frogNPC3/npc3speechbubble.text = "godspeed lil\nfroggy..."
+		bubble.text = "godspeed lil\nfroggy..."
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC3/npc3speechbubble.visible = false
 		npc3 = 1
@@ -279,26 +414,61 @@ func _on_lanternhitbox_body_shape_entered(body_rid, body, body_shape_index, loca
 
 
 func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
+	var bubble: Label = $frogNPC4/npc4speechbubble
+	if _lost_frog_up:  # (out of the dark at last, by the castle)
+		$frogNPC4/npc4talk.play()
+		bubble.visible = true
+		if _lost_frog_thanked:
+			bubble.text = "go on...\nthey're waiting for you"
+			return
+		_lost_frog_thanked = true
+		bubble.text = "i followed your jumps..."
+		await get_tree().create_timer(3.0).timeout
+		$frogNPC4/npc4talk.play()
+		bubble.text = "thank you for showing\nme the way out..."
+		await get_tree().create_timer(3.5).timeout
+		$frogNPC4/npc4talk.play()
+		bubble.text = "go on...\nthey're waiting for you"
+		await get_tree().create_timer(3.0).timeout
+		bubble.visible = false
+		return
+
 	if npc4 == 1:
 		$frogNPC4/npc4talk.play()
-		$frogNPC4/npc4speechbubble.visible = true
-		$frogNPC4/npc4speechbubble.text = "hello again..."
-		
+		bubble.visible = true
+		var fell := _fell_line(4, $frogNPC4)
+		if $Player.has_key:
+			bubble.text = "you found the key...!\nmaybe there's a way out"
+		elif gateDestroyed == 1:
+			bubble.text = "was that the gate..?\ni'll follow your jumps"
+		elif fell != "":
+			bubble.text = fell
+		else:
+			bubble.text = "hello again..."
+
 	if npc4 == 0:
 		npc4 = 3
 		$frogNPC4/npc4talk.play()
-		$frogNPC4/npc4speechbubble.visible = true
-		$frogNPC4/npc4speechbubble.text = "oh hello"
+		bubble.visible = true
+		bubble.text = "oh hello"
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC4/npc4talk.play()
-		$frogNPC4/npc4speechbubble.text = "i'm lost..."
+		bubble.text = "i'm lost..."
 		await get_tree().create_timer(3.0).timeout
-		$frogNPC4/npc4speechbubble.visible = false
+		if $Player.has_key:
+			$frogNPC4/npc4talk.play()
+			bubble.text = "is that a key..?\nyou could get out of here"
+			await get_tree().create_timer(3.5).timeout
+		elif gateDestroyed == 0:
+			$frogNPC4/npc4talk.play()
+			bubble.text = "they say there's a key\nsomewhere in the dark..."
+			await get_tree().create_timer(3.5).timeout
+		bubble.visible = false
 		npc4 = 1
 
 
 func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
-	if npc4 == 1:
+	if npc4 == 1 or _lost_frog_up:
 		$frogNPC4/npc4speechbubble.visible = false
 
 
@@ -474,30 +644,42 @@ func _on_finaleexit_body_entered(body):
 		$finale/Control/froggod.stop()
 		$finale/glassbreak.play()
 		$"World Sprites/GodraysContainer3".visible = true
+		create_tween().tween_property(_no_gods, "modulate:a", 1.0, 2.5)
 
 
 func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	
+		var area: Area2D = $frogNPC5/Area2D5
+		var bubble: Label = $frogNPC5/npc5speechbubble
 		if npc5 == 1:
 			$frogNPC5/npc5talk.play()
-			$frogNPC5/npc5speechbubble.visible = true
-			$frogNPC5/npc5speechbubble.text = "the way forward is a\nleap of faith to your right..."
-			
+			bubble.visible = true
+			var fell := _fell_line(5, $frogNPC5)
+			if fell != "":
+				bubble.text = fell
+				await get_tree().create_timer(2.5).timeout
+				if npc5 != 1 or not area.overlaps_body($Player):
+					return
+				$frogNPC5/npc5talk.play()
+			bubble.text = "the way forward is a\nleap of faith to your right..."
+
 		if npc5 == 0:
 			npc5 = 3
 			print("npc croak")
 			$frogNPC5/npc5talk.play()
-			$frogNPC5/npc5speechbubble.visible = true
+			bubble.visible = true
 			if jokeCheck == 1:
-				$frogNPC5/npc5speechbubble.text = "o ho ho ho so you\nwant another joke, do you?"
+				bubble.text = "o ho ho ho so you\nwant another joke, do you?"
 			else:
-				$frogNPC5/npc5speechbubble.text = "o ho ho ho you must be\nhere for a good joke, yes?"
+				bubble.text = "o ho ho ho you must be\nhere for a good joke, yes?"
 			await get_tree().create_timer(5.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC5/npc5talk.play()
-			$frogNPC5/npc5speechbubble.text = "why are frogs\nso happy..?"
+			bubble.text = "why are frogs\nso happy..?"
 			await get_tree().create_timer(3.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC5/npc5talk.play()
-			$frogNPC5/npc5speechbubble.text = "...because they eat\nwhatever bugs them"
+			bubble.text = "...because they eat\nwhatever bugs them"
 			await get_tree().create_timer(0.75).timeout
 			$frogNPC5/npc5rimshot.play()
 			await get_tree().create_timer(0.5).timeout
@@ -513,15 +695,18 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(0.5).timeout
 			$frogNPC5.play("wiz")
 			await get_tree().create_timer(0.5).timeout
+			await _while_away(area, bubble)
 			$frogNPC5/npc5talk.play()
-			$frogNPC5/npc5speechbubble.text = "hehehehe...\nnow let me help you"
+			bubble.text = "hehehehe...\nnow let me help you"
 			await get_tree().create_timer(3.0).timeout
+			await _while_away(area, bubble)
 			$frogNPC5/npc5talk.play()
-			$frogNPC5/npc5speechbubble.text = "the way forward is a\nleap of faith to your right..."
+			bubble.text = "the way forward is a\nleap of faith to your right..."
 			await get_tree().create_timer(5.0).timeout
 			if jokeCheck == 1:
+				await _while_away(area, bubble)
 				$frogNPC5/npc5talk.play()
-				$frogNPC5/npc5speechbubble.text = "although you probably \nknew that already heheh..."
+				bubble.text = "although you probably \nknew that already heheh..."
 				await get_tree().create_timer(4.0).timeout
 			$frogNPC5/npc5speechbubble.visible = false
 			npc5 = 1
@@ -557,10 +742,10 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC6/npc6speechbubble.text = "your final test\nawaits you..."
 			await get_tree().create_timer(3.0).timeout
 			$frogNPC6/npc6talk.play()
-			$frogNPC6/npc6speechbubble.text = "as you can see, these\n petals have fallen..."
+			$frogNPC6/npc6speechbubble.text = "as you can see, these\npetals have fallen..."
 			await get_tree().create_timer(4.0).timeout
 			$frogNPC6/npc6talk.play()
-			$frogNPC6/npc6speechbubble.text = "there is no god to guide you,\n you must succeed on your own..."
+			$frogNPC6/npc6speechbubble.text = "there is no god to guide you,\nyou must succeed on your own..."
 			await get_tree().create_timer(5.0).timeout
 			$frogNPC6/npc6talk.play()
 			$frogNPC6/npc6speechbubble.text = "allow me to\nopen the path..."
