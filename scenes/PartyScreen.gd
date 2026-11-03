@@ -183,6 +183,10 @@ func _look() -> void:
 	_box.add_child(_button("Name Tags: %s" % ("On" if Party.name_tags else "Off"), func() -> void:
 		Party.set_name_tags(not Party.name_tags)
 		_show(), "quiet"))
+	_box.add_child(_button("Tethers: %s" % ("On" if Party.tethers else "Off"), func() -> void:
+		Party.set_tethers(not Party.tethers)
+		_show(), "quiet"))
+	_box.add_child(_label("A tether ties you to your nearest friend: fall, and they pull you back up.", BODY_FONT_SZ, DIM))
 
 
 ## Online: hosting (friends join from their Friends list) or Play with Anyone (a public party).

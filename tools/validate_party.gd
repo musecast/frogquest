@@ -148,10 +148,54 @@ func _same_tower(party: Node) -> void:
 			same = false
 			break
 	_expect(same, "two runs on one seed build the same tower (%d and %d platforms)" % [a.size(), b.size()])
+	await _rubber_banding(runs[0], party)
 	for endless in runs:
 		endless.queue_free()
 	party.in_run = false
 	await process_frame
+
+
+## Rubber banding, the tether: tied to the nearest friend; a real fall, once the band's taut, has them reel
+## you up to them; coming down onto a platform below doesn't; with tethers off, nothing catches you; and
+## past the point of no return a friend above still pulls you up rather than the run ending.
+func _rubber_banding(endless: Node2D, party: Node) -> void:
+	party.players = {1: {"name": "@me", "hat": "", "skin": "", "color": 0}, 2: {"name": "@pal", "hat": "", "skin": "", "color": 2}}
+	party.tethers = true
+	var player: CharacterBody2D = endless.player
+	player.set_physics_process(false)  # (held where he's put)
+	var y: float = player.global_position.y
+	var friend_y := y - 300.0
+	endless._on_frog_moved(2, [0.0, friend_y, "default", 0, false, 0.0, 0, 30, 1])
+	for _f in 40:  # (their frog glides to where it's said to be)
+		await process_frame
+	player.velocity = Vector2.ZERO
+	endless._tether(0.016)
+	_expect(endless._tether_peer == 2, "the band ties to the nearest friend")
+	endless._last_floor_y = y
+	player.global_position.y = y + 30.0
+	player.velocity = Vector2(0.0, 400.0)
+	endless._tether(0.016)
+	_expect(endless._reel.is_empty(), "coming down a little, onto a platform below, isn't a fall: no pull")
+	player.global_position.y = y + 120.0
+	endless._tether(0.016)
+	_expect(not endless._reel.is_empty(), "a real fall, the band taut: your friend starts pulling you up")
+	await create_timer(endless.TETHER_REEL + 0.3).timeout
+	_expect(endless._reel.is_empty() and absf(player.global_position.y - friend_y) < 150.0,
+		"and you're up by them (%.0f from them)" % absf(player.global_position.y - friend_y))
+	player.set_physics_process(false)
+	party.tethers = false
+	endless._last_floor_y = player.global_position.y
+	player.global_position.y += 400.0
+	player.velocity = Vector2(0.0, 400.0)
+	endless._tether(0.016)
+	_expect(endless._reel.is_empty() and endless._tether_peer == 0, "with tethers off, nothing catches you")
+	party.tethers = true
+	endless.highest_player_y = friend_y
+	player.global_position.y = friend_y + endless.fail_y_threshold + 10.0
+	endless._trigger_reset()
+	_expect(not endless.is_resetting and not endless._reel.is_empty(), "past the point of no return, a friend above still pulls you up")
+	await create_timer(endless.TETHER_REEL + 0.3).timeout
+	party.players = {}
 
 
 func _until(done: Callable, seconds: float) -> void:

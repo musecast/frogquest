@@ -263,9 +263,7 @@ func _physics_process(delta):
 		$Shadow.rotation = $Sprite2D.rotation
 
 		if is_on_wall():
-			print("Wall detected at position: ", position)
 			velocity.x = -tempVelocityx
-			print("New velocity: ", velocity)
 
 
 	if is_on_floor():

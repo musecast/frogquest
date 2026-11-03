@@ -37,6 +37,7 @@ var run_started_ms := 0  # when the party's climb started, on this phone's clock
 var my_name := "Froggy"  # (when there's no Muse @handle to go by)
 var color := 0  # your party colour (COLORS)
 var name_tags := true
+var tethers := true  # a stretchy band to your nearest friend, that catches you falling
 var settings_path := SETTINGS_PATH  # (the tests point it elsewhere)
 var on_start := Callable()  # (what starting does; the tests swap it so the scene stays put)
 
@@ -359,6 +360,12 @@ func set_color(i: int) -> void:
 	share_look()
 
 
+func set_tethers(on: bool) -> void:
+	tethers = on
+	_save()
+	players_changed.emit()
+
+
 func set_name_tags(on: bool) -> void:
 	name_tags = on
 	_save()
@@ -527,6 +534,7 @@ func _load() -> void:
 	my_name = str(cfg.get_value("party", "name", my_name))
 	color = clampi(int(cfg.get_value("party", "color", color)), 0, COLORS.size() - 1)
 	name_tags = bool(cfg.get_value("party", "name_tags", name_tags))
+	tethers = bool(cfg.get_value("party", "tethers", tethers))
 
 
 func _save() -> void:
@@ -534,4 +542,5 @@ func _save() -> void:
 	cfg.set_value("party", "name", my_name)
 	cfg.set_value("party", "color", color)
 	cfg.set_value("party", "name_tags", name_tags)
+	cfg.set_value("party", "tethers", tethers)
 	cfg.save(settings_path)

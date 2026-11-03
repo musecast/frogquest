@@ -8,6 +8,8 @@ const HATS := ["Froggycrown", "FroggyWizHat", "FroggyCakeHat"]
 var peer := 0
 var score := 0
 var metres := 0
+var standing := false  # (on a platform, by their animation: one who can pull a friend back up)
+var tether_to := 0  # who their band is tied to (a peer id; 0: nobody), for drawing it
 var _sprite: AnimatedSprite2D
 var _hats := {}
 var _skin := ""
@@ -76,7 +78,9 @@ func show_state(state: Array) -> void:
 	_sprite.flip_h = bool(state[4])
 	_sprite.rotation = float(state[5])
 	score = int(state[6])
+	standing = str(state[2]) != "airborne"
 	metres = int(state[7])
+	tether_to = int(state[8]) if state.size() > 8 else 0
 	_place_hats()
 
 

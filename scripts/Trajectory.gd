@@ -1,4 +1,14 @@
 extends Node2D
+## Froggy's slingshot: press, drag back, let go, and he jumps the other way, harder the further you
+## dragged. The numbers that turn a drag into a jump (launch_velocity) are the original's, untouched: the
+## story was built around them. Around them:
+## - A jump let go a moment after he's left a platform's edge still goes (COYOTE_MS), and a press made
+##   just before he lands is kept for when he does, so a jump isn't lost to a wobble on a moving platform
+##   or a tap a hair too early.
+## - The aim line points where he'll actually go (launch_velocity, sideways stretch and push and all),
+##   not along the raw drag, which pointed well off his real path on short drags.
+
+const COYOTE_MS := 120  # (ms after leaving a platform that a jump still goes)
 
 var mouseOrigin = Vector2()
 var mousePosition = Vector2()
@@ -6,6 +16,12 @@ var mousePath = Vector2()
 var cursorLock = false
 var endGame = 1
 var sensitivity = 3.5
+
+var _floor_ms := -100000  # when he was last on a platform
+var _was_grounded := false
+var _cursor_closed: Texture2D
+var _cursor_open: Texture2D
+var _cursor_x: Texture2D
 
 func _supports_desktop_mouse() -> bool:
 	var platform := OS.get_name()
@@ -18,97 +34,76 @@ func _set_custom_cursor(texture: Texture2D) -> void:
 
 
 func _ready():
+	if _supports_desktop_mouse():
+		_cursor_closed = load("res://assets/cursorclosed.png")
+		_cursor_open = load("res://assets/cursoropen.png")
+		_cursor_x = load("res://assets/cursor-x.png")
 
-	pass
+
+## Where a drag sends him: the original's numbers (the sideways stretch, the push short drags get, the
+## caps), for the jump and the aim line alike.
+func launch_velocity(path: Vector2) -> Vector2:
+	var velocity: Vector2 = path * sensitivity
+	velocity.x *= 1.5
+	velocity.y *= 1.1
+	velocity.x = clampf(velocity.x, -800, 800)
+	velocity.y = clampf(velocity.y, -450, 450)
+	if absf(velocity.x) < 450:
+		velocity.x = 200 * signf(velocity.x) + velocity.x
+	if absf(velocity.x) < 450 and absf(velocity.y) > 350:
+		velocity.x = 50 * signf(velocity.x) + velocity.x
+	return velocity
+
+
+## On a platform, or only just off one (COYOTE_MS).
+func can_jump() -> bool:
+	return get_parent().is_on_floor() or Time.get_ticks_msec() - _floor_ms <= COYOTE_MS
+
 
 func _process(delta):
 	if Engine.time_scale != 0.05 and Engine.time_scale != 0.0 and endGame == 0:
-		if get_parent().is_on_floor():
-			if Input.is_action_just_pressed("ui_mouse"):
-				#Input.set_default_cursor_shape()
-				#Input.set_custom_mouse_cursor(load("res://assets/cursorclosed.png"))
-				if cursorLock == true and _supports_desktop_mouse():
-					Input.mouse_mode = 4
-					get_viewport().warp_mouse(Vector2(160,15))
-				#elif DisplayServer.window_get_mode() == 3:
-				#	Input.mouse_mode = 3
-				else:
-					if _supports_desktop_mouse():
-						Input.mouse_mode = 0
-				mouseOrigin = get_global_mouse_position()
+		var grounded: bool = get_parent().is_on_floor()
+		if grounded:
+			_floor_ms = Time.get_ticks_msec()
+		var can_go := can_jump()
+		if Input.is_action_just_pressed("ui_mouse"):
+			if cursorLock == true and _supports_desktop_mouse():
+				Input.mouse_mode = 4
+				get_viewport().warp_mouse(Vector2(160,15))
+			elif _supports_desktop_mouse():
+				Input.mouse_mode = 0
+			mouseOrigin = get_global_mouse_position()  # (in the air too: kept for when he lands)
+			if can_go:
 				$"../frogaim".play()
-				
-			if Input.is_action_pressed("ui_mouse"):
-				_set_custom_cursor(load("res://assets/cursorclosed.png"))
-				mousePosition = get_global_mouse_position()
-				if mouseOrigin != Vector2(0, 0):
-					mousePath = mouseOrigin - mousePosition
-					queue_redraw()
-			else:
-				_set_custom_cursor(load("res://assets/cursoropen.png"))
-				
-			if Input.is_action_just_released("ui_mouse"):
-				
-				
-				_set_custom_cursor(load("res://assets/cursoropen.png"))
-				if cursorLock == true:
-					#Input.mouse_mode = 3
-					pass
-				if mouseOrigin != Vector2(0, 0):
-					var velocity = get_parent().velocity
-					# dont? MULTIPLY BY SENSITIVITY
-					velocity = mousePath * sensitivity
-					velocity.x *= 1.5
-					velocity.y *= 1.1
-					velocity.x = clamp(velocity.x, -800, 800)
-					velocity.y = clamp(velocity.y, -450, 450)
-					
-					if abs(velocity.x) < 450:
-						velocity.y *= 1.0
-						velocity.x = 200 * sign(velocity.x) + velocity.x
-						print("vel multiplied")
-						
-					if abs(velocity.x) < 450 and abs(velocity.y) > 350:
-						velocity.y *= 1.0
-						velocity.x = 50 * sign(velocity.x) + velocity.x
-						#FIX
-						#FIX
-						#FIX
-						#FIX
-						#FIX
-						#FIX
-						print("more vel multiplied")
-						
-					if abs(velocity.x) >= 450 and abs(velocity.x) <= 520:
-						velocity.y *= 1.0
-						#velocity.x = 50 * sign(velocity.x) + velocity.x
-						print("STRONG vel multiplied")
-						
-					get_parent().velocity = velocity
-					print(velocity)
-					mouseOrigin = Vector2(0, 0)
-					mousePath = Vector2(0, 0)
-					mousePosition = Vector2(0, 0)
-					$"../frogjump".pitch_scale = randf_range(0.8, 1.2)
-					$"../frogjump".play()
-					$"..".jumpCount += 1
-					queue_redraw()
-			
-			#Input.set_custom_mouse_cursor(load("res://assets/cursoropen.png"))
-		else:
-			_set_custom_cursor(load("res://assets/cursor-x.png"))
-					
-func _draw():
-	if Input.is_action_pressed("ui_mouse"):
-		var max_length = Vector2(300, 300).length()
-		var trajectory = (mousePath * (sensitivity/2)).clamp(Vector2(-300, -300), Vector2(300, 300))
-		var trajectoryLength = trajectory.length()
-		trajectory = trajectory.normalized() * trajectoryLength
+		elif grounded and not _was_grounded and Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0):
+			$"../frogaim".play()  # (pressed just before landing: now it's an aim)
+		_was_grounded = grounded
 
-		var normalized_length = trajectoryLength / max_length
-		var lineColor = 1.2 - normalized_length
-		
-		draw_line(Vector2(0,0), trajectory / 5, Color(255, lineColor, lineColor, 1), 2.0)
+		if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0):
+			mousePosition = get_global_mouse_position()
+			mousePath = mouseOrigin - mousePosition
+			queue_redraw()
+		_set_custom_cursor(_cursor_x if not can_go else (_cursor_closed if Input.is_action_pressed("ui_mouse") else _cursor_open))
+
+		if Input.is_action_just_released("ui_mouse"):
+			if can_go and mouseOrigin != Vector2(0, 0):
+				get_parent().velocity = launch_velocity(mousePath)
+				_floor_ms = -100000  # (one jump per moment off the edge)
+				$"../frogjump".pitch_scale = randf_range(0.8, 1.2)
+				$"../frogjump".play()
+				$"..".jumpCount += 1
+			mouseOrigin = Vector2(0, 0)
+			mousePath = Vector2(0, 0)
+			mousePosition = Vector2(0, 0)
+			queue_redraw()
+
+
+## The aim line: along the jump he'll make, longer and whiter the stronger it is.
+func _draw():
+	if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0) and can_jump():
+		var launch := launch_velocity(mousePath)
+		var power := clampf(launch.length() / Vector2(800, 450).length(), 0.0, 1.0)
+		draw_line(Vector2(0,0), launch / 10.8, Color(255, 1.2 - power, 1.2 - power, 1), 2.0)
 
 
 func _on_cursor_lock_button_pressed():

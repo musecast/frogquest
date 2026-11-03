@@ -20,6 +20,13 @@ const GOLDEN_FLY_POINTS := 5
 const INK := Color(0.20784314, 0.16862746, 0.1882353)
 const CREAM := Color(0.9019608, 0.83137256, 0.74509805)
 const GOLD := Color(1.0, 0.86, 0.42)
+## Rubber banding, in a party: a stretchy band (a tether) ties you to your nearest friend. Fall, and once
+## it's taut they reel you back up to them. Your jumps themselves never change.
+const TETHER_SLACK := 140.0  # world units of give in the band before it catches a fall (14 m)
+const TETHER_REEL := 0.8  # seconds a friend takes to pull you back up
+const TETHER_FALLING := 150.0  # (falling at least this fast,
+const TETHER_DROP := 80.0  # and this far below where he last stood: coming down onto a platform isn't a fall)
+const TETHER_DRAWN := 1600.0  # (a band longer than this is off the screen: not drawn)
 
 var score: int = 0
 var high_score: int = 0
@@ -49,6 +56,10 @@ var _run_ticket := ""  # (MuseSocial.start_run's, asked for as the run starts: t
 var _rng := RandomNumberGenerator.new()  # the tower's dice: in a party everyone's share a seed, so everyone climbs the same tower
 var _party_frogs := {}  # peer id -> PartyFrog: friends climbing with you (Party)
 var _party_tags: CanvasLayer  # their names over them (and yours, in gold)
+var _tether_peer := 0  # the friend your band is tied to (0: nobody)
+var _bands: Node2D  # draws everyone's bands
+var _reel := {}  # being pulled up: {from, to, t}
+var _last_floor_y := 0.0  # where he last stood (a fall is well below it)
 var _zone_reached: int = 0
 var _passed_best: bool = false
 var _extra_gap: float = 0.0  # (a bobbing platform's reach, kept off the next gap)
@@ -377,6 +388,8 @@ func _show_banner(title: String, sub: String) -> void:
 
 
 func _trigger_reset() -> void:
+	if Party.in_run and _pull_up():
+		return
 	is_resetting = true
 	pitch_step = 0  # (the combo itself goes by the run's clock alone, stopped now, as score_of_log does)
 	_revive_platform_id = last_platform_id
@@ -728,6 +741,8 @@ func _update_score_label() -> void:
 ## A ticket for this run from Muse (only when you're signed in with an @handle and Muse Social is
 ## there): the server times the run from when it handed this out.
 func _get_ticket() -> void:
+	if Party.in_run:
+		return  # (party climbs, with their catching up and rescues, aren't for the leaderboards)
 	_run_ticket = await MuseSocial.start_run()
 
 
@@ -777,6 +792,10 @@ func _join_party() -> void:
 	_party_tags = CanvasLayer.new()
 	_party_tags.layer = 2
 	add_child(_party_tags)
+	_bands = Node2D.new()
+	_bands.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_bands.draw.connect(_draw_bands)
+	add_child(_bands)
 	Party.frog_moved.connect(_on_frog_moved)
 	Party.players_changed.connect(_on_party_changed)
 	Party.ended.connect(_on_party_ended)
@@ -788,8 +807,123 @@ func _join_party() -> void:
 func _party_frame(delta: float) -> void:
 	var sprite: AnimatedSprite2D = player.sprite
 	Party.send_frog([snappedf(player.global_position.x, 0.1), snappedf(player.global_position.y, 0.1), str(sprite.animation),
-		sprite.frame, sprite.flip_h, snappedf(sprite.rotation, 0.01), score, maxi(0, int(-highest_player_y / 10.0))], delta)
+		sprite.frame, sprite.flip_h, snappedf(sprite.rotation, 0.01), score, maxi(0, int(-highest_player_y / 10.0)),
+		_tether_peer if Party.tethers else 0], delta)
+	_tether(delta)
 	_place_tags()
+	_bands.queue_redraw()
+
+
+## The band: tied to your nearest friend (chosen again whenever you're standing). Falling, once you're
+## its slack below a friend who's standing, they reel you up.
+func _tether(delta: float) -> void:
+	if not _reel.is_empty():
+		_reel_in(delta)
+		return
+	if not Party.tethers:
+		_tether_peer = 0
+		return
+	if player.is_on_floor() and player.velocity.y <= 1.0:  # (standing: not on the way down)
+		_last_floor_y = player.global_position.y
+	if player.velocity.y <= TETHER_FALLING:  # (standing, or on the way up: tie to whoever's nearest)
+		var nearest := 0
+		for peer in _party_frogs:
+			if nearest == 0 or _party_frogs[peer].position.distance_to(player.global_position) \
+					< _party_frogs[nearest].position.distance_to(player.global_position):
+				nearest = peer
+		_tether_peer = nearest
+	elif not is_resetting:
+		var friend = _party_frogs.get(_tether_peer)
+		if friend and friend.standing and player.global_position.y > _last_floor_y + TETHER_DROP 				and player.global_position.y > friend.position.y + TETHER_SLACK:
+			_start_reel(friend)
+
+
+## Pulled back up by the band, to the steady platform nearest the friend (no skip points for it).
+func _start_reel(friend: Node2D) -> bool:
+	while highest_generated_y > friend.position.y - generation_ahead_distance:
+		_generate_one_platform_above()
+	var spot: Node2D = null
+	for p in platforms.get_children():
+		if p.is_queued_for_deletion() or not p.is_solid() or not _steady(p) or p.global_position.y < friend.position.y - 10.0:
+			continue
+		if spot == null or p.global_position.distance_to(friend.position) < spot.global_position.distance_to(friend.position):
+			spot = p
+	if spot == null:
+		return false
+	_highest_landed_id = maxi(_highest_landed_id, int(spot.get_meta("platform_id", 0)) - 1)
+	_reel = {"from": player.global_position, "to": spot.global_position + Vector2(0.0, -16.0), "t": 0.0}
+	player.set_physics_process(false)
+	player.velocity = Vector2.ZERO
+	var who := str(Party.players.get(friend.peer, {}).get("name", "A friend"))
+	_popup(friend.position + Vector2(0, -40), "%s pulled you up!" % who, GOLD, 16)
+	_play("res://assets/coolfind.mp3", 1.2, -6.0)
+	return true
+
+
+## Up the band, quickly at first and gently at the end, in a little arc, then down onto the platform.
+func _reel_in(delta: float) -> void:
+	_reel.t = minf(1.0, float(_reel.t) + delta / TETHER_REEL)
+	var k := 1.0 - pow(1.0 - float(_reel.t), 3.0)
+	var from: Vector2 = _reel.from
+	var to: Vector2 = _reel.to
+	player.global_position = from.lerp(to, k) + Vector2(0.0, -sin(k * PI) * 24.0)
+	player.reset_physics_interpolation()
+	if _reel.t >= 1.0:
+		_reel = {}
+		player.set_physics_process(true)
+		if player.global_position.y < highest_player_y:
+			highest_player_y = player.global_position.y
+			_climbed()
+
+
+## Falling past the point of no return with nobody to have caught you yet: a friend standing above you
+## (not far below your best) still pulls you up. (Usually the band's caught you long before.)
+func _pull_up() -> bool:
+	if not Party.tethers or not _reel.is_empty():
+		return not _reel.is_empty()
+	var catcher: Node2D = null
+	for frog in _party_frogs.values():
+		if not frog.standing or frog.position.y > player.global_position.y - 100.0 \
+				or frog.position.y > highest_player_y + fail_y_threshold * 0.5:
+			continue
+		if catcher == null or absf(frog.position.y - highest_player_y) < absf(catcher.position.y - highest_player_y):
+			catcher = frog
+	return catcher != null and _start_reel(catcher)
+
+
+## Every band in the party: yours to your friend, and each friend's to theirs. Slack, it sags, thick and
+## pink; stretched, it pulls straight and thin.
+func _draw_bands() -> void:
+	var seen := {}
+	if Party.tethers and _party_frogs.has(_tether_peer):
+		_band(player.global_position, _party_frogs[_tether_peer].position)
+		seen["%d-%d" % [mini(0, _tether_peer), maxi(0, _tether_peer)]] = true
+	var mine := Party.me()
+	for peer in _party_frogs:
+		var to := int(_party_frogs[peer].tether_to)
+		if to == 0:
+			continue
+		var other = player if to == mine else _party_frogs.get(to)
+		var key := "%d-%d" % [mini(0 if to == mine else to, peer), maxi(0 if to == mine else to, peer)]
+		if other == null or seen.has(key):
+			continue
+		seen[key] = true
+		_band(_party_frogs[peer].position, other.global_position)
+
+
+func _band(a: Vector2, b: Vector2) -> void:
+	a += Vector2(0.0, -8.0)
+	b += Vector2(0.0, -8.0)
+	var d := a.distance_to(b)
+	if d > TETHER_DRAWN or d < 4.0:
+		return
+	var taut := clampf((d - TETHER_SLACK * 0.5) / (TETHER_SLACK * 0.5), 0.0, 1.0)
+	var mid := (a + b) * 0.5 + Vector2(0.0, maxf(0.0, TETHER_SLACK - d) * 0.5)
+	var points := PackedVector2Array()
+	for i in 13:
+		var t := i / 12.0
+		points.append(a.lerp(mid, t).lerp(mid.lerp(b, t), t))
+	_bands.draw_polyline(points, Color(1.0, 0.5, 0.7).lerp(Color(1.0, 0.82, 0.9), taut), lerpf(3.0, 1.5, taut))
 
 
 func _on_frog_moved(peer: int, state: Array) -> void:
@@ -819,6 +953,12 @@ func _on_party_ended(why: String) -> void:
 	for peer in _party_frogs:
 		_party_frogs[peer].queue_free()
 	_party_frogs.clear()
+	_tether_peer = 0
+	if not _reel.is_empty():
+		_reel = {}
+		player.set_physics_process(true)
+	if _bands:
+		_bands.queue_redraw()
 	_place_tags()
 	if why != "":
 		_show_banner("PARTY OVER", why)
