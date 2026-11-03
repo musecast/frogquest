@@ -79,19 +79,40 @@ func _y(world_y: float, depth: float) -> float:
 
 
 # ── MUSHROOM SWAMP ──────────────────────────────────────────────────────────────────────────────
+# A sunny morning by the pond: giant mushrooms in soft colours (some with a door and a lit window) on
+# green hills, paler the further off they are, under a warm sun and a few clouds. (It was a misty teal
+# with dark mushroom poles, which looked liminal and a bit scary.) Pastel, domed and hazy, so none of it
+# is taken for a platform.
+const CAPS := [Color(0.95, 0.56, 0.56), Color(0.98, 0.72, 0.50), Color(0.73, 0.63, 0.93), Color(0.99, 0.84, 0.50), Color(0.93, 0.52, 0.71)]
+const STEM := Color(0.98, 0.93, 0.81)
+const STEM_SHADE := Color(0.87, 0.78, 0.64)
+const SPOT := Color(1.0, 0.98, 0.92)
+const DOOR := Color(0.55, 0.36, 0.25)
+const WINDOW := Color(1.0, 0.88, 0.50)
+const HILLS := [Color(0.62, 0.84, 0.58), Color(0.50, 0.76, 0.46)]
+
+
 func _swamp(a: float, half: Vector2) -> void:
-	# Far giant mushrooms, misty.
-	var far := Color(0.20, 0.42, 0.37, 0.75 * a)
-	var base := _y(40.0, 0.35)
-	for i in range(-6, 7):
-		var x := i * 150.0 + _h(i, 1) * 60.0
-		var tall := 120.0 + _h(i, 2) * 220.0
-		var cap_w := 50.0 + _h(i, 3) * 60.0
-		draw_rect(Rect2(x - 6.0, base - tall, 12.0, tall + 400.0), far)
-		_dome(Vector2(x, base - tall), cap_w, cap_w * 0.45, far)
-	# Reeds and cattails, nearer.
-	var reed := Color(0.14, 0.30, 0.22, a)
-	var head := Color(0.40, 0.24, 0.14, a)
+	var sky: Array = _zones.sky_at(-global_position.y)
+	var air: Color = sky[0].lerp(sky[1], 0.6)  # (what far things fade toward)
+	# The sun, and a few high clouds drifting by.
+	var sun := Vector2(half.x * 0.5, -half.y * 0.6 + _y(-500.0, 0.05))
+	for glow in [[64.0, 0.10], [42.0, 0.16], [24.0, 1.0]]:
+		draw_circle(sun, glow[0], Color(1.0, 0.97, 0.80, glow[1] * a))
+	var step := 240.0
+	var off := fposmod(-global_position.y * 0.12, step)
+	var j := -2
+	while j * step + off - half.y < half.y + step:
+		var row := j - int(floor(-global_position.y * 0.12 / step))
+		var drift := fposmod(_t * 5.0 + _h(row, 60) * 900.0, half.x * 2.0 + 260.0) - half.x - 130.0
+		_puff(Vector2(drift, j * step + off - half.y), 0.8, Color(1.0, 1.0, 1.0, 0.5 * a))
+		j += 1
+	# Giant mushrooms on their hills, in two layers.
+	for layer in 2:
+		_giant_mushrooms(layer, a, half, air)
+	# Reeds, cattails, grass and flowers along the bank, nearer.
+	var reed := Color(0.32, 0.58, 0.32, a)
+	var head := Color(0.58, 0.38, 0.23, a)
 	var near := _y(10.0, 0.7)
 	for i in range(-20, 21):
 		var x := i * 26.0 + _h(i, 4) * 14.0
@@ -100,21 +121,95 @@ func _swamp(a: float, half: Vector2) -> void:
 		draw_line(Vector2(x, near), Vector2(x + sway, near - tall), reed, 2.0)
 		if _h(i, 6) > 0.45:
 			draw_rect(Rect2(x + sway - 2.0, near - tall - 2.0, 4.0, 11.0), head)
-	# The pond, right under the first lily pad.
+	if near - 30.0 < half.y:
+		var grass := Color(0.42, 0.72, 0.38, a)
+		var petals := [Color(1.0, 0.68, 0.78, a), Color(1.0, 0.90, 0.45, a), Color(1.0, 1.0, 0.96, a)]
+		for i in range(-30, 31):
+			var x := i * 17.0 + _h(i, 7) * 10.0
+			for blade in 3:
+				draw_line(Vector2(x + blade * 3.0, near), Vector2(x + blade * 3.0 + (blade - 1) * 3.0, near - 8.0 - _h(i + blade, 8) * 8.0), grass, 2.0)
+			if _h(i, 9) > 0.6:
+				var flower := Vector2(x + 4.0, near - 12.0 - _h(i, 10) * 10.0)
+				draw_line(Vector2(x + 4.0, near), flower, grass, 1.0)
+				draw_circle(flower, 2.5, petals[i % petals.size()])
+	# The pond, right under the first lily pad, glinting.
 	var water_top := _y(5.0, 1.0)
 	if water_top < half.y:
-		draw_rect(Rect2(-half.x, water_top, half.x * 2.0, half.y - water_top + 4.0), Color(0.16, 0.42, 0.46, 1.0))
+		draw_rect(Rect2(-half.x, water_top, half.x * 2.0, half.y - water_top + 4.0), Color(0.30, 0.63, 0.74, 1.0))
 		for k in 6:
 			var wy := water_top + 6.0 + k * 9.0
 			var shift := fmod(_t * (10.0 + k * 3.0), 40.0)
 			for i in range(-int(half.x / 40.0) - 2, int(half.x / 40.0) + 2):
-				draw_rect(Rect2(i * 40.0 + shift + k * 13.0, wy, 14.0, 2.0), Color(0.55, 0.82, 0.80, 0.5 - k * 0.06))
-	# Fireflies.
-	for i in 14:
-		var p := Vector2(sin(_t * 0.35 + i * 1.7) * half.x * 0.9, cos(_t * 0.27 + i * 2.3) * half.y * 0.8)
-		var glow := 0.5 + 0.5 * sin(_t * 3.0 + i)
-		draw_circle(p, 6.0, Color(1.0, 0.95, 0.5, 0.12 * glow * a))
-		draw_rect(Rect2(p - Vector2(1.5, 1.5), Vector2(3, 3)), Color(1.0, 0.96, 0.6, (0.4 + 0.6 * glow) * a))
+				draw_rect(Rect2(i * 40.0 + shift + k * 13.0, wy, 14.0, 2.0), Color(0.80, 0.95, 0.97, 0.55 - k * 0.07))
+	_glow_bugs(a, half)
+
+
+## One layer of giant mushrooms (0 far, 1 nearer), growing from hills along their foot.
+func _giant_mushrooms(layer: int, a: float, half: Vector2, air: Color) -> void:
+	var depth := 0.2 if layer == 0 else 0.4
+	var haze := 0.5 if layer == 0 else 0.22
+	var ground := _y(80.0, depth)
+	var salt := layer * 20
+	var spacing := 110.0 if layer == 0 else 150.0
+	for i in range(-8, 9):
+		var x := i * spacing + (_h(i, 1 + salt) - 0.5) * spacing * 0.6
+		var tall := (70.0 + _h(i, 2 + salt) * 260.0) if layer == 0 else (90.0 + _h(i, 2 + salt) * 540.0)
+		var cap_w := (34.0 + _h(i, 3 + salt) * 40.0) * (1.0 + layer * 0.6)
+		var cap_h := cap_w * 0.5
+		var stem_w := roundf(maxf(6.0, cap_w * 0.24))
+		var top := ground - tall
+		if top - cap_h > half.y or absf(x) - cap_w > half.x:
+			continue
+		var stem_col := _faded(STEM, air, haze, a)
+		draw_rect(Rect2(x - stem_w * 0.5, top, stem_w, tall + 6.0), stem_col)
+		draw_rect(Rect2(x + stem_w * 0.5 - stem_w * 0.3, top, stem_w * 0.3, tall + 6.0), _faded(STEM_SHADE, air, haze, a))
+		# Now and then a front door, and a window lit inside.
+		if layer == 1 and stem_w >= 12.0 and _h(i, 11 + salt) > 0.5:
+			var door_w := roundf(stem_w * 0.45)
+			var sill := ground - 38.0  # (above the hills)
+			draw_rect(Rect2(x - door_w * 0.5, sill - door_w * 1.1, door_w, door_w * 1.1), _faded(DOOR, air, haze, a))
+			draw_circle(Vector2(x, sill - door_w * 1.1), door_w * 0.5, _faded(DOOR, air, haze, a))
+			draw_circle(Vector2(x - stem_w * 0.12, sill - door_w * 2.6), maxf(2.0, stem_w * 0.15), _faded(WINDOW, air, haze * 0.5, a))
+		var cap: Color = CAPS[int(_h(i, 4 + salt) * CAPS.size()) % CAPS.size()]
+		draw_rect(Rect2(x - cap_w * 0.4, top - 2.0, cap_w * 0.8, 3.0), _faded(cap.darkened(0.25), air, haze, a))
+		_dome(Vector2(x, top - cap_h), cap_w, cap_h, _faded(cap, air, haze, a))
+		for s in 3:
+			var spot := Vector2(x + (_h(i * 3 + s, 12 + salt) - 0.5) * cap_w * 0.55, top - cap_h * (0.3 + _h(i * 3 + s, 13 + salt) * 0.4))
+			draw_circle(spot, cap_w * (0.05 + _h(i * 3 + s, 14 + salt) * 0.035), _faded(SPOT, air, haze, a))
+	# Their hills, in front of the stems' feet.
+	if ground - 40.0 < half.y:
+		var hill := _faded(HILLS[layer], air, haze * 0.6, a)
+		for i in range(-10, 11):
+			var r := 46.0 + _h(i, 15 + salt) * 30.0
+			draw_circle(Vector2(i * 70.0 + _h(i, 16 + salt) * 30.0, ground + r * 0.6), r, hill)
+		draw_rect(Rect2(-half.x, ground + 20.0, half.x * 2.0, maxf(0.0, half.y - ground)), hill)
+
+
+## A colour faded toward the air by `haze` (far things are paler), at the zone's share `a`.
+static func _faded(col: Color, air: Color, haze: float, a: float) -> Color:
+	var c := col.lerp(air, haze)
+	c.a = a
+	return c
+
+
+## Glow bugs out in the world, not on the screen: each keeps to its own spot as he climbs past (they
+## used to ride along with the camera), wandering a little and pulsing. Some are a touch further back.
+func _glow_bugs(a: float, half: Vector2) -> void:
+	var row_h := 70.0
+	for layer in 2:
+		var depth := 0.75 if layer == 0 else 1.0
+		var first := int(floor((global_position.y - half.y / depth - 20.0) / row_h))
+		var last := int(floor((global_position.y + half.y / depth + 20.0) / row_h))
+		for row in range(first, last + 1):
+			if row * row_h > 0.0 or row * row_h < -1600.0:  # (over the pond and up through the swamp)
+				continue
+			var k := row * 2 + layer
+			var phase := _h(k, 51) * TAU
+			var home := Vector2((_h(k, 50) - 0.5) * 1.9 * half.x, _y(row * row_h + row_h * _h(k, 52), depth))
+			var p := home + Vector2(sin(_t * 0.6 + phase) * 14.0, cos(_t * 0.45 + phase) * 10.0)
+			var glow := 0.5 + 0.5 * sin(_t * 3.0 + phase)
+			draw_circle(p, 6.0, Color(1.0, 0.95, 0.5, 0.18 * glow * a))
+			draw_rect(Rect2(p - Vector2(1.5, 1.5), Vector2(3, 3)), Color(1.0, 0.93, 0.45, (0.5 + 0.5 * glow) * a))
 
 
 func _dome(top_mid: Vector2, w: float, h: float, col: Color) -> void:
@@ -127,10 +222,12 @@ func _dome(top_mid: Vector2, w: float, h: float, col: Color) -> void:
 
 # ── TREETOPS ────────────────────────────────────────────────────────────────────────────────────
 func _treetops(a: float, half: Vector2) -> void:
+	# Sunlit, not a dark wood: warm bark and soft leaves, paler further off so the leafy platforms
+	# stand out in front.
 	for layer in 2:
 		var depth := 0.35 if layer == 0 else 0.6
-		var trunk := Color(0.10, 0.17, 0.11, a) if layer == 0 else Color(0.06, 0.11, 0.07, a)
-		var leaves := Color(0.14, 0.28, 0.15, a) if layer == 0 else Color(0.09, 0.19, 0.10, a)
+		var trunk := Color(0.62, 0.50, 0.38, a) if layer == 0 else Color(0.52, 0.39, 0.28, a)
+		var leaves := Color(0.58, 0.78, 0.46, a) if layer == 0 else Color(0.46, 0.68, 0.38, a)
 		var spacing := 170.0 if layer == 0 else 260.0
 		for i in range(-5, 6):
 			var x := i * spacing + _h(i, 10 + layer) * 80.0
@@ -150,7 +247,7 @@ func _treetops(a: float, half: Vector2) -> void:
 	for i in 3:
 		var x := -half.x * 0.6 + i * half.x * 0.6 + sin(_t * 0.2 + i) * 20.0
 		draw_colored_polygon(PackedVector2Array([Vector2(x, -half.y), Vector2(x + 40.0, -half.y),
-			Vector2(x + 160.0, half.y), Vector2(x + 90.0, half.y)]), Color(0.95, 1.0, 0.7, 0.05 * a))
+			Vector2(x + 160.0, half.y), Vector2(x + 90.0, half.y)]), Color(1.0, 1.0, 0.8, 0.12 * a))
 	# Falling leaves.
 	for i in 14:
 		var fx := sin(_t * 0.6 + i * 2.1) * half.x * 0.95
