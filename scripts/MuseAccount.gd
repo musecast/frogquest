@@ -19,6 +19,7 @@ extends Node
 signal changed  # signed in or out, or Pro came or went
 signal link_ended(result: String)  # signing in through Muse Shelf stopped: "" signed in, "expired", or what went wrong
 signal _check_finished(answered: bool)
+signal _access_done(token: String)  # (a refresh finished: _access)
 
 const SUPABASE_URL := "https://rdafaxpamctnqbevgnxd.supabase.co"
 const PUBLISHABLE_KEY := "sb_publishable_4Ju-f7ORTQHkarTeqyUFEQ_Bccg9qKy"  # public by design (RLS guards the data)
@@ -42,6 +43,7 @@ var _access_token := ""
 var _access_expires_at := 0.0
 var _loaded := false
 var _checking := false
+var _refreshing := false  # (a refresh is on its way: _access)
 var linking := {}  # while waiting on Muse Shelf: the code to type there, its secret, links to open it
 var _link_token := 0
 
@@ -243,6 +245,24 @@ func check_pro() -> bool:
 	return answered
 
 
+## Calls one of the Muse account's functions (rpc/<fn_name>) as you: {code, data}. Code 0 when Muse
+## couldn't be reached, -1 when you're not signed in, 404 when there's no such function (yet). A
+## turned-down session gets a fresh token and one more try, as check_pro does.
+func call_rpc(fn_name: String, args := {}) -> Dictionary:
+	if not is_signed_in():
+		return {"code": -1, "data": null}
+	var r := {"code": 0, "data": null}
+	for _attempt in 2:
+		var token: String = await _access()
+		if token == "":
+			return {"code": 0 if is_signed_in() else -1, "data": null}
+		r = await _call("/rest/v1/rpc/" + fn_name, args, token)
+		if r.code != 401:
+			return r
+		_access_token = ""  # (turned down: get a fresh one and ask once more)
+	return r
+
+
 ## Signs out here (only here: the Muse apps stay signed in).
 func sign_out() -> void:
 	var refresh := _refresh_token
@@ -254,18 +274,26 @@ func sign_out() -> void:
 
 ## A current access token: the one we have, or a fresh one from the refresh token. "" when there's
 ## no getting one right now (offline), or the session has ended (then you're signed out here too).
+## One refresh at a time: refresh tokens are single use, so a second caller (the Pro check and Muse
+## Social together) waits for the first one's answer rather than spending the same token again.
 func _access() -> String:
 	if _access_token != "" and _now() < _access_expires_at - 60.0:
 		return _access_token
+	if _refreshing:
+		return await _access_done
+	_refreshing = true
+	var token := ""
 	var r: Dictionary = await _call("/auth/v1/token?grant_type=refresh_token", {"refresh_token": _refresh_token})
 	if r.code == 200 and r.data is Dictionary and str(r.data.get("refresh_token", "")) != "":
 		_take_session(r.data)
 		_save()
-		return _access_token
-	if r.code >= 400 and r.code < 500 and r.code != 429:
+		token = _access_token
+	elif r.code >= 400 and r.code < 500 and r.code != 429:
 		_clear()  # (signed out everywhere, or the account's gone)
 		changed.emit()
-	return ""
+	_refreshing = false
+	_access_done.emit(token)
+	return token
 
 
 ## Ends the session on Muse's side too, once you've signed out here (best effort, in the background).
@@ -299,7 +327,7 @@ func _set_pro(on: bool) -> void:
 ## One request to the account service: {code, data}, code 0 when it couldn't be reached.
 func _call(path: String, body: Dictionary, bearer := "", base := SUPABASE_URL) -> Dictionary:
 	if transport.is_valid():
-		return transport.call(path, body, bearer)
+		return await transport.call(path, body, bearer)  # (a test's fake may take its time)
 	var http := HTTPRequest.new()
 	http.timeout = TIMEOUT
 	add_child(http)

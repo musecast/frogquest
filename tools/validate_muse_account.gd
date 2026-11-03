@@ -19,6 +19,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var acct: Node = root.get_node("MuseAccount")
+	var social: Node = root.get_node("MuseSocial")  # (kept out of it: it has its own test, and its calls would join these)
+	acct.changed.disconnect(social._on_account_changed)
 	var real_path: String = acct.save_path
 	acct.save_path = SCRATCH
 	acct._clear()
@@ -84,6 +86,23 @@ func _run() -> void:
 	_reply("/auth/v1/token", 200, _session("access-3", "refresh-3"))
 	_reply("/rest/v1/rpc/muse_has_pro", 200, true)
 	_expect(await acct.check_pro() and acct.has_pro() and _calls[-1].bearer == "access-3", "a turned-down check refreshes and asks again")
+
+	# Two asking at once with a stale session share one refresh (refresh tokens are single use: a
+	# second refresh spent on the same token would sign you out).
+	acct.transport = func(path: String, body: Dictionary, bearer: String) -> Dictionary:
+		await process_frame  # (an answer that takes a moment, as the real one does)
+		return _fake(path, body, bearer)
+	acct._access_expires_at = acct._now() - 10.0
+	_calls.clear()
+	_reply("/auth/v1/token", 200, _session("access-5", "refresh-5"))
+	var got := ["", ""]
+	var ask := func(i: int) -> void: got[i] = await acct._access()
+	ask.call(0)
+	ask.call(1)
+	await create_timer(0.3).timeout
+	var refreshes := _calls.filter(func(c: Dictionary) -> bool: return c.path.begins_with("/auth/v1/token"))
+	_expect(refreshes.size() == 1 and got == ["access-5", "access-5"] and acct.is_signed_in(), "two asking at once share one refresh")
+	acct.transport = _fake
 
 	# Offline: nothing changes.
 	acct._access_expires_at = acct._now() - 10.0
@@ -154,6 +173,7 @@ func _run() -> void:
 	acct.transport = Callable()
 	acct._clear()
 	acct.save_path = real_path
+	acct.changed.connect(social._on_account_changed)
 	_forget(acct)
 	if _failures.is_empty():
 		print("Muse account test passed.")

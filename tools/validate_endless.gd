@@ -97,6 +97,8 @@ func _run() -> void:
 			break
 	_expect(zones_seen == [0, 1, 2, 3, 4], "the zones came in order, swamp to space (saw %s)" % str(zones_seen))
 	_expect(endless.score > 50, "the score climbed (%d)" % endless.score)
+	var by_log: int = endless.score_of_log(endless.run_log())
+	_expect(by_log == endless.score, "the run's log gives the score the game gave (%d by the log, %d in the game)" % [by_log, endless.score])
 	_expect(is_equal_approx(player.gravity, 980.0 * 0.6), "space is floaty (gravity %.0f)" % player.gravity)
 	_expect(spring_boosted, "a spring boosts the jump off it")
 	_expect(crumble_went, "a crumbling platform gave way after he landed on it")
@@ -112,10 +114,34 @@ func _run() -> void:
 	await endless.revive()
 	await _frames(20)
 	_expect(not endless.is_resetting and player.is_on_floor(), "keep going put him back on a platform")
+	_expect(endless.score_of_log(endless.run_log()) == endless.score, "after keeping going, the log still gives the game's score")
+	_check_scorer_vectors(endless)
 
 	endless.queue_free()
 	await _frames(5)
 	_finish()
+
+
+## The leaderboard server's own test runs (muse-media-tracker tests/play.test.ts): the game's rule
+## (EndlessMode.score_of_log) must score each the same, or posted runs and the game would disagree.
+func _check_scorer_vectors(endless: Node) -> void:
+	var b := []
+	for i in range(1, 10):
+		b.append([1000 * i, i + 1, 60 * i, 0])
+	var e := []
+	for i in range(1, 30):
+		e.append([400 * i, i + 1, 150 * i, 0])
+	var vectors := {
+		"A": [{"landings": [[1000, 2, 60, 0], [2000, 3, 120, 0], [3000, 4, 200, 0], [4000, 5, 260, 0], [5000, 7, 370, 0], [8000, 6, 300, 0], [9000, 8, 420, 0]], "flies": [[2500, 0], [6000, 1]], "end_ms": 12000}, 18],
+		"B": [{"landings": b, "flies": [[1500, 1], [2500, 0], [3500, 0]], "end_ms": 20000}, 26],
+		"C": [{"landings": [[1000, 2, 100, 0], [2000, 6, 520, 1]], "flies": [], "end_ms": 10000}, 5],
+		"D": [{"landings": [[500, 1, 0, 0], [1000, 2, 60, 0], [4000, 4, 150, 0], [4500, 3, 100, 0]], "flies": [], "end_ms": 5000}, 4],
+		"E": [{"landings": e, "flies": [], "end_ms": 12000}, 77],
+		"F": [{"landings": [], "flies": [], "end_ms": 0}, 0],
+	}
+	for name in vectors:
+		var got: int = endless.score_of_log(vectors[name][0])
+		_expect(got == vectors[name][1], "the server's test run %s scores %d here too (got %d)" % [name, vectors[name][1], got])
 
 
 ## The next platform up from the one with this id (by id: they're made in order, bottom to top).

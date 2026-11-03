@@ -32,6 +32,8 @@ config/custom_user_dir_name="Godot/app_userdata/Frog Quest+"
 
 MusicManager="*res://scripts/MusicManager.gd"
 MuseAccount="*res://scripts/MuseAccount.gd"
+MuseSocial="*res://scripts/MuseSocial.gd"
+Party="*res://scripts/Party.gd"
 AdsManager="*res://scripts/AdsManager.gd"
 ComplianceConfig="*res://scripts/ComplianceConfig.gd"
 

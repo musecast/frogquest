@@ -794,8 +794,9 @@ func _on_wardrobe_button_pressed() -> void:
 
 
 ## The title's menu, in the menus' chunky buttons (UIStyle): CONTINUE (START with no climb saved),
-## ENDLESS, WARDROBE (once there's something in it: it can turn up mid-game, Muse Pro brings Lil
-## Froggy on a computer), MUSE ACCOUNT and SETTINGS. _layout_title places it. (It took over from the
+## ENDLESS, PLAY TOGETHER (a party climbing Endless together: PartyScreen), WARDROBE (once there's
+## something in it: it can turn up mid-game, Muse Pro brings Lil Froggy on a computer), MUSE ACCOUNT
+## and SETTINGS. _layout_title places it. (It took over from the
 ## scene's own buttons and from MUSE ACCOUNT up in the corner.)
 func _build_title_menu() -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
@@ -805,6 +806,7 @@ func _build_title_menu() -> void:
 	var play := _title_button(menu, "PlayButton", _on_button_pressed)
 	play.text = "CONTINUE" if FileAccess.file_exists(save_path) else "START"
 	_title_button(menu, "EndlessButton", _on_endlessmodebutton_pressed).set_meta("words", "ENDLESS")
+	_title_button(menu, "PartyButton", _on_party_button_pressed).set_meta("words", "PLAY TOGETHER")
 	var wardrobe := _title_button(menu, "WardrobeButton", _on_wardrobe_button_pressed)
 	wardrobe.set_meta("words", "WARDROBE")
 	_attach_new_badge(wardrobe)
@@ -812,6 +814,7 @@ func _build_title_menu() -> void:
 	_title_button(menu, "SettingsButton", _on_title_settings_pressed).set_meta("words", "SETTINGS")
 	for b in menu.get_children():  # (each one's picture at its left end, its words in the middle: UIStyle.button_face)
 		b.set_meta("icon", {"EndlessButton": [load("res://assets/infinity.png"), false],
+			"PartyButton": [ui.pixel_icon(ui.PARTY), true],
 			"WardrobeButton": [load("res://assets/crownicon.png"), false],
 			"MuseButton": [ui.pixel_icon(ui.PERSON), true],
 			"SettingsButton": [ui.pixel_icon(ui.GEAR), true]}.get(str(b.name), []))
@@ -877,7 +880,7 @@ func _layout_title(vp: Vector2, is_portrait: bool) -> void:
 	for b: Button in shown:
 		var first: bool = b == shown[0]
 		ui.style_button(b, pick[0], "go" if first else ("gold" if b.name == "MuseButton" and MuseAccount.has_pro() else
-			("wood" if b.name in ["EndlessButton", "WardrobeButton"] else "quiet")))
+			("wood" if b.name in ["EndlessButton", "PartyButton", "WardrobeButton"] else "quiet")))
 		b.custom_minimum_size = Vector2(0, pick[1] if first else pick[2])
 		var icon: Array = b.get_meta("icon", [])
 		if not icon.is_empty():
@@ -915,6 +918,22 @@ func _on_muse_button_pressed() -> void:
 	var title_was_visible: bool = $titlescreen.visible
 	$titlescreen.visible = false
 	var screen = load("res://scenes/MuseAccountScreen.gd").new()
+	add_child(screen)
+	screen.closed.connect(func() -> void:
+		screen.queue_free()
+		$titlescreen.visible = title_was_visible
+		if title_was_visible:
+			_apply_ui_layout()
+			_show_logo(true)
+	)
+
+
+## PLAY TOGETHER: host or join a party on the same Wi-Fi (PartyScreen); starting it climbs Endless.
+func _on_party_button_pressed() -> void:
+	$frogaim.play()
+	var title_was_visible: bool = $titlescreen.visible
+	$titlescreen.visible = false
+	var screen = load("res://scenes/PartyScreen.gd").new()
 	add_child(screen)
 	screen.closed.connect(func() -> void:
 		screen.queue_free()

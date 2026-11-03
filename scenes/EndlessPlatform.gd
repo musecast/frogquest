@@ -34,6 +34,8 @@ var crumbles := false
 var spring := false
 var coil := true  # (a spring shows as a coil set in its top, except on a kind that's bouncy itself)
 var flower := false  # (the first lily pad's lotus)
+var phase := -1.0  # where a moving one starts its swing (EndlessMode deals it from the tower's dice; -1: any)
+var clock := Callable()  # in a party, the party's clock in seconds (Party.run_seconds): everyone's swing together
 
 var _strip: Texture2D
 var _under: Texture2D
@@ -78,7 +80,9 @@ func _ready() -> void:
 	_shape.one_way_collision = true
 	add_child(_shape)
 	_home = position
-	_t = randf() * TAU
+	_t = phase if phase >= 0.0 else randf() * TAU
+	if clock.is_valid():
+		_t = phase + float(clock.call()) * motion_speed
 	if motion != "":
 		position = _target(_t)
 
@@ -104,7 +108,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if motion != "":
 		var before := position
-		_t += delta * motion_speed
+		_t = phase + float(clock.call()) * motion_speed if clock.is_valid() else _t + delta * motion_speed
 		position = _target(_t)
 		# (so he's carried standing on it; endlessplayer.gd takes it back off his jump)
 		constant_linear_velocity = (position - before) / delta

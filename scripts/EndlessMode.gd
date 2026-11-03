@@ -14,7 +14,7 @@ extends Node2D
 var save_path := "user://endless_highscore.dat"  # the best score, then the best height in metres (tests redirect it)
 const GRAVITY := 980.0
 const JUMP_UP := 450.0  # the trajectory's fastest straight-up launch (endlessplayertrajectory.gd)
-const COMBO_WINDOW := 2.5  # seconds between new platforms to keep a combo going
+const COMBO_MS := 2500  # milliseconds between new platforms to keep a combo going (on the run's clock)
 const FLY_POINTS := 2
 const GOLDEN_FLY_POINTS := 5
 const INK := Color(0.20784314, 0.16862746, 0.1882353)
@@ -40,7 +40,15 @@ var _revived: bool = false  # one "keep going" per run
 var _standing_id: int = 0
 var _highest_landed_id: int = 1
 var _combo: int = 0
-var _since_new_platform: float = 99.0
+var _run_ms := 0.0  # the run's own clock, in ms: it runs while he climbs, not while the run's ended
+var _last_new_ms := -100000  # when he last landed somewhere new, in whole ms on that clock (combos)
+var _log_landings: Array = []  # [ms, platform id, height, off a spring] for each first landing: run_log()
+var _log_flies: Array = []  # [ms, golden] for each fly caught
+var _off_spring := false  # (the jump he's on was launched off a spring)
+var _run_ticket := ""  # (MuseSocial.start_run's, asked for as the run starts: the server times it from then)
+var _rng := RandomNumberGenerator.new()  # the tower's dice: in a party everyone's share a seed, so everyone climbs the same tower
+var _party_frogs := {}  # peer id -> PartyFrog: friends climbing with you (Party)
+var _party_tags: CanvasLayer  # their names over them (and yours, in gold)
 var _zone_reached: int = 0
 var _passed_best: bool = false
 var _extra_gap: float = 0.0  # (a bobbing platform's reach, kept off the next gap)
@@ -140,7 +148,10 @@ func _ready() -> void:
 	_fit_to_viewport()
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	player.connect("launched", _on_launched)
-	randomize()
+	if Party.in_run:
+		_rng.seed = Party.run_seed
+	else:
+		_rng.randomize()
 	_update_score_label()
 	_make_platform(Vector2(0, 0), _zones.ZONES[0], 0.0, true, {"kind": "lilypad", "flower": true, "width": 120.0})
 	_height_label.text = "0 m"
@@ -151,7 +162,11 @@ func _ready() -> void:
 	fade_rect.color.a = 1.0
 	_fade(1.0, 0.0, 0.6)
 	_show_banner(_zones.ZONES[0]["name"], "Climb as high as you can!")
+	if Party.in_run:
+		_join_party()
 	set_process(true)
+	MuseSocial.set_activity("endless")
+	_get_ticket()
 	_request_ads_after_first_frames()
 	await get_tree().process_frame
 	if is_inside_tree():
@@ -285,12 +300,14 @@ func _fit_to_viewport() -> void:
 
 func _process(delta: float) -> void:
 	_follow(delta)
+	if Party.in_run:
+		_party_frame(delta)
 	if is_resetting:
 		return
 	if not player.is_on_floor():
 		airborne_since_landing = true
-	_since_new_platform += delta
-	if _since_new_platform > COMBO_WINDOW and _combo > 0:
+	_run_ms += delta * 1000.0
+	if _combo > 0 and int(_run_ms) - _last_new_ms > COMBO_MS:
 		_combo = 0
 		pitch_step = 0
 	var height := -player.global_position.y
@@ -361,8 +378,7 @@ func _show_banner(title: String, sub: String) -> void:
 
 func _trigger_reset() -> void:
 	is_resetting = true
-	pitch_step = 0
-	_combo = 0
+	pitch_step = 0  # (the combo itself goes by the run's clock alone, stopped now, as score_of_log does)
 	_revive_platform_id = last_platform_id
 	last_platform_id = 0
 	airborne_since_landing = false
@@ -383,6 +399,8 @@ func _trigger_reset() -> void:
 	if _pending_notification.size() > 0:
 		MusicManager.show_unlock_notification(_pending_notification[0], _pending_notification[1])
 		_pending_notification = []
+	if not can_revive():
+		finish_run()
 
 
 ## True if this run can still "keep going" (once per run, with a platform to put him back on).
@@ -392,17 +410,25 @@ func can_revive() -> bool:
 
 ## Where a revive puts him: the last platform he stood on, or, if that crumbled away, the highest one
 ## still there below his best.
+## A steady one, though: one that moves can slide out from under him as he's put back, and one that
+## crumbles gives way under him straight after. (Only if there's no steady one does he go on one of those.)
 func _revive_spot() -> Node2D:
 	var last = _find_platform(_revive_platform_id)
-	if last and last.is_solid():
+	if last and last.is_solid() and _steady(last):
 		return last
 	var best: Node2D = null
 	for p in platforms.get_children():
-		if p.is_queued_for_deletion() or not p.is_solid() or p.global_position.y < highest_player_y - 40.0:
+		if p.is_queued_for_deletion() or not p.is_solid() or not _steady(p) or p.global_position.y < highest_player_y - 40.0:
 			continue
 		if best == null or p.global_position.y < best.global_position.y:
 			best = p
+	if best == null and last and last.is_solid():
+		return last
 	return best
+
+
+static func _steady(p: Node) -> bool:
+	return p.motion == "" and not p.crumbles
 
 
 ## Puts him back on the last platform he stood on, score and all.
@@ -461,13 +487,16 @@ func register_platform_landing(platform_id: int) -> void:
 		return
 	player.landed_platform_ids[platform_id] = true
 	last_platform_id = platform_id
+	var now := int(_run_ms)
+	var top: float = platform.global_position.y if platform else player.global_position.y
+	_log_landings.append([now, platform_id, roundi(-top), int(_off_spring)])
 	if platform_id == 1:
 		return
 	# Points: one for the platform, one more for each he jumped right past, times the combo.
 	var skipped := maxi(0, platform_id - _highest_landed_id - 1)
 	_highest_landed_id = maxi(_highest_landed_id, platform_id)
-	_combo = _combo + 1 if _since_new_platform <= COMBO_WINDOW else 1
-	_since_new_platform = 0.0
+	_combo = _combo + 1 if now - _last_new_ms <= COMBO_MS else 1
+	_last_new_ms = now
 	var mult := 1 + int(_combo >= 4) + int(_combo >= 8)
 	var points := (1 + skipped) * mult
 	score += points
@@ -489,6 +518,7 @@ func register_platform_landing(platform_id: int) -> void:
 
 ## Off a platform: a spring pops back up.
 func _on_launched(platform: Node) -> void:
+	_off_spring = platform != null and platform.get("spring") == true
 	if platform and platform.has_method("launched"):
 		platform.launched()
 
@@ -507,11 +537,11 @@ func _generate_one_platform_above() -> void:
 	var g: float = _zones.gravity_at(height + 80.0)
 	var reach := 0.85 * JUMP_UP * JUMP_UP / (2.0 * GRAVITY * g)
 	var gaps: Array = _zones.ramp(zone["gap"], t)
-	var gap := minf(randf_range(gaps[0], gaps[1]), reach - _extra_gap)
+	var gap := minf(_rng.randf_range(gaps[0], gaps[1]), reach - _extra_gap)
 	# Off to one side of the last one (never straight on top of it), turning back at the play area's
 	# edge rather than piling up against it.
-	var side := -1.0 if randf() < 0.5 else 1.0
-	var step := randf_range(50.0, minf(max_horizontal_step, max_x - min_x - 20.0))
+	var side := -1.0 if _rng.randf() < 0.5 else 1.0
+	var step := _rng.randf_range(50.0, minf(max_horizontal_step, max_x - min_x - 20.0))
 	var next_x: float = last_generated_x + side * step
 	if next_x < min_x or next_x > max_x:
 		next_x = last_generated_x - side * step
@@ -520,8 +550,8 @@ func _generate_one_platform_above() -> void:
 	var platform = _make_platform(Vector2(next_x, next_y), zone, t, false, {}, reach - gap - _extra_gap)
 	highest_generated_y = next_y
 	last_generated_x = next_x
-	if next_platform_id > 4 and randf() < float(zone["flies"]):
-		_spawn_fly(Vector2(next_x + randf_range(-40.0, 40.0), next_y - randf_range(34.0, 80.0)))
+	if next_platform_id > 4 and _rng.randf() < float(zone["flies"]):
+		_spawn_fly(Vector2(next_x + _rng.randf_range(-40.0, 40.0), next_y - _rng.randf_range(34.0, 80.0)))
 	if platform.motion == "bob":
 		_extra_gap = platform.motion_range * 0.35
 	else:
@@ -534,30 +564,38 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 	var platform = StaticBody2D.new()
 	platform.set_script(_platform_script)
 	var widths: Array = _zones.ramp(zone["width"], t)
-	platform.width = roundf(randf_range(widths[0], widths[1]))
-	platform.kind = _pick_kind(zone["kinds"])
+	platform.width = roundf(_rng.randf_range(widths[0], widths[1]))
+	platform.kind = _pick_kind(zone["kinds"], _rng)
+	platform.phase = _rng.randf() * TAU  # (where a moving one starts its swing)
+	if Party.in_run:
+		platform.clock = Party.run_seconds  # (and everyone's swing in time together)
 	if not plain and next_platform_id > 3:
-		var r := randf()
+		var r := _rng.randf()
 		var spring_chance: float = _zones.ramp(zone["spring"], t)
 		var crumble_chance: float = _zones.ramp(zone["crumble"], t) if zone["crumble_kind"] != "" else 0.0
-		if r < spring_chance and _last_special != "spring":
-			platform.spring = true
-			if zone["spring_kind"] != "":
-				platform.kind = zone["spring_kind"]
-				platform.coil = false
-			_last_special = "spring"
+		# (a second spring in a row is a plain one: it used to fall through to a crumbling one, even in
+		# the swamp, which has none, and came out an invisible platform you could stand on)
+		if r < spring_chance:
+			if _last_special != "spring":
+				platform.spring = true
+				if zone["spring_kind"] != "":
+					platform.kind = zone["spring_kind"]
+					platform.coil = false
+				_last_special = "spring"
+			else:
+				_last_special = ""
 		elif r < spring_chance + crumble_chance and _last_special != "crumble":
 			platform.crumbles = true
 			platform.kind = zone["crumble_kind"]
 			_last_special = "crumble"
 		else:
 			_last_special = ""
-		if randf() < float(_zones.ramp(zone["moving"], t)):
+		if _rng.randf() < float(_zones.ramp(zone["moving"], t)):
 			var speeds: Array = zone["speed"]
 			var ranges: Array = zone["range"]
-			platform.motion_speed = lerpf(speeds[0], speeds[1], t) * randf_range(0.8, 1.2)
+			platform.motion_speed = lerpf(speeds[0], speeds[1], t) * _rng.randf_range(0.8, 1.2)
 			platform.motion_range = lerpf(ranges[0], ranges[1], t)
-			if randf() < float(zone["bob"]) and spare >= 12.0:
+			if _rng.randf() < float(zone["bob"]) and spare >= 12.0:
 				platform.motion = "bob"
 				platform.motion_range = minf(platform.motion_range, spare / 0.35)
 			else:
@@ -567,8 +605,8 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 				platform.motion_range = minf(platform.motion_range, room)
 				at.x = clampf(at.x, min_x + platform.motion_range, max_x - platform.motion_range)
 		var tilt: float = _zones.ramp(zone["tilt"], t)
-		if tilt > 0.0 and randf() < 0.5:
-			platform.rotation = randf_range(-tilt, tilt)
+		if tilt > 0.0 and _rng.randf() < 0.5:
+			platform.rotation = _rng.randf_range(-tilt, tilt)
 	for key in overrides:
 		platform.set(key, overrides[key])
 	platform.position = at
@@ -578,11 +616,11 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 	return platform
 
 
-static func _pick_kind(kinds: Array) -> String:
+static func _pick_kind(kinds: Array, rng: RandomNumberGenerator) -> String:
 	var total := 0.0
 	for k in kinds:
 		total += float(k[1])
-	var r := randf() * total
+	var r := rng.randf() * total
 	for k in kinds:
 		r -= float(k[1])
 		if r <= 0.0:
@@ -595,7 +633,7 @@ func _spawn_fly(at: Vector2) -> void:
 	var fly = Node2D.new()
 	fly.set_script(_fly_script)
 	fly.position = at
-	fly.golden = randf() < 0.1
+	fly.golden = _rng.randf() < 0.1
 	fly.hunt_for(player, _on_fly_caught)
 	add_child(fly)
 	_flies.append(fly)
@@ -604,6 +642,7 @@ func _spawn_fly(at: Vector2) -> void:
 func _on_fly_caught(fly) -> void:
 	var points := GOLDEN_FLY_POINTS if fly.golden else FLY_POINTS
 	score += points
+	_log_flies.append([int(_run_ms), int(fly.golden)])
 	_popup(fly.global_position + Vector2(0, -12), "+%d" % points, GOLD if fly.golden else Color(1.0, 0.6, 0.72), 20 if fly.golden else 16)
 	_play("res://assets/pickupCoin.wav", 1.2 if fly.golden else 1.0, -8.0)
 	_update_score_label()
@@ -682,3 +721,134 @@ func _check_score_unlocks() -> void:
 
 func _update_score_label() -> void:
 	score_label.text = "Score: %d" % score
+
+
+# ── the run, for the leaderboards ───────────────────────────────────────────────────────────────
+
+## A ticket for this run from Muse (only when you're signed in with an @handle and Muse Social is
+## there): the server times the run from when it handed this out.
+func _get_ticket() -> void:
+	_run_ticket = await MuseSocial.start_run()
+
+
+## The run's over for good (no "keep going" left, or Try Again or Exit): MuseSocial posts its log to the
+## leaderboards, if it got a ticket as it started. Once only.
+func finish_run() -> void:
+	if _run_ticket == "":
+		return
+	var ticket := _run_ticket
+	_run_ticket = ""
+	MuseSocial.post_run(ticket, run_log())
+
+
+## What happened this run, for the server to work the score out from and check (EndlessMode.score_of_log
+## is the same rule): each first landing [ms, platform id, height in world units, off a spring] and each fly
+## caught [ms, golden], on the run's own clock.
+func run_log() -> Dictionary:
+	return {"v": 1, "landings": _log_landings.duplicate(true), "flies": _log_flies.duplicate(true), "end_ms": int(_run_ms)}
+
+
+## A run's score from its log, by the game's own rule (register_platform_landing, _on_fly_caught): the
+## leaderboard's server recomputes it the same way, so the score is never just taken from the phone.
+static func score_of_log(log: Dictionary) -> int:
+	var total := 0
+	var highest := 1
+	var combo := 0
+	var last_ms := -100000
+	for landing in log.get("landings", []):
+		var id := int(landing[1])
+		if id == 1:
+			continue
+		var ms := int(landing[0])
+		var skipped := maxi(0, id - highest - 1)
+		highest = maxi(highest, id)
+		combo = combo + 1 if ms - last_ms <= COMBO_MS else 1
+		last_ms = ms
+		total += (1 + skipped) * (1 + int(combo >= 4) + int(combo >= 8))
+	for fly in log.get("flies", []):
+		total += GOLDEN_FLY_POINTS if int(fly[1]) == 1 else FLY_POINTS
+	return total
+
+
+# ── a party ─────────────────────────────────────────────────────────────────────────────────────
+
+## Climbing with friends (Party): their frogs come and go as they do, and yours goes to them.
+func _join_party() -> void:
+	_party_tags = CanvasLayer.new()
+	_party_tags.layer = 2
+	add_child(_party_tags)
+	Party.frog_moved.connect(_on_frog_moved)
+	Party.players_changed.connect(_on_party_changed)
+	Party.ended.connect(_on_party_ended)
+	var c: Color = Party.COLORS[Party.color]
+	if c.a > 0.0 and not str(MusicManager.equipped_skin) in ["golden_skin", "grayscale_skin", "negative_skin"]:
+		player.sprite.material = load("res://scripts/PartyFrog.gd")._tint(c, 0.45)
+
+
+func _party_frame(delta: float) -> void:
+	var sprite: AnimatedSprite2D = player.sprite
+	Party.send_frog([snappedf(player.global_position.x, 0.1), snappedf(player.global_position.y, 0.1), str(sprite.animation),
+		sprite.frame, sprite.flip_h, snappedf(sprite.rotation, 0.01), score, maxi(0, int(-highest_player_y / 10.0))], delta)
+	_place_tags()
+
+
+func _on_frog_moved(peer: int, state: Array) -> void:
+	if not Party.players.has(peer):
+		return
+	var frog = _party_frogs.get(peer)
+	if frog == null:
+		frog = Node2D.new()
+		frog.set_script(load("res://scripts/PartyFrog.gd"))
+		add_child(frog)
+		frog.setup(player, peer, Party.players[peer])
+		_party_frogs[peer] = frog
+	frog.show_state(state)
+
+
+## Someone left (their frog goes) or changed their look (it's dressed again).
+func _on_party_changed() -> void:
+	for peer in _party_frogs.keys():
+		if not Party.players.has(peer):
+			_party_frogs[peer].queue_free()
+			_party_frogs.erase(peer)
+		else:
+			_party_frogs[peer].dress(Party.players[peer])
+
+
+func _on_party_ended(why: String) -> void:
+	for peer in _party_frogs:
+		_party_frogs[peer].queue_free()
+	_party_frogs.clear()
+	_place_tags()
+	if why != "":
+		_show_banner("PARTY OVER", why)
+
+
+## Each frog's name just over its head, on the screen at the pixel font's size (so it's crisp at any
+## zoom): friends' in cream, yours in gold. Off with the name tags setting.
+func _place_tags() -> void:
+	if _party_tags == null:
+		return
+	var want := {}
+	if Party.name_tags and Party.in_run and Party.players.size() > 1:
+		want[0] = [player, Party.display_name(), GOLD]
+		for peer in _party_frogs:
+			want[peer] = [_party_frogs[peer], str(Party.players.get(peer, {}).get("name", "Froggy")), CREAM]
+	for tag in _party_tags.get_children():
+		if not want.has(int(tag.get_meta("peer", -1))):
+			tag.queue_free()
+	var xf := get_viewport().get_canvas_transform()
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	for peer in want:
+		var tag := _party_tags.get_node_or_null("Tag%d" % peer) as Label
+		if tag == null:
+			tag = Label.new()
+			tag.name = "Tag%d" % peer
+			tag.set_meta("peer", peer)
+			tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			ui.style_label(tag, 16, want[peer][2])
+			_party_tags.add_child(tag)
+		tag.text = want[peer][1]
+		var frog: Node2D = want[peer][0]
+		var head: Vector2 = xf * (frog.global_position + Vector2(0.0, -18.0 * frog.scale.y))
+		tag.position = (head - Vector2(tag.size.x * 0.5, tag.size.y)).round()

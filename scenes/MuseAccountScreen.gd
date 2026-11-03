@@ -30,6 +30,8 @@ var _buttons: Array[Button] = []
 var _mode := ""  # signed out: "" (which way to sign in), "email", "code" (emailed) or "link" (waiting on Muse Shelf)
 var _sent_to := ""  # where the code went, between "Email Me a Code" and "Sign In"
 var _busy := false
+var _friends: Button  # (Friends and Leaderboard: signed in, once Muse Social's there)
+var _leaderboard: Button
 
 
 func _ready() -> void:
@@ -38,6 +40,7 @@ func _ready() -> void:
 	_show_state()
 	_fit()
 	MuseAccount.changed.connect(_show_state)
+	MuseSocial.changed.connect(_show_state)
 	MuseAccount.link_ended.connect(_on_link_ended)
 	if not MuseAccount.linking.is_empty():
 		_mode = "link"  # (opened again while it's still waiting on Muse Shelf)
@@ -104,6 +107,10 @@ func _build_ui() -> void:
 	_status.visible = false
 	box.add_child(_status)
 
+	_friends = _button("Friends", _open_screen.bind("res://scenes/FriendsScreen.gd"), "go")
+	box.add_child(_friends)
+	_leaderboard = _button("Leaderboard", _open_screen.bind("res://scenes/LeaderboardScreen.gd"))
+	box.add_child(_leaderboard)
 	box.add_child(_button("Privacy Policy", ComplianceConfig.open_privacy_policy))
 	frame.add_child(_button("Close", func() -> void: closed.emit()))
 
@@ -113,6 +120,8 @@ func _build_ui() -> void:
 func _show_state() -> void:
 	_pro_note.visible = false
 	_code.visible = false
+	_friends.visible = MuseAccount.is_signed_in() and MuseSocial.available
+	_leaderboard.visible = _friends.visible
 	if MuseAccount.is_signed_in():
 		_mode = ""
 		_body.text = "Signed in as\n%s" % MuseAccount.email
@@ -159,6 +168,13 @@ func _show_state() -> void:
 		_primary.text = "Sign In with Muse Shelf"
 		_secondary.text = "Sign In with Email"
 		_secondary.visible = true
+
+
+## Friends or the leaderboard, over this screen; back here when it's closed.
+func _open_screen(path: String) -> void:
+	var screen = load(path).new()
+	add_child(screen)
+	screen.closed.connect(screen.queue_free)
 
 
 func _ask(placeholder: String, keyboard: LineEdit.VirtualKeyboardType, longest: int) -> void:

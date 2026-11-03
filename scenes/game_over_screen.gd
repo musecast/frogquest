@@ -295,11 +295,14 @@ func _keep_going() -> void:
 
 func _on_try_again_button_pressed() -> void:
 	AdsManager.hide_banner()
+	get_parent().finish_run()  # (to the leaderboards, if it's there to go)
 	get_tree().reload_current_scene()
 
 
 func _on_exit_button_pressed() -> void:
 	AdsManager.hide_banner()
+	get_parent().finish_run()
+	Party.leave()  # (leaving Endless leaves the party)
 	get_tree().change_scene_to_file("res://scenes/Main.tscn")
 
 
