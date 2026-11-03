@@ -61,6 +61,8 @@ func _run() -> void:
 		sling._floor_ms = Time.get_ticks_msec() - 400
 		_expect(not sling.can_jump(), "but not long after (not a jump in mid-air)")
 
+	await _real_jumps()
+
 	if _failures.is_empty():
 		print("Froggy jump test passed (%d drags)." % drags)
 	else:
@@ -68,6 +70,45 @@ func _run() -> void:
 			push_warning("FAIL: " + f)
 		print("Froggy jump test failed (%d)." % _failures.size())
 	quit(1 if not _failures.is_empty() else 0)
+
+
+## Real jumps off the first lily pad, in Endless itself: the aim line (flight_velocity) must point the way
+## he really flies, sideways speed and all (near-upright drags go near straight up). Scratch scores and
+## wardrobe; yours are byte-checked by the caller.
+func _real_jumps() -> void:
+	var mm := root.get_node("MusicManager")
+	var real_wardrobe: String = mm.wardrobe_path
+	mm.wardrobe_path = "user://test_jump_wardrobe.save"
+	var endless: Node2D = (load("res://scenes/EndlessMode.tscn") as PackedScene).instantiate()
+	endless.save_path = "user://test_jump_scores.dat"
+	root.add_child(endless)
+	for _f in 30:
+		await process_frame
+	var frog: CharacterBody2D = endless.player
+	var sling: Node2D = frog.get_node("Trajectory")
+	var worst := 0.0
+	for path in [Vector2(0, -100), Vector2(5, -80), Vector2(-12, -95), Vector2(40, -60), Vector2(-60, -40), Vector2(120, -30), Vector2(150, -110)]:
+		frog.global_position = Vector2(0.0, -24.0)
+		frog.velocity = Vector2.ZERO
+		frog.reset_physics_interpolation()
+		for _f in 40:
+			await physics_frame
+			if frog.is_on_floor():
+				break
+		var shown: Vector2 = sling.flight_velocity(path)
+		frog.velocity = sling.launch_velocity(path)  # (as letting go does)
+		await physics_frame
+		await physics_frame
+		worst = maxf(worst, absf(frog.velocity.x - shown.x))
+		if absf(frog.velocity.x - shown.x) > 0.5:
+			_failures.append("drag %s: the line shows %.0f sideways, he flies %.0f" % [path, shown.x, frog.velocity.x])
+	_expect(worst <= 0.5, "the aim line points where he really flies (worst %.1f off sideways)" % worst)
+	endless.queue_free()
+	await process_frame
+	mm.wardrobe_path = real_wardrobe
+	for f in ["user://test_jump_wardrobe.save", "user://test_jump_scores.dat"]:
+		if FileAccess.file_exists(f):
+			DirAccess.remove_absolute(f)
 
 
 ## A slingshot on a frog of its own (not in any level: nothing jumps).

@@ -117,18 +117,17 @@ func _show() -> void:
 			_box.add_child(_label("Waiting for the host to start the climb...", BODY_FONT_SZ, DIM))
 			_say_note()
 		_:
-			_box.add_child(_label("Climb Endless with friends: up to %d frogs on the same tower, each on their own phone. On the same Wi-Fi, one hosts and the others join with its code; online, friends join from anywhere." % Party.MAX_PLAYERS, BODY_FONT_SZ, GOLD))
-			_box.add_child(_label("Same Wi-Fi", BODY_FONT_SZ, GOLD))
-			_box.add_child(_button("Host a Party", _host, "go"))
-			_box.add_child(_button("Join a Party", func() -> void: _go("join")))
-			_box.add_child(_label("Online, anywhere", BODY_FONT_SZ, GOLD))
+			_box.add_child(_label("Up to %d frogs climbing one tower together." % Party.MAX_PLAYERS, BODY_FONT_SZ, DIM))
+			_header("Same Wi-Fi")
+			_row([_button("Host", _host, "go"), _button("Join", func() -> void: _go("join"))])
+			_header("Online")
 			if MuseSocial.is_member() and not MuseSocial.rooms_live:
-				_box.add_child(_label("Online parties are on their way.", BODY_FONT_SZ, DIM))
+				_box.add_child(_label("Online parties are coming soon.", BODY_FONT_SZ, DIM))
 			elif MuseSocial.is_member():
 				_box.add_child(_button("Host Online Party", _online.bind("host"), "go"))
 				_box.add_child(_button("Play with Anyone", _online.bind("anyone")))
 			else:
-				_box.add_child(_label("Sign in to your Muse account with an @handle (Muse Account, then Friends) to play online.", BODY_FONT_SZ, DIM))
+				_box.add_child(_label("Sign in to Muse (Muse Account) to play online.", BODY_FONT_SZ, DIM))
 			_say_note()
 			_look()
 	_bottom.text = "Leave Party" if _mode in ["host", "joined", "connecting"] else "Close"
@@ -146,17 +145,16 @@ func _players() -> void:
 		_box.add_child(_label(who + (" (you)" if int(id) == Party.me() else ""), BODY_FONT_SZ, GREEN if int(id) == Party.me() else DIM))
 
 
-## Your name over your frog, your party colour and name tags.
+## You, as your friends see you: your name over your frog, your colour, name tags and tethers.
 func _look() -> void:
+	_header("You")
 	if MuseSocial.is_member():
 		_box.add_child(_label("Friends see you as %s" % Party.display_name(), BODY_FONT_SZ, GOLD))
 	else:
-		_box.add_child(_label("Your name over your frog", BODY_FONT_SZ, GOLD))
 		_input = _line("Your name", 16)
 		_input.text = Party.my_name if _typed == "" else _typed
 		_input.text_changed.connect(func(text: String) -> void: Party.set_my_name(text))
 		_box.add_child(_input)
-	_box.add_child(_label("Your colour", BODY_FONT_SZ, GOLD))
 	var swatches := GridContainer.new()
 	swatches.columns = 4
 	swatches.add_theme_constant_override("h_separation", 6)
@@ -182,11 +180,34 @@ func _look() -> void:
 	_box.add_child(swatches)
 	_box.add_child(_button("Name Tags: %s" % ("On" if Party.name_tags else "Off"), func() -> void:
 		Party.set_name_tags(not Party.name_tags)
-		_show(), "quiet"))
+		_show(), "go" if Party.name_tags else "quiet"))
 	_box.add_child(_button("Tethers: %s" % ("On" if Party.tethers else "Off"), func() -> void:
 		Party.set_tethers(not Party.tethers)
-		_show(), "quiet"))
-	_box.add_child(_label("A tether ties you to your nearest friend: fall, and they pull you back up.", BODY_FONT_SZ, DIM))
+		_show(), "go" if Party.tethers else "quiet"))
+	_box.add_child(_label("With tethers, a friend pulls you up when you fall.", BODY_FONT_SZ, DIM))
+
+
+## A section's name, in gold, over a thin line.
+func _header(text: String) -> void:
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 2)
+	_box.add_child(gap)
+	_box.add_child(_label(text, BODY_FONT_SZ, load("res://scripts/UIStyle.gd").GOLD))
+	var line := ColorRect.new()
+	line.color = Color(GOLD, 0.35)
+	line.custom_minimum_size = Vector2(0, 1)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_box.add_child(line)
+
+
+## Buttons side by side, sharing the width.
+func _row(buttons: Array) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	for b in buttons:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(b)
+	_box.add_child(row)
 
 
 ## Online: hosting (friends join from their Friends list) or Play with Anyone (a public party).

@@ -855,15 +855,17 @@ func _layout_title(vp: Vector2, is_portrait: bool) -> void:
 	var bottom: float = spots.floor  # (just over "made by muse")
 	var shown: Array = menu.get_children().filter(func(b: Control) -> bool: return b.visible)
 	var count := shown.size()
-	# [words, first button's height, the others', gap]
-	var sizes := [[32, 72.0, 60.0, 10.0], [32, 56.0, 48.0, 8.0], [16, 44.0, 38.0, 6.0], [16, 34.0, 30.0, 4.0]] \
+	# [words, first button's height, the others', gap]. (With six buttons, the big words dropped to the small
+	# ones on a closed iPhone Duo, short of room by under a pixel: the third size keeps them big on slimmer
+	# buttons.)
+	var sizes := [[32, 72.0, 60.0, 10.0], [32, 56.0, 48.0, 8.0], [32, 50.0, 42.0, 6.0], [16, 44.0, 38.0, 6.0], [16, 34.0, 30.0, 4.0]] \
 		if is_portrait else [[16, 40.0, 34.0, 6.0], [16, 34.0, 28.0, 4.0]]
 	var logo: Vector2 = spots.logo
 	title.scale = Vector2.ONE * spots.logo_scale
 	var top: float
 	var width: float
 	if is_portrait:  # (whole pixels wide, so the words land dead in the middle)
-		top = logo.y + 375.0 * 0.25 + 16.0
+		top = logo.y + 375.0 * 0.25 + 8.0
 		width = floorf(minf(vp.x * 0.84, 420.0))
 	else:
 		top = room.position.y + 8.0

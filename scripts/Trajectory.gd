@@ -5,10 +5,11 @@ extends Node2D
 ## - A jump let go a moment after he's left a platform's edge still goes (COYOTE_MS), and a press made
 ##   just before he lands is kept for when he does, so a jump isn't lost to a wobble on a moving platform
 ##   or a tap a hair too early.
-## - The aim line points where he'll actually go (launch_velocity, sideways stretch and push and all),
-##   not along the raw drag, which pointed well off his real path on short drags.
+## - The aim line points where he'll actually go (flight_velocity: the launch, less the tick of standing
+##   friction before he's off the platform).
 
 const COYOTE_MS := 120  # (ms after leaving a platform that a jump still goes)
+const FLOOR_FRICTION := 300.0  # (the frog's SPEED: how much standing slows him sideways each tick)
 
 var mouseOrigin = Vector2()
 var mousePosition = Vector2()
@@ -53,6 +54,14 @@ func launch_velocity(path: Vector2) -> Vector2:
 	if absf(velocity.x) < 450 and absf(velocity.y) > 350:
 		velocity.x = 50 * signf(velocity.x) + velocity.x
 	return velocity
+
+## Where he really goes: the launch, less the one tick of standing friction it gets before he's off the
+## platform (on the frame he jumps he's still standing, and standing he's slowed by his SPEED sideways;
+## the push short drags get makes up for it). So a near-upright drag goes, and shows, near straight up.
+func flight_velocity(path: Vector2) -> Vector2:
+	var v := launch_velocity(path)
+	v.x = move_toward(v.x, 0.0, FLOOR_FRICTION)
+	return v
 
 
 ## On a platform, or only just off one (COYOTE_MS).
@@ -101,7 +110,7 @@ func _process(delta):
 ## The aim line: along the jump he'll make, longer and whiter the stronger it is.
 func _draw():
 	if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0) and can_jump():
-		var launch := launch_velocity(mousePath)
+		var launch := flight_velocity(mousePath)
 		var power := clampf(launch.length() / Vector2(800, 450).length(), 0.0, 1.0)
 		draw_line(Vector2(0,0), launch / 10.8, Color(255, 1.2 - power, 1.2 - power, 1), 2.0)
 

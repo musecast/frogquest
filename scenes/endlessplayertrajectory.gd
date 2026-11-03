@@ -2,9 +2,10 @@ extends Node2D
 ## Froggy's slingshot in Endless, as the story's (scripts/Trajectory.gd): the drag-to-jump numbers are the
 ## original's (launch_velocity), times a spring's boost; a jump let go just after leaving a platform's
 ## edge still goes, a press just before landing is kept for the landing, and the aim line points where
-## he'll really go (gold and longer off a spring).
+## he'll really go (flight_velocity; gold and longer off a spring).
 
 const COYOTE_MS := 120  # (ms after leaving a platform that a jump still goes)
+const FLOOR_FRICTION := 300.0  # (the frog's SPEED: how much standing slows him sideways each tick)
 
 var mouseOrigin = Vector2()
 var mousePosition = Vector2()
@@ -53,6 +54,14 @@ func launch_velocity(path: Vector2) -> Vector2:
 		velocity *= get_parent().launch_boost()  # (off a spring: much higher)
 	return velocity
 
+## Where he really goes: the launch, less the one tick of standing friction it gets before he's off the
+## platform (on the frame he jumps he's still standing, and standing he's slowed by his SPEED sideways;
+## the push short drags get makes up for it). So a near-upright drag goes, and shows, near straight up.
+func flight_velocity(path: Vector2) -> Vector2:
+	var v := launch_velocity(path)
+	v.x = move_toward(v.x, 0.0, FLOOR_FRICTION)
+	return v
+
 
 ## On a platform, or only just off one (COYOTE_MS).
 func can_jump() -> bool:
@@ -100,7 +109,7 @@ func _process(delta):
 ## The aim line: along the jump he'll make, longer and whiter the stronger it is; off a spring, gold.
 func _draw():
 	if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0) and can_jump():
-		var launch := launch_velocity(mousePath)
+		var launch := flight_velocity(mousePath)
 		var boost: float = get_parent().launch_boost() if get_parent().has_method("launch_boost") else 1.0
 		if boost > 1.0:  # on a spring: longer, in spring gold
 			draw_line(Vector2(0,0), launch / 10.8, Color(1.0, 0.86, 0.3, 1), 3.0)
