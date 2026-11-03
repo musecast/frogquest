@@ -206,6 +206,11 @@ func _friend_row(card: Dictionary) -> void:
 	more.custom_minimum_size = Vector2(BTN_HEIGHT * 1.5, BTN_HEIGHT)
 	row.add_child(more)
 	_box.add_child(row)
+	var room := str(card.get("joinable", {}).get("room", "")) if card.get("joinable") is Dictionary else ""
+	if room != "" and room != Party.online_room and state == "online":
+		_box.add_child(_button("Join @%s's Party" % who, _join_friend.bind(who, room), "go"))
+	elif Party.online_room != "" and room != Party.online_room and state in ["online", "away"]:
+		_box.add_child(_button("Invite to Your Party", _invite.bind(who), "quiet"))
 	if _open == who:
 		if _reporting == who:
 			_box.add_child(_label("Report @%s for:" % who, BODY_FONT_SZ, GOLD))
@@ -306,6 +311,28 @@ func _report(who: String, reason: String) -> void:
 	_reporting = ""
 	if _start_action():
 		_end_action(await MuseSocial.report(who, reason), "Thanks: the Muse team will look at @%s." % who)
+
+
+func _invite(who: String) -> void:
+	if not _start_action():
+		return
+	var result: String = await MuseSocial.invite(who)
+	match result:
+		"sent":
+			_end_action("", "Invited @%s." % who)
+		"joined":
+			_end_action("", "@%s is already in your party." % who)
+		"dnd":
+			_end_action("", "@%s has do not disturb on." % who)
+		_:
+			_end_action(result, "")
+
+
+func _join_friend(who: String, room: String) -> void:
+	if not _start_action():
+		return
+	var problem: String = await Party.join_room(room)
+	_end_action(problem, "Joining @%s's party..." % who)
 
 
 ## One of MuseSocial's actions at a time (a second tap meanwhile does nothing).

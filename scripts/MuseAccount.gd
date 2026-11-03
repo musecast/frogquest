@@ -263,6 +263,22 @@ func call_rpc(fn_name: String, args := {}) -> Dictionary:
 	return r
 
 
+## Calls the Muse API (MUSE_API, Muse's Worker) as you, like call_rpc: {code, data}, -1 signed out.
+func call_api(path: String, body := {}) -> Dictionary:
+	if not is_signed_in():
+		return {"code": -1, "data": null}
+	var r := {"code": 0, "data": null}
+	for _attempt in 2:
+		var token: String = await _access()
+		if token == "":
+			return {"code": 0 if is_signed_in() else -1, "data": null}
+		r = await _call(path, body, token, MUSE_API)
+		if r.code != 401:
+			return r
+		_access_token = ""
+	return r
+
+
 ## Signs out here (only here: the Muse apps stay signed in).
 func sign_out() -> void:
 	var refresh := _refresh_token

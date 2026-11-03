@@ -86,6 +86,17 @@ func _show() -> void:
 			_say_note()
 			_box.add_child(_button("Back", func() -> void: _go("menu"), "quiet"))
 		"host":
+			if Party.is_online():
+				_box.add_child(_label("Your online party", BODY_FONT_SZ, GOLD))
+				_box.add_child(_label("Friends anywhere can tap Join by your name in their Friends list, or you can invite them.", BODY_FONT_SZ, GOLD))
+				_box.add_child(_button("Invite Friends", _open_friends))
+				_players()
+				_box.add_child(_button("Start Climbing", func() -> void: Party.start(), "go"))
+				_say_note()
+				_bottom.text = "Leave Party"
+				load("res://scripts/UIStyle.gd").finger_scroll(_scroll)
+				_fit()
+				return
 			var code := Party.code()
 			_box.add_child(_label("Your party code", BODY_FONT_SZ, GOLD))
 			var big := _label(code if code != "" else "----", 32, load("res://scripts/UIStyle.gd").GOLD)
@@ -96,6 +107,9 @@ func _show() -> void:
 			_players()
 			_box.add_child(_button("Start Climbing", func() -> void: Party.start(), "go"))
 			_say_note()
+		"connecting":
+			_box.add_child(_label("Connecting to the party...", BODY_FONT_SZ, DIM))
+			_say_note()
 		"joined":
 			var host_name := str(Party.players.get(1, {}).get("name", "the host"))
 			_box.add_child(_label("You're in %s's party!" % host_name, BODY_FONT_SZ, GREEN))
@@ -103,12 +117,21 @@ func _show() -> void:
 			_box.add_child(_label("Waiting for the host to start the climb...", BODY_FONT_SZ, DIM))
 			_say_note()
 		_:
-			_box.add_child(_label("Climb Endless with friends: up to %d frogs on the same tower, each on their own phone. On the same Wi-Fi, one hosts and the others join with the host's code. (Online parties are on their way.)" % Party.MAX_PLAYERS, BODY_FONT_SZ, GOLD))
+			_box.add_child(_label("Climb Endless with friends: up to %d frogs on the same tower, each on their own phone. On the same Wi-Fi, one hosts and the others join with its code; online, friends join from anywhere." % Party.MAX_PLAYERS, BODY_FONT_SZ, GOLD))
+			_box.add_child(_label("Same Wi-Fi", BODY_FONT_SZ, GOLD))
 			_box.add_child(_button("Host a Party", _host, "go"))
 			_box.add_child(_button("Join a Party", func() -> void: _go("join")))
+			_box.add_child(_label("Online, anywhere", BODY_FONT_SZ, GOLD))
+			if MuseSocial.is_member() and not MuseSocial.rooms_live:
+				_box.add_child(_label("Online parties are on their way.", BODY_FONT_SZ, DIM))
+			elif MuseSocial.is_member():
+				_box.add_child(_button("Host Online Party", _online.bind("host"), "go"))
+				_box.add_child(_button("Play with Anyone", _online.bind("anyone")))
+			else:
+				_box.add_child(_label("Sign in to your Muse account with an @handle (Muse Account, then Friends) to play online.", BODY_FONT_SZ, DIM))
 			_say_note()
 			_look()
-	_bottom.text = "Leave Party" if _mode in ["host", "joined"] else "Close"
+	_bottom.text = "Leave Party" if _mode in ["host", "joined", "connecting"] else "Close"
 	load("res://scripts/UIStyle.gd").finger_scroll(_scroll)
 	_fit()
 
@@ -162,6 +185,28 @@ func _look() -> void:
 		_show(), "quiet"))
 
 
+## Online: hosting (friends join from their Friends list) or Play with Anyone (a public party).
+func _online(how: String) -> void:
+	_say("Joining a public party..." if how == "anyone" else "Starting your online party...", DIM)
+	var problem: String
+	if how == "anyone":
+		problem = await Party.play_with_anyone()
+	else:
+		problem = await Party.host_online()
+	if problem != "":
+		_say(problem, RED)
+		return
+	_mode = "connecting"
+	_note = ""
+	_show()
+
+
+func _open_friends() -> void:
+	var screen = load("res://scenes/FriendsScreen.gd").new()
+	add_child(screen)
+	screen.closed.connect(screen.queue_free)
+
+
 func _host() -> void:
 	var problem := Party.host()
 	if problem != "":
@@ -185,10 +230,12 @@ func _join() -> void:
 
 
 func _on_players_changed() -> void:
-	if _mode == "join" and Party.is_on() and Party.players.has(Party.me()):
+	if _mode in ["join", "connecting"] and Party.is_on() and Party.players.has(Party.me()):
 		_note = ""
-		_mode = "joined"
-	if _mode in ["host", "joined", "join"]:
+		_mode = "host" if Party.is_host() else "joined"
+	elif _mode in ["joined", "connecting"] and Party.is_on() and Party.is_host():
+		_mode = "host"  # (online, the host left: you've been there longest now)
+	if _mode in ["host", "joined", "join", "connecting"]:
 		_show()
 
 
@@ -198,7 +245,7 @@ func _on_ended(why: String) -> void:
 
 
 func _on_bottom() -> void:
-	if _mode in ["host", "joined"]:
+	if _mode in ["host", "joined", "connecting"]:
 		Party.leave()
 		_go("menu")
 	else:

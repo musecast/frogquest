@@ -10,6 +10,7 @@ extends Node
 ## Until those functions answer on the live project, `available` stays false and none of it shows.
 
 signal changed  # you, your friends, or whether Muse Social is there
+signal invited(invite: Dictionary)  # a friend asks you into their online party: {id, room, from (a card), players...}
 signal run_posted(result: Dictionary)  # an Endless run went to the leaderboards: submit_run's answer, {} if it couldn't
 
 const APP := "frog-quest"
@@ -17,6 +18,7 @@ const GAME := "frog-quest"
 const BOARD := "endless"
 const PING_EVERY := 60.0  # seconds between "still here"s while the game's in front
 const FRIENDS_EVERY := 30.0  # and between looks at what your friends are up to, while you're looking
+const INVITES_EVERY := 15.0  # and between looks for invites into friends' parties
 const STATUSES := ["online", "away", "dnd", "invisible"]
 const STATE_ORDER := ["online", "away", "dnd", "offline"]  # (how friends are listed: who's on first)
 const REPORT_REASONS := ["spam", "harassment", "hate", "sexual", "impersonation", "other"]
@@ -30,11 +32,14 @@ var friends: Array = []  # [{handle, displayName, avatar, avatarColor, state, ap
 var incoming: Array = []  # friend requests waiting on you: cards
 var outgoing: Array = []  # ones you sent
 var presence_live := false  # (friends' states come from muse_presence_friends; without it, just the list)
+var rooms_live := false  # Muse's online party rooms answer (muse_game_invites): online parties show then
 var activity := "title"  # what you're doing here: title, story or endless (set by those scenes)
 var watching := 0  # screens showing your friends right now (they're looked at more often then)
 var last_post := {}  # the last run posted, as the server answered (run_posted)
 
 var _ping_timer: Timer
+var _invites_timer: Timer
+var _seen_invites := {}
 var _friends_timer: Timer
 var _refreshing := false
 
@@ -45,6 +50,8 @@ func _ready() -> void:
 	_friends_timer = _timer(FRIENDS_EVERY, func() -> void:
 		if watching > 0:
 			refresh())
+	_invites_timer = _timer(INVITES_EVERY, _check_invites)
+	invited.connect(_show_invite)
 	if MuseAccount.is_signed_in() and not MuseAccount._is_froggy():
 		get_tree().create_timer(MuseAccount.FIRST_CHECK_DELAY + 1.0).timeout.connect(refresh)
 
@@ -115,6 +122,8 @@ func refresh() -> void:
 	if is_member() and _ping_timer.is_stopped():
 		ping()
 		_ping_timer.start()
+	if is_member():
+		_check_invites()  # (and finds out whether online parties are open)
 
 
 ## "Still here, doing this" (every PING_EVERY while the game's in front, and when what you're doing
@@ -122,7 +131,7 @@ func refresh() -> void:
 func ping() -> void:
 	if not is_member() or not presence_live:
 		return
-	var r: Dictionary = await MuseAccount.call_rpc("muse_presence_ping", {"p_app": APP, "p_activity": activity, "p_joinable": null})
+	var r: Dictionary = await MuseAccount.call_rpc("muse_presence_ping", {"p_app": APP, "p_activity": activity, "p_joinable": Party.joinable()})
 	if r.code == 200 and str(r.data) in STATUSES and str(r.data) != my_status:
 		my_status = str(r.data)
 		changed.emit()
@@ -213,6 +222,55 @@ func submit_run(run: String, log: Dictionary) -> Dictionary:
 	return r.data if r.code == 200 and r.data is Dictionary else {}
 
 
+## Asks a friend into your online party: "sent", "joined" (they're in), "dnd" (they've asked not to be
+## disturbed), or what went wrong.
+func invite(who: String) -> String:
+	if Party.online_room == "":
+		return "Host an online party first (Play Together)."
+	var r: Dictionary = await MuseAccount.call_rpc("muse_game_invite", {"p_to_handle": _bare(who), "p_room": Party.online_room})
+	if r.code == 200 and r.data is Dictionary:
+		return str(r.data.get("status", "sent"))
+	return _problem(r)
+
+
+## Yes or no to an invite. Yes goes into their party (Party.enter_room). "" or what went wrong.
+func answer_invite(inv: Dictionary, accept: bool) -> String:
+	var r: Dictionary = await MuseAccount.call_rpc("muse_game_invite_respond", {"p_id": inv.get("id"), "p_accept": accept})
+	if r.code != 200:
+		return _problem(r)
+	if not accept:
+		return ""
+	if not (r.data is Dictionary):
+		return "That invite ran out."
+	return await Party.enter_room(r.data)
+
+
+## New invites into friends' parties (each shown once), while you're not in one already.
+func _check_invites() -> void:
+	if not is_member() or Party.is_on():
+		return
+	var r: Dictionary = await MuseAccount.call_rpc("muse_game_invites", {"p_app": APP})
+	if (r.code == 200) != rooms_live and (r.code == 200 or r.code == 404):
+		rooms_live = r.code == 200
+		changed.emit()
+	if r.code != 200 or not (r.data is Array):
+		return
+	for inv in r.data:
+		if inv is Dictionary and not _seen_invites.has(str(inv.get("id", ""))):
+			_seen_invites[str(inv.get("id", ""))] = true
+			invited.emit(inv)
+
+
+func _show_invite(inv: Dictionary) -> void:
+	if get_tree().root.has_node("InvitePopup"):
+		return  # (one at a time; a later one waits for the next look)
+	var popup := CanvasLayer.new()
+	popup.name = "InvitePopup"
+	popup.set_script(load("res://scenes/InvitePopup.gd"))
+	popup.invite = inv
+	get_tree().root.add_child(popup)
+
+
 ## Posts a finished run in the background (the scene that ran it may be gone by the answer): run_posted.
 func post_run(run: String, log: Dictionary) -> void:
 	last_post = await submit_run(run, log)
@@ -261,6 +319,9 @@ func _apply(is_there: bool, who: Dictionary, list: Array, ins: Array, outs: Arra
 	outgoing = outs
 	if not is_member():
 		_ping_timer.stop()
+		_invites_timer.stop()
+	elif _invites_timer.is_stopped():
+		_invites_timer.start()
 	changed.emit()
 
 

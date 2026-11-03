@@ -3,8 +3,12 @@ extends Node
 ## same platforms; one clock, so the moving ones swing together), each on their own phone. One hosts and
 ## gets a party code; the others type it in. On the same Wi-Fi it's phone to phone over ENet (Godot's own
 ## networking), no server in between. Everyone's frog shows on everyone's screen in its own hat, skin and
-## colour, with its name over it (name tags can be turned off). Online parties, through Muse's relay, are
-## to connect here too, as a second way in.
+## colour, with its name over it (name tags can be turned off).
+##
+## Online, anywhere, it goes through Muse instead (with a Muse @handle): a room in Muse's database (made
+## by the host, joined by a friend's Join or an invite, or picked by Play with Anyone), and a relay that
+## passes each frog on to the room (one WebSocket each; seats 1 to 16 stand in for the Wi-Fi's peer ids).
+## Online, names are the room's own @handles, which Muse's word filter has passed, never typed ones.
 ##
 ## The code is the host's address on the Wi-Fi, its last two numbers (a home network's first two are
 ## the same for everyone on it): 192.168.1.37 is 1 and 37, written "0137" in base 36 as four letters
@@ -36,8 +40,16 @@ var name_tags := true
 var settings_path := SETTINGS_PATH  # (the tests point it elsewhere)
 var on_start := Callable()  # (what starting does; the tests swap it so the scene stays put)
 
+var online_room := ""  # the Muse room you're in, online ("" on Wi-Fi or alone)
+var ws_ticket_path := "/api/rooms/ticket"  # (on MuseAccount.MUSE_API)
+
 var _send_left := 0.0
 var _last_state := []
+var _ws: WebSocketPeer  # online: the relay
+var _seat := 0  # your seat in the room (0 until the relay's welcome)
+var _host_seat := 0  # whoever's been in the room longest: they start the climb
+var _ping_left := 0.0
+var _tries := 0  # (a ticket that wouldn't open is tried once more)
 
 
 func _ready() -> void:
@@ -50,17 +62,32 @@ func _ready() -> void:
 
 
 func is_on() -> bool:
+	if _ws != null:
+		return _seat > 0 and _ws.get_ready_state() == WebSocketPeer.STATE_OPEN
 	var peer := multiplayer.multiplayer_peer
 	return peer != null and not (peer is OfflineMultiplayerPeer) \
 		and peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED
 
 
+func is_online() -> bool:
+	return _ws != null
+
+
 func is_host() -> bool:
+	if _ws != null:
+		return is_on() and _seat == _host_seat
 	return is_on() and multiplayer.is_server()
 
 
 func me() -> int:
+	if _ws != null:
+		return _seat
 	return multiplayer.get_unique_id() if is_on() else 0
+
+
+## What friends see to join you by (Muse presence), online: {mode, room}; null otherwise.
+func joinable():
+	return {"mode": "endless", "room": online_room} if online_room != "" else null
 
 
 ## The name others see over your frog: your Muse @handle, or the name you typed.
@@ -103,6 +130,16 @@ func join(code: String) -> String:
 
 ## Leaves the party (ends it, for the host). Quietly: no ended signal, you know.
 func leave() -> void:
+	if _ws != null:
+		var ws := _ws
+		_ws = null  # (first, so its closing isn't taken for the party ending)
+		ws.close()
+	if online_room != "":
+		MuseAccount.call_rpc("muse_game_room_leave", {"p_room": online_room})
+		online_room = ""
+		MuseSocial.ping()
+	_seat = 0
+	_host_seat = 0
 	var peer := multiplayer.multiplayer_peer
 	if peer != null and not (peer is OfflineMultiplayerPeer):
 		peer.close()
@@ -114,8 +151,166 @@ func leave() -> void:
 
 ## The host starts everyone climbing: a new tower (a new seed) for all.
 func start() -> void:
-	if is_host():
+	if not is_host():
+		return
+	if _ws != null:
+		var the_seed := randi()
+		_relay({"data": {"t": "start", "seed": the_seed, "ago": 0}})
+		_begin(the_seed, 0)
+	else:
 		_start.rpc(randi(), 0)
+
+
+# ── online ──────────────────────────────────────────────────────────────────────────────────────
+
+## Hosts an online party: friends join from their Friends list, or by your invite. "" or what went wrong.
+func host_online() -> String:
+	return await _into_room("muse_game_room_create", {"p_app": MuseSocial.APP, "p_mode": "endless"})
+
+
+## Joins a friend's online party (their Join). "" or what went wrong.
+func join_room(room: String) -> String:
+	return await _into_room("muse_game_room_join", {"p_room": room})
+
+
+## Play with Anyone: Muse puts you in an open public party, or starts one. "" or what went wrong.
+func play_with_anyone() -> String:
+	return await _into_room("muse_game_quick_join", {"p_app": MuseSocial.APP, "p_mode": "endless"})
+
+
+## Into a room you're already in (an invite you said yes to): straight to its relay.
+func enter_room(room: Dictionary) -> String:
+	return await _connect_room(str(room.get("room", "")))
+
+
+func _into_room(fn_name: String, args: Dictionary) -> String:
+	if not MuseSocial.is_member():
+		return "Sign in to your Muse account and pick an @handle to play online."
+	var r: Dictionary = await MuseAccount.call_rpc(fn_name, args)
+	if r.code == 404 and fn_name == "muse_game_quick_join":
+		return "Play with Anyone isn't open yet."
+	if r.code == 404:
+		return "Online parties aren't open yet."
+	if r.code != 200 or not (r.data is Dictionary):
+		return MuseSocial._problem(r)
+	return await _connect_room(str(r.data.get("room", "")))
+
+
+## A ticket from Muse's relay for the room, then its WebSocket. The welcome that follows seats you.
+func _connect_room(room: String) -> String:
+	if room == "":
+		return "That party isn't there any more."
+	if online_room != room:
+		leave()
+	online_room = room
+	var t: Dictionary = await MuseAccount.call_api(ws_ticket_path, {"room": room})
+	if t.code != 200 or not (t.data is Dictionary) or str(t.data.get("url", "")) == "":
+		online_room = ""
+		return "Couldn't reach the party (%s)." % ("you're not in it" if t.code == 403 else "the relay said %d" % t.code)
+	_ws = WebSocketPeer.new()
+	if _ws.connect_to_url(str(t.data.url)) != OK:
+		_ws = null
+		online_room = ""
+		return "Couldn't reach the party."
+	_ping_left = 25.0
+	players = {}
+	players_changed.emit()
+	return ""
+
+
+func _process(delta: float) -> void:
+	if _ws == null:
+		return
+	_ws.poll()
+	match _ws.get_ready_state():
+		WebSocketPeer.STATE_OPEN:
+			while _ws != null and _ws.get_available_packet_count() > 0:
+				_on_relay(_ws.get_packet().get_string_from_utf8())
+			_ping_left -= delta
+			if _ws != null and _ping_left <= 0.0:
+				_ping_left = 25.0
+				_ws.send_text("ping")  # (keeps it open; free)
+		WebSocketPeer.STATE_CLOSED:
+			var code := _ws.get_close_code()
+			var was_seated := _seat > 0
+			var room := online_room
+			_ws = null
+			if not was_seated and _tries < 1 and room != "":
+				_tries += 1  # (the ticket didn't take: once more, with a fresh one)
+				_connect_room(room)
+				return
+			_tries = 0
+			_end("You joined this party somewhere else." if code == 4000 else "Lost the online party.")
+
+
+func _on_relay(text: String) -> void:
+	if text == "pong":
+		return
+	var msg = JSON.parse_string(text)
+	if not (msg is Dictionary):
+		return
+	if msg.has("sys"):
+		match str(msg.sys):
+			"welcome":
+				_tries = 0
+				_seat = int(msg.get("you", 0))
+				_host_seat = int(msg.get("host", 0))
+				players = {}
+				for card in msg.get("players", []):
+					if card is Dictionary:
+						players[int(card.get("slot", 0))] = _look_of(card)
+				var mine := my_info()
+				mine.name = str(players.get(_seat, {}).get("name", mine.name))
+				players[_seat] = mine
+				_relay({"data": {"t": "look", "i": my_info()}})
+				players_changed.emit()
+				MuseSocial.ping()  # (friends see they can join)
+			"join":
+				var card: Dictionary = msg.get("player", {}) if msg.get("player") is Dictionary else {}
+				var slot := int(card.get("slot", 0))
+				_host_seat = int(msg.get("host", _host_seat))
+				if slot > 0 and slot != _seat:
+					players[slot] = _look_of(card, players.get(slot, {}))
+					_relay({"to": slot, "data": {"t": "look", "i": my_info()}})
+					if is_host() and in_run:
+						_relay({"to": slot, "data": {"t": "start", "seed": run_seed, "ago": Time.get_ticks_msec() - run_started_ms}})
+				players_changed.emit()
+			"leave":
+				players.erase(int(msg.get("slot", 0)))
+				_host_seat = int(msg.get("host", _host_seat))
+				players_changed.emit()
+		return
+	var from := int(msg.get("from", 0))
+	var d = msg.get("data")
+	if from <= 0 or not (d is Dictionary):
+		return
+	match str(d.get("t", "")):
+		"f":
+			if d.get("s") is Array and d.s.size() >= 8:
+				frog_moved.emit(from, d.s)
+		"look":
+			if d.get("i") is Dictionary:
+				var look := _clean(d.i)
+				look.name = str(players.get(from, {}).get("name", "Froggy"))  # (the room's own @handle, not a typed name)
+				players[from] = look
+				players_changed.emit()
+		"start":
+			if from == _host_seat:
+				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)))
+
+
+## A seat's look from the relay's card: their @handle (passed by Muse's filter), keeping any hat and
+## colour they've shared.
+func _look_of(card: Dictionary, before := {}) -> Dictionary:
+	var look := _clean(before)
+	var handle := str(card.get("handle", ""))
+	look.name = "@" + handle if handle != "" else "Froggy"
+	return look
+
+
+func _relay(msg: Dictionary) -> void:
+	if _ws != null and _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		_ws.send_text(JSON.stringify(msg))
 
 
 ## Seconds since the party's climb started, on the clock everyone shares (moving platforms swing by it).
@@ -134,12 +329,22 @@ func send_frog(state: Array, delta: float) -> void:
 		return
 	_send_left = SEND_EVERY if players.size() < BIG_PARTY else SEND_EVERY_BIG
 	_last_state = state
-	_frog.rpc(state)
+	if _ws != null:
+		_relay({"data": {"t": "f", "s": state}})
+	else:
+		_frog.rpc(state)
 
 
 ## Changes your look for the others (a new hat or colour in the party screen or the wardrobe).
 func share_look() -> void:
 	if not is_on():
+		return
+	if _ws != null:
+		var mine := my_info()
+		mine.name = str(players.get(_seat, {}).get("name", mine.name))
+		players[_seat] = mine
+		_relay({"data": {"t": "look", "i": my_info()}})
+		players_changed.emit()
 		return
 	if is_host():
 		players[1] = my_info()
@@ -283,6 +488,11 @@ func _roster(all: Dictionary) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _start(the_seed: int, ago_ms: int) -> void:
+	_begin(the_seed, ago_ms)
+
+
+## The climb starts (or a latecomer catches up with it): everyone on the same tower and clock.
+func _begin(the_seed: int, ago_ms: int) -> void:
 	run_seed = the_seed
 	run_started_ms = Time.get_ticks_msec() - ago_ms
 	in_run = true
