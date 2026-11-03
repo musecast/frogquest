@@ -125,6 +125,8 @@ func _show_state() -> void:
 	if MuseAccount.is_signed_in():
 		_mode = ""
 		_body.text = "Signed in as\n%s" % MuseAccount.email
+		if MuseAccount.member_since_text() != "":
+			_body.text += "\nMember since %s" % MuseAccount.member_since_text()
 		_pro_note.visible = true
 		if MuseAccount.has_pro():
 			_pro_note.text = "You have Muse Pro, so this is Frog Quest+: %s!" % _perks()

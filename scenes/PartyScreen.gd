@@ -120,14 +120,13 @@ func _show() -> void:
 			_box.add_child(_label("Up to %d frogs climbing one tower together." % Party.MAX_PLAYERS, BODY_FONT_SZ, DIM))
 			_header("Same Wi-Fi")
 			_row([_button("Host", _host, "go"), _button("Join", func() -> void: _go("join"))])
-			_header("Online")
-			if MuseSocial.is_member() and not MuseSocial.rooms_live:
-				_box.add_child(_label("Online parties are coming soon.", BODY_FONT_SZ, DIM))
-			elif MuseSocial.is_member():
-				_box.add_child(_button("Host Online Party", _online.bind("host"), "go"))
-				_box.add_child(_button("Play with Anyone", _online.bind("anyone")))
-			else:
-				_box.add_child(_label("Sign in to Muse (Muse Account) to play online.", BODY_FONT_SZ, DIM))
+			if MuseSocial.rooms_live:  # (online only once Muse's rooms answer: nothing "coming soon" in a store build)
+				_header("Online")
+				if MuseSocial.is_member():
+					_box.add_child(_button("Host Online Party", _online.bind("host"), "go"))
+					_box.add_child(_button("Play with Anyone", _online.bind("anyone")))
+				else:
+					_box.add_child(_label("Sign in to Muse (Muse Account) to play online.", BODY_FONT_SZ, DIM))
 			_say_note()
 			_look()
 	_bottom.text = "Leave Party" if _mode in ["host", "joined", "connecting"] else "Close"

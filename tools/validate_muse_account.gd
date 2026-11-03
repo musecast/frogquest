@@ -53,6 +53,7 @@ func _run() -> void:
 	_reply("/rest/v1/rpc/muse_has_pro", 200, true)
 	_expect(await acct.verify_code("jay@example.com", "123456") == "", "the right code signs you in")
 	_expect(acct.is_signed_in() and acct.has_pro() and acct.email == "jay@example.com", "and finds Muse Pro")
+	_expect(acct.member_since_text() == "Jun 14, 2025", "and when the account was made, in words (%s)" % acct.member_since_text())
 	_expect(_calls[-1].bearer == "access-1", "the Pro check goes with your sign-in")
 	_expect(acct.logo_path() == acct.LOGO_PLUS and link.has_muse_pro(), "Pro brings the + and lets Lil Froggy out")
 	_expect(changes[0] >= 2, "the screens hear about it (signed in, then Pro)")
@@ -62,6 +63,7 @@ func _run() -> void:
 	# It's all still there next launch.
 	_forget(acct)
 	_expect(acct.is_signed_in() and acct.has_pro() and acct.email == "jay@example.com", "the sign-in survives a restart")
+	_expect(acct.member_since == "2025-06-14T18:02:11.123456Z", "its signup date too")
 
 	# Offline, Pro lasts a while, then doesn't.
 	acct._pro_checked_at = acct._now() - 29.0 * DAY
@@ -125,7 +127,8 @@ func _run() -> void:
 	acct.sign_out()
 	for _i in 3:
 		await process_frame
-	_expect(not acct.is_signed_in() and not FileAccess.file_exists(SCRATCH), "signing out forgets the session")
+	_expect(not acct.is_signed_in() and not FileAccess.file_exists(SCRATCH) and acct.member_since == "",
+		"signing out forgets the session")
 	_expect(_calls.size() == 1 and _calls[0].path == "/auth/v1/logout?scope=local" and _calls[0].bearer == "access-4",
 		"and ends it on Muse's side, for this device only (the Muse apps stay signed in)")
 
@@ -198,7 +201,7 @@ func _forget(acct: Node) -> void:
 
 func _session(access: String, refresh: String) -> Dictionary:
 	return {"access_token": access, "refresh_token": refresh, "expires_in": 3600, "token_type": "bearer",
-		"user": {"email": "jay@example.com"}}
+		"user": {"email": "jay@example.com", "created_at": "2025-06-14T18:02:11.123456Z"}}
 
 
 func _reply(path_start: String, code: int, data: Variant) -> void:

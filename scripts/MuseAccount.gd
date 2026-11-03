@@ -33,6 +33,7 @@ const LOGO_PLUS := "res://assets/frogquesttitle_plus.png"  # (the same, with the
 const MUSE_API := "https://muse-tracker-api.jasonmuse.workers.dev"
 
 var email := ""
+var member_since := ""  # (when the account was made, as Muse has it: an ISO date; "" until a sign-in or refresh says)
 var save_path := SAVE_PATH  # (the tests point this somewhere else, so they never touch your sign-in)
 var transport := Callable()  # (and swap the network for a fake: (path, body, bearer) -> {code, data})
 
@@ -329,6 +330,19 @@ func _take_session(d: Dictionary) -> void:
 	var user = d.get("user")
 	if user is Dictionary and str(user.get("email", "")) != "":
 		email = str(user.email)
+	if user is Dictionary and str(user.get("created_at", "")) != "":
+		member_since = str(user.created_at)
+
+
+## When the account was made, for people: "Nov 2, 2026" ("" if Muse hasn't said yet).
+func member_since_text() -> String:
+	if member_since.length() < 10:
+		return ""
+	var when := Time.get_datetime_dict_from_datetime_string(member_since.substr(0, 10), false)
+	if int(when.get("month", 0)) < 1 or int(when.get("month", 0)) > 12:
+		return ""
+	const MONTHS := ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+	return "%s %d, %d" % [MONTHS[int(when.month) - 1], int(when.day), int(when.year)]
 
 
 func _set_pro(on: bool) -> void:
@@ -394,6 +408,7 @@ func _ensure_loaded() -> void:
 	if not (d is Dictionary):
 		return
 	email = str(d.get("email", ""))
+	member_since = str(d.get("member_since", ""))
 	_refresh_token = str(d.get("refresh_token", ""))
 	_access_token = str(d.get("access_token", ""))
 	_access_expires_at = float(d.get("access_expires_at", 0.0))
@@ -408,6 +423,7 @@ func _save() -> void:
 		return
 	f.store_var({
 		"email": email,
+		"member_since": member_since,
 		"refresh_token": _refresh_token,
 		"access_token": _access_token,
 		"access_expires_at": _access_expires_at,
@@ -418,6 +434,7 @@ func _save() -> void:
 
 func _clear() -> void:
 	email = ""
+	member_since = ""
 	_refresh_token = ""
 	_access_token = ""
 	_access_expires_at = 0.0
