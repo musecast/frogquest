@@ -117,6 +117,19 @@ func _run() -> void:
 	_expect(endless.score_of_log(endless.run_log()) == endless.score, "after keeping going, the log still gives the game's score")
 	_check_scorer_vectors(endless)
 
+	# Pause: the climb stops under a menu, and carries on.
+	endless.pause()
+	_expect(paused and endless._pause_screen != null, "the pause button pauses, under a menu")
+	endless._unpause()
+	_expect(not paused and endless._pause_screen == null, "Resume carries on")
+
+	# Into the pond, on the screen: a splash, he's gone under, the run's over.
+	endless._cam_y = 0.0
+	player.global_position = Vector2(0.0, 40.0)
+	player.velocity = Vector2(0.0, 300.0)
+	await _frames(5)
+	_expect(endless._splashed and not player.visible and endless.is_resetting, "falling into the pond splashes, and ends the run")
+
 	endless.queue_free()
 	await _frames(5)
 	_finish()

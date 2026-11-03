@@ -97,8 +97,8 @@ func _swamp(a: float, half: Vector2) -> void:
 	var air: Color = sky[0].lerp(sky[1], 0.6)  # (what far things fade toward)
 	# The sun, and a few high clouds drifting by.
 	var sun := Vector2(half.x * 0.5, -half.y * 0.6 + _y(-500.0, 0.05))
-	for glow in [[64.0, 0.10], [42.0, 0.16], [24.0, 1.0]]:
-		draw_circle(sun, glow[0], Color(1.0, 0.97, 0.80, glow[1] * a))
+	for glow in [[84.0, 0.10], [56.0, 0.16], [36.0, 0.24], [24.0, 1.0]]:
+		draw_circle(sun, glow[0], Color(1.0, 0.94, 0.70, glow[1] * a))
 	var step := 240.0
 	var off := fposmod(-global_position.y * 0.12, step)
 	var j := -2
@@ -135,7 +135,12 @@ func _swamp(a: float, half: Vector2) -> void:
 	# The pond, right under the first lily pad, glinting.
 	var water_top := _y(5.0, 1.0)
 	if water_top < half.y:
-		draw_rect(Rect2(-half.x, water_top, half.x * 2.0, half.y - water_top + 4.0), Color(0.30, 0.63, 0.74, 1.0))
+		draw_rect(Rect2(-half.x, water_top, half.x * 2.0, half.y - water_top + 4.0), Color(0.22, 0.55, 0.70, 1.0))
+		draw_rect(Rect2(-half.x, water_top, half.x * 2.0, 3.0), Color(0.72, 0.92, 0.97, 1.0))  # (the bright edge of the water)
+		for i in 10:  # (glints, twinkling)
+			var glint := Vector2((_h(i, 70) - 0.5) * 1.9 * half.x, water_top + 10.0 + _h(i, 71) * 60.0)
+			if sin(_t * 2.5 + i * 1.7) > 0.6:
+				draw_rect(Rect2(glint, Vector2(3, 1)), Color(1.0, 1.0, 1.0, 0.8))
 		for k in 6:
 			var wy := water_top + 6.0 + k * 9.0
 			var shift := fmod(_t * (10.0 + k * 3.0), 40.0)
@@ -147,7 +152,7 @@ func _swamp(a: float, half: Vector2) -> void:
 ## One layer of giant mushrooms (0 far, 1 nearer), growing from hills along their foot.
 func _giant_mushrooms(layer: int, a: float, half: Vector2, air: Color) -> void:
 	var depth := 0.2 if layer == 0 else 0.4
-	var haze := 0.5 if layer == 0 else 0.22
+	var haze := 0.45 if layer == 0 else 0.14
 	var ground := _y(80.0, depth)
 	var salt := layer * 20
 	var spacing := 110.0 if layer == 0 else 150.0
@@ -171,8 +176,9 @@ func _giant_mushrooms(layer: int, a: float, half: Vector2, air: Color) -> void:
 			draw_circle(Vector2(x, sill - door_w * 1.1), door_w * 0.5, _faded(DOOR, air, haze, a))
 			draw_circle(Vector2(x - stem_w * 0.12, sill - door_w * 2.6), maxf(2.0, stem_w * 0.15), _faded(WINDOW, air, haze * 0.5, a))
 		var cap: Color = CAPS[int(_h(i, 4 + salt) * CAPS.size()) % CAPS.size()]
-		draw_rect(Rect2(x - cap_w * 0.4, top - 2.0, cap_w * 0.8, 3.0), _faded(cap.darkened(0.25), air, haze, a))
+		draw_rect(Rect2(x - cap_w * 0.4, top - 2.0, cap_w * 0.8, 3.0), _faded(cap.darkened(0.35), air, haze, a))
 		_dome(Vector2(x, top - cap_h), cap_w, cap_h, _faded(cap, air, haze, a))
+		draw_circle(Vector2(x - cap_w * 0.2, top - cap_h * 0.62), cap_w * 0.11, _faded(cap.lightened(0.4), air, haze, a))  # (a shine)
 		for s in 3:
 			var spot := Vector2(x + (_h(i * 3 + s, 12 + salt) - 0.5) * cap_w * 0.55, top - cap_h * (0.3 + _h(i * 3 + s, 13 + salt) * 0.4))
 			draw_circle(spot, cap_w * (0.05 + _h(i * 3 + s, 14 + salt) * 0.035), _faded(SPOT, air, haze, a))

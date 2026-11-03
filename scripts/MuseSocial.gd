@@ -45,6 +45,7 @@ var _refreshing := false
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS  # (still on, and still pinging, while a climb's paused)
 	MuseAccount.changed.connect(_on_account_changed)
 	_ping_timer = _timer(PING_EVERY, ping)
 	_friends_timer = _timer(FRIENDS_EVERY, func() -> void:

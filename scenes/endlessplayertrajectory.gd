@@ -63,6 +63,12 @@ func flight_velocity(path: Vector2) -> Vector2:
 	return v
 
 
+## A press on a button (pause) isn't the start of a jump.
+func _over_button() -> bool:
+	var c := get_viewport().gui_get_hovered_control()
+	return c != null and (c is BaseButton or c.get_parent() is BaseButton)
+
+
 ## On a platform, or only just off one (COYOTE_MS).
 func can_jump() -> bool:
 	return get_parent().is_on_floor() or infinijump == 1 or Time.get_ticks_msec() - _floor_ms <= COYOTE_MS
@@ -74,7 +80,7 @@ func _process(delta):
 		if grounded:
 			_floor_ms = Time.get_ticks_msec()
 		var can_go := can_jump()
-		if Input.is_action_just_pressed("ui_mouse"):
+		if Input.is_action_just_pressed("ui_mouse") and not _over_button():
 			if cursorLock == true and _supports_desktop_mouse():
 				Input.mouse_mode = 4
 				get_viewport().warp_mouse(Vector2(160,15))

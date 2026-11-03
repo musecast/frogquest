@@ -54,6 +54,7 @@ var _tries := 0  # (a ticket that wouldn't open is tried once more)
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS  # (the party carries on while your Endless is paused)
 	_load()
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)

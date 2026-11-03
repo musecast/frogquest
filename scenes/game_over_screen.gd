@@ -30,8 +30,10 @@ func _apply_layout() -> void:
 	var top: float = maxf(inset.y, AdsManager.get_viewport_top_banner_clearance())
 	var bottom: float = maxf(inset.w, AdsManager.get_viewport_bottom_banner_clearance())
 	var margin := 16.0 if is_portrait else 10.0
-	# (in the middle of the screen across, the same way in from both sides: UIStyle.across)
-	var side := maxf(inset.x, inset.z)
+	# (in the middle of the screen across, the same way in from both sides. Upright, only a notch on both
+	# sides counts: an iPhone Duo's strip down one side only has its camera up at the top, above the
+	# column, and keeping clear of it both sides left the column barely half the screen wide)
+	var side := minf(inset.x, inset.z) if is_portrait else maxf(inset.x, inset.z)
 	var box: VBoxContainer = $MarginContainer
 	box.anchor_left = 0.0
 	box.anchor_top = 0.0

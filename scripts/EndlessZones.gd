@@ -10,7 +10,7 @@ const BLEND := 300.0  # the skies of two zones blend over this much height eithe
 const ZONES := [
 	{
 		"name": "MUSHROOM SWAMP", "from": 0.0,
-		"sky": [Color(0.62, 0.85, 0.96), Color(0.84, 0.94, 0.82)],  # top, bottom: a sunny morning
+		"sky": [Color(0.47, 0.74, 0.96), Color(0.99, 0.91, 0.76)],  # top, bottom: a sunrise, warm low down
 		"kinds": [["mushroom", 1.0]],
 		"spring_kind": "mushroom_red", "crumble_kind": "",
 		"spring": [0.0, 0.14], "crumble": [0.0, 0.0], "moving": [0.0, 0.0], "tilt": [0.0, 0.0],
@@ -20,7 +20,7 @@ const ZONES := [
 	},
 	{
 		"name": "THE TREETOPS", "from": 1200.0,
-		"sky": [Color(0.74, 0.90, 0.62), Color(0.47, 0.72, 0.47)],  # sunlight through the leaves
+		"sky": [Color(0.80, 0.90, 0.56), Color(0.42, 0.66, 0.40)],  # golden sunlight through the leaves
 		"kinds": [["canopy", 1.0]],
 		"spring_kind": "", "crumble_kind": "twig",
 		"spring": [0.06, 0.10], "crumble": [0.05, 0.16], "moving": [0.08, 0.22], "tilt": [0.0, 0.0],

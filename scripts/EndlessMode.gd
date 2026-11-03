@@ -20,6 +20,7 @@ const GOLDEN_FLY_POINTS := 5
 const INK := Color(0.20784314, 0.16862746, 0.1882353)
 const CREAM := Color(0.9019608, 0.83137256, 0.74509805)
 const GOLD := Color(1.0, 0.86, 0.42)
+const WATER_Y := 5.0  # the pond's top, just under the first lily pad (EndlessSky draws it)
 ## Rubber banding, in a party: a stretchy band (a tether) ties you to your nearest friend. Fall, and once
 ## it's taut they reel you back up to them. Your jumps themselves never change.
 const TETHER_SLACK := 140.0  # world units of give in the band before it catches a fall (14 m)
@@ -55,6 +56,10 @@ var _off_spring := false  # (the jump he's on was launched off a spring)
 var _run_ticket := ""  # (MuseSocial.start_run's, asked for as the run starts: the server times it from then)
 var _rng := RandomNumberGenerator.new()  # the tower's dice: in a party everyone's share a seed, so everyone climbs the same tower
 var _party_frogs := {}  # peer id -> PartyFrog: friends climbing with you (Party)
+var _pause_button: Button
+var _pause_screen: CanvasLayer
+var _splashed := false  # (gone under, in the pond)
+static var _splash_sound: AudioStreamWAV
 var _party_tags: CanvasLayer  # their names over them (and yours, in gold)
 var _tether_peer := 0  # the friend your band is tied to (0: nobody)
 var _bands: Node2D  # draws everyone's bands
@@ -85,6 +90,28 @@ var _pending_notification: Array = []  # [type, item id] or empty
 
 @onready var player: CharacterBody2D = $EndlessPlayer
 @onready var platforms: Node2D = $Platforms
+
+
+class Ripple extends Node2D:
+	## Rings spreading on the pond where he went in, fading.
+	var _t := 0.0
+
+	func _ready() -> void:
+		z_index = 6
+		z_as_relative = false
+		scale = Vector2(1.0, 0.32)  # (flat: rings lying on the water)
+
+	func _process(delta: float) -> void:
+		_t += delta
+		if _t > 1.0:
+			queue_free()
+		queue_redraw()
+
+	func _draw() -> void:
+		for k in 3:
+			var t := _t - k * 0.18
+			if t > 0.0:
+				draw_arc(Vector2.ZERO, 6.0 + t * 46.0, 0.0, TAU, 32, Color(0.85, 0.96, 1.0, maxf(0.0, 0.8 - t)), 2.0)
 
 
 class FloatText extends Node2D:
@@ -155,6 +182,7 @@ func _ready() -> void:
 	_sky.best_height = best_height * 10.0
 	add_child(_sky)
 	_create_ui()
+	_make_pause_button()
 	_make_walls()
 	_fit_to_viewport()
 	get_viewport().size_changed.connect(_on_viewport_resized)
@@ -283,6 +311,12 @@ func _fit_to_viewport() -> void:
 	var big := 48 if is_portrait else 16
 	var small := 32 if is_portrait else 16
 	score_label.add_theme_font_size_override("font_size", big)
+	if _pause_button:
+		var room: Rect2 = ui.room(viewport_size)
+		var side := 32.0 if is_portrait else 24.0
+		_pause_button.custom_minimum_size = Vector2(side, side)
+		_pause_button.size = Vector2(side, side)
+		_pause_button.position = (room.position + Vector2(8.0, 8.0)).round()
 	score_label.add_theme_constant_override("outline_size", ui.outline_px(big))
 	if is_portrait:
 		score_label.offset_top = viewport_size.y * 0.1
@@ -311,6 +345,8 @@ func _fit_to_viewport() -> void:
 
 func _process(delta: float) -> void:
 	_follow(delta)
+	if not _splashed and player.visible and player.global_position.y > WATER_Y + 8.0 and _water_on_screen():
+		_splash()
 	if Party.in_run:
 		_party_frame(delta)
 	if is_resetting:
@@ -391,6 +427,7 @@ func _trigger_reset() -> void:
 	if Party.in_run and _pull_up():
 		return
 	is_resetting = true
+	_pause_button.visible = false
 	pitch_step = 0  # (the combo itself goes by the run's clock alone, stopped now, as score_of_log does)
 	_revive_platform_id = last_platform_id
 	last_platform_id = 0
@@ -456,6 +493,10 @@ func revive() -> void:
 	player.global_position = platform.global_position + Vector2(0.0, -40.0)
 	player.velocity = Vector2.ZERO
 	player.reset_physics_interpolation()
+	player.visible = true  # (out of the pond, if he'd gone in)
+	player.set_physics_process(true)
+	_splashed = false
+	_pause_button.visible = true
 	_cam_y = player.global_position.y
 	_follow(0.0)
 	highest_player_y = player.global_position.y
@@ -851,6 +892,8 @@ func _start_reel(friend: Node2D) -> bool:
 	if spot == null:
 		return false
 	_highest_landed_id = maxi(_highest_landed_id, int(spot.get_meta("platform_id", 0)) - 1)
+	player.visible = true  # (pulled out of the pond, if he'd gone in)
+	_splashed = false
 	_reel = {"from": player.global_position, "to": spot.global_position + Vector2(0.0, -16.0), "t": 0.0}
 	player.set_physics_process(false)
 	player.velocity = Vector2.ZERO
@@ -992,3 +1035,135 @@ func _place_tags() -> void:
 		var frog: Node2D = want[peer][0]
 		var head: Vector2 = xf * (frog.global_position + Vector2(0.0, -18.0 * frog.scale.y))
 		tag.position = (head - Vector2(tag.size.x * 0.5, tag.size.y)).round()
+
+
+# ── pause ───────────────────────────────────────────────────────────────────────────────────────
+
+## The pause button, top left of the room the screen has (clear of a notch, and of an iPhone Duo's camera,
+## top right). Pressing it doesn't start a jump (the slingshot leaves presses on buttons alone).
+func _make_pause_button() -> void:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	_pause_button = Button.new()
+	_pause_button.name = "PauseButton"
+	_pause_button.focus_mode = Control.FOCUS_NONE
+	ui.style_button(_pause_button, 16, "quiet")
+	var bars := TextureRect.new()
+	bars.texture = ui.pixel_icon(ui.PAUSE)
+	bars.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bars.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	bars.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bars.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bars.offset_left = 8.0
+	bars.offset_right = -8.0
+	bars.offset_top = 6.0
+	bars.offset_bottom = -10.0
+	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pause_button.add_child(bars)
+	_pause_button.pressed.connect(pause)
+	$CanvasLayer.add_child(_pause_button)
+
+
+## Paused: the climb stops where it is under a menu (Resume, Try Again, Main Menu). In a party the others
+## keep climbing and your frog waits. Also when the game goes to the background.
+func pause() -> void:
+	if is_resetting or _pause_screen != null or not is_inside_tree() or not _reel.is_empty():
+		return
+	get_tree().paused = true
+	_pause_screen = load("res://scenes/EndlessPauseScreen.gd").new()
+	_pause_screen.resumed.connect(_unpause)
+	_pause_screen.try_again.connect(func() -> void:
+		_unpause()
+		$GameOverScreen._on_try_again_button_pressed())
+	_pause_screen.main_menu.connect(func() -> void:
+		_unpause()
+		$GameOverScreen._on_exit_button_pressed())
+	add_child(_pause_screen)
+
+
+func _unpause() -> void:
+	get_tree().paused = false
+	if _pause_screen:
+		_pause_screen.queue_free()
+		_pause_screen = null
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		pause()  # (back to it paused, not mid-air)
+
+
+# ── the pond ────────────────────────────────────────────────────────────────────────────────────
+
+## Is the pond on the screen?
+func _water_on_screen() -> bool:
+	var cam := player.get_node_or_null("Camera2D") as Camera2D
+	if cam == null:
+		return false
+	return WATER_Y < _cam_y + get_viewport().get_visible_rect().size.y / cam.zoom.y * 0.5
+
+
+## Into the pond (missed the lily pad, or fell all the way back): a splash, he goes under, and the run's
+## over (unless "keep going", or a friend's tether, pulls him out).
+func _splash() -> void:
+	_splashed = true
+	var at := Vector2(player.global_position.x, WATER_Y)
+	var drops := CPUParticles2D.new()
+	drops.position = at
+	drops.z_index = 6
+	drops.one_shot = true
+	drops.explosiveness = 1.0
+	drops.amount = 28
+	drops.lifetime = 0.8
+	drops.direction = Vector2(0, -1)
+	drops.spread = 55.0
+	drops.initial_velocity_min = 90.0
+	drops.initial_velocity_max = 190.0
+	drops.gravity = Vector2(0, 520)
+	drops.scale_amount_min = 1.5
+	drops.scale_amount_max = 3.0
+	drops.color = Color(0.82, 0.95, 1.0)
+	drops.emitting = true
+	add_child(drops)
+	get_tree().create_timer(1.4).timeout.connect(drops.queue_free)
+	var ripple := Ripple.new()
+	ripple.position = at
+	add_child(ripple)
+	var sound := AudioStreamPlayer.new()
+	sound.stream = _splash_stream()
+	sound.volume_db = -3.0
+	add_child(sound)
+	sound.play()
+	sound.finished.connect(sound.queue_free)
+	player.visible = false
+	player.velocity = Vector2.ZERO
+	player.set_physics_process(false)
+	if not is_resetting:
+		_trigger_reset()
+
+
+## A splash, made here once (there's no recording of one): a short hiss of water, and a bloop that falls.
+static func _splash_stream() -> AudioStreamWAV:
+	if _splash_sound:
+		return _splash_sound
+	var rate := 22050
+	var count := int(rate * 0.45)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var low := 0.0
+	var phase := 0.0
+	for i in count:
+		var t := float(i) / rate
+		var cutoff := lerpf(0.55, 0.08, minf(1.0, t / 0.35))
+		low += (rng.randf_range(-1.0, 1.0) - low) * cutoff
+		var hiss := low * minf(1.0, t / 0.005) * exp(-t * 9.0)
+		phase += TAU * lerpf(420.0, 160.0, minf(1.0, t / 0.18)) / rate
+		var bloop := sin(phase) * exp(-t * 18.0) * 0.5
+		data.encode_s16(i * 2, int(clampf(hiss * 0.9 + bloop, -1.0, 1.0) * 30000.0))
+	_splash_sound = AudioStreamWAV.new()
+	_splash_sound.format = AudioStreamWAV.FORMAT_16_BITS
+	_splash_sound.mix_rate = rate
+	_splash_sound.stereo = false
+	_splash_sound.data = data
+	return _splash_sound
