@@ -342,6 +342,7 @@ var _pending_rewarded_preload := false
 var _rewarded_done := Callable()
 var _rewarded_earned := false
 var _consent_form_showing := false
+var _full_screen_ad_up := false  # an interstitial or rewarded video is on screen (see _full_screen_ad_opening)
 
 var _placeholder_layer: CanvasLayer
 var _placeholder_root: Control
@@ -573,6 +574,9 @@ func _preload_interstitial_now() -> void:
 		return
 	if _interstitial_ready or _interstitial_loading:
 		return
+	if _full_screen_ad_up:
+		_pending_interstitial_preload = true  # (loaded when it closes: see _full_screen_ad_opening)
+		return
 
 	_ensure_lightweight_ad_ui()
 	_interstitial_loading = true
@@ -602,6 +606,7 @@ func on_game_over() -> void:
 		_interstitial_ready = false
 		if _interstitial_ad:
 			_last_full_screen_ad_ms = Time.get_ticks_msec()
+			_full_screen_ad_opening()
 			_interstitial_ad.show()
 		return
 	preload_interstitial()
@@ -617,6 +622,7 @@ func on_story_break() -> void:
 	if not too_soon and _interstitial_ready and _interstitial_ad:
 		_interstitial_ready = false
 		_last_full_screen_ad_ms = now
+		_full_screen_ad_opening()
 		_interstitial_ad.show()
 		return
 	preload_interstitial()
@@ -639,6 +645,9 @@ func _preload_rewarded_now() -> void:
 	if not _ads_active or not _mobile_ads_ready:
 		return
 	if _rewarded_ready or _rewarded_loading:
+		return
+	if _full_screen_ad_up:
+		_pending_rewarded_preload = true  # (loaded when it closes: see _full_screen_ad_opening)
 		return
 
 	_rewarded_loading = true
@@ -673,8 +682,41 @@ func show_rewarded(on_done: Callable) -> bool:
 	_rewarded_ready = false
 	_rewarded_done = on_done
 	_rewarded_earned = false
+	_full_screen_ad_opening()
 	_rewarded_ad.show()
 	return true
+
+
+## A full-screen ad is going up. The ad plugin lays each banner it makes over everything on the screen,
+## full-screen ads included, so a banner asked for now would sit on the ad and over its buttons (Endless's
+## top banner, see-through till it filled, swallowed taps on "Skip to playable"). So till it closes no
+## banner is made, and those there hide. No other full-screen ad loads meanwhile, either: one arriving
+## would take the place of the one up, and we'd never hear that one close.
+func _full_screen_ad_opening() -> void:
+	_full_screen_ad_up = true
+	if _banner_view_bottom:
+		_banner_view_bottom.hide()
+	if _banner_view_top:
+		_banner_view_top.hide()
+
+
+func _full_screen_ad_closed() -> void:
+	if not _full_screen_ad_up:
+		return
+	_full_screen_ad_up = false
+	if not _ads_active:
+		return
+	if _pending_banner_refresh:
+		call_deferred("_request_banners_deferred")
+	else:
+		if _banner_view_bottom and _native_bottom_banner_loaded:
+			_banner_view_bottom.show()
+		if _banner_view_top and _native_top_banner_loaded:
+			_banner_view_top.show()
+	if _pending_interstitial_preload:
+		preload_interstitial()
+	if _pending_rewarded_preload:
+		preload_rewarded()
 
 
 func try_code(input: String) -> bool:
@@ -783,7 +825,7 @@ func _configure_banner_callbacks() -> void:
 
 	_banner_listener_bottom.on_ad_loaded = func() -> void:
 		_native_bottom_banner_loaded = true
-		if _banner_view_bottom:
+		if _banner_view_bottom and not _full_screen_ad_up:
 			_banner_view_bottom.show()
 		_refresh_placeholder_visibility()
 		_notify_banner_dependent_ui()
@@ -803,7 +845,7 @@ func _configure_banner_callbacks() -> void:
 
 	_banner_listener_top.on_ad_loaded = func() -> void:
 		_native_top_banner_loaded = true
-		if _banner_view_top:
+		if _banner_view_top and not _full_screen_ad_up:
 			_banner_view_top.show()
 		_refresh_placeholder_visibility()
 		_notify_banner_dependent_ui()
@@ -850,10 +892,12 @@ func _configure_interstitial_callbacks() -> void:
 	_interstitial_content_callback.on_ad_dismissed_full_screen_content = func() -> void:
 		print("AdsManager: interstitial dismissed")
 		_destroy_interstitial()
+		_full_screen_ad_closed()
 		preload_interstitial()
 	_interstitial_content_callback.on_ad_failed_to_show_full_screen_content = func(error) -> void:
 		print("AdsManager: interstitial failed to show: %s" % _ad_error_message(error))
 		_destroy_interstitial()
+		_full_screen_ad_closed()
 		preload_interstitial()
 
 
@@ -915,6 +959,7 @@ func _finish_rewarded() -> void:
 	var done := _rewarded_done
 	_rewarded_done = Callable()
 	_destroy_rewarded()
+	_full_screen_ad_closed()
 	preload_rewarded()
 	if done.is_valid():
 		done.call(_rewarded_earned)
@@ -1358,6 +1403,10 @@ func _warn_if_ios_product_missing(data: Dictionary) -> void:
 
 
 func _request_banners() -> void:
+	if _full_screen_ad_up:
+		_pending_banner_refresh = true  # (made when it closes: see _full_screen_ad_opening)
+		_notify_banner_dependent_ui()
+		return
 	_pending_banner_refresh = false
 	_banner_request_token += 1
 	var request_token := _banner_request_token
