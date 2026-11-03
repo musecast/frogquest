@@ -1,60 +1,42 @@
 extends TileMap
+## The bouncy mushrooms (and the bed): moving sideways on one, he's thrown up hard. The rule is the
+## original's, untouched (the climb was built around it): three points under his feet (below him, and a
+## frog's width either side) on layer 1; any of them on a mushroom tile and he's moving sideways, up he
+## goes at jump_velocity; on the bed, at half that. pad_jump_at tells it for a spot, so the aim line
+## (Trajectory.shown_velocity) can show the throw before he lets go.
 
-# Assume the player node is named "Player"
+const MUSHROOMS := [Vector2i(12, 0), Vector2i(13, 0), Vector2i(14, 0), Vector2i(15, 0)]
+const BED := Vector2i(16, 0)
+const PAD_SOURCE := 3
+
 @onready var player = $"../Player"
-# Set the jump velocity
 var jump_velocity = -800
 
-func _process(delta):
-	# Get the player's global position
-	var player_global_pos = player.position #- Vector2i(0, 16)
-	# Convert the global position to the TileMap's local coordinates
-	var player_local_pos = to_local(player_global_pos)+ Vector2(0, 15)
-	var player_local_posleft = to_local(player_global_pos)+ Vector2(15, 15)
-	var player_local_posright= to_local(player_global_pos)+ Vector2(-15, 15)
-	# Convert the local position to the TileMap's cell coordinates
-	var player_tile_pos = local_to_map(player_local_pos)
-	var player_tile_posleft = local_to_map(player_local_posleft)
-	var player_tile_posright = local_to_map(player_local_posright)
-	
-	# Get the tile ID at the player's position
-	var tile_id = get_cell_atlas_coords(1, player_tile_pos, false) # 0 is the layer, false to ignore proxies
-	var tile_idleft = get_cell_atlas_coords(1, player_tile_posleft, false) # 0 is the layer, false to ignore proxies
-	var tile_idright = get_cell_atlas_coords(1, player_tile_posright, false) # 0 is the layer, false to ignore proxies
-	# Get the tile ID at the player's position
-	var tile_source_id = get_cell_source_id(1, player_tile_pos, false) # 0 is the layer, false to ignore proxies
-	var tile_source_idleft = get_cell_source_id(1, player_tile_posleft, false) # 0 is the layer, false to ignore proxies
-	var tile_source_idright = get_cell_source_id(1, player_tile_posright, false) # 0 is the layer, false to ignore proxies
-	
-	# Debug print statements to check values
-	#print("Player Global Position: ", player_global_pos)
-	#print("Player Local Position: ", player_local_pos)
-	#print("Player TileMap Position: ", player_tile_pos)
-	#print("Tile ID: ", tile_id)
-	#print("Source ID: ", tile_source_id)
-	
-	if tile_source_id == 3 or tile_source_idleft == 3 or tile_source_idright == 3:
-		
-		if tile_id == Vector2i(12, 0) or tile_id == Vector2i(13, 0) or tile_id == Vector2i(14, 0) or tile_id == Vector2i(15, 0): # The ID of the jump pad tile
-			if player.velocity.x != 0: # Only apply if the player is moving downward
-				$"../Environmental Audio/jumpPad".play()
-				print("Jump Pad Activated")
-				player.velocity.y = jump_velocity
-				
-		if tile_idleft == Vector2i(12, 0) or tile_idleft == Vector2i(13, 0) or tile_idleft == Vector2i(14, 0) or tile_idleft == Vector2i(15, 0): # The ID of the jump pad tile
-			if player.velocity.x != 0: # Only apply if the player is moving downward
-				$"../Environmental Audio/jumpPad".play()
-				print("Jump Pad Activated")
-				player.velocity.y = jump_velocity
-				
-		if tile_idright == Vector2i(12, 0) or tile_idright == Vector2i(13, 0) or tile_idright == Vector2i(14, 0) or tile_idright == Vector2i(15, 0): # The ID of the jump pad tile
-			if player.velocity.x != 0: # Only apply if the player is moving downward
-				$"../Environmental Audio/jumpPad".play()
-				print("Jump Pad Activated")
-				player.velocity.y = jump_velocity
-				
-		if tile_idright == Vector2i(16, 0) or tile_idleft == Vector2i(16, 0) or tile_id == Vector2i(16, 0): # The ID of the jump pad tile
-			if player.velocity.x != 0: # Only apply if the player is moving downward
-				$"../Environmental Audio/jumpPad".play()
-				print("Bed Jump Pad Activated")
-				player.velocity.y = jump_velocity / 2
+
+func _process(_delta):
+	var pad := pad_jump_at(player.position)
+	if pad != 0.0 and player.velocity.x != 0:  # (moving sideways: landing on it, or jumping off it)
+		$"../Environmental Audio/jumpPad".play()
+		player.velocity.y = pad
+
+
+## The throw a mushroom gives him standing at at (his position): jump_velocity on a mushroom, half on the
+## bed, 0 off them.
+func pad_jump_at(at: Vector2) -> float:
+	var feet := to_local(at)
+	var cells := [local_to_map(feet + Vector2(0, 15)), local_to_map(feet + Vector2(15, 15)), local_to_map(feet + Vector2(-15, 15))]
+	var on_pads := false
+	for cell in cells:
+		if get_cell_source_id(1, cell, false) == PAD_SOURCE:
+			on_pads = true
+	if not on_pads:
+		return 0.0
+	var mushroom := false
+	var bed := false
+	for cell in cells:
+		var tile := get_cell_atlas_coords(1, cell, false)
+		mushroom = mushroom or tile in MUSHROOMS
+		bed = bed or tile == BED
+	if bed:
+		return jump_velocity / 2.0  # (the original checked the bed last, so it won)
+	return float(jump_velocity) if mushroom else 0.0

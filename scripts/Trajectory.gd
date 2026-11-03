@@ -1,15 +1,20 @@
 extends Node2D
 ## Froggy's slingshot: press, drag back, let go, and he jumps the other way, harder the further you
-## dragged. The numbers that turn a drag into a jump (launch_velocity) are the original's, untouched: the
-## story was built around them. Around them:
+## dragged. The story was built around the original's numbers, so they're kept to the number wherever they
+## ran smoothly: every short and medium drag, every upright one, and full power (launch_for). Where they
+## jumped (a strong-but-not-full sideways drag suddenly flew 200 slower: the aim line hitched as you pulled),
+## they're joined up evenly, with every jump the original could make still there to make. Around them:
 ## - A jump let go a moment after he's left a platform's edge still goes (COYOTE_MS), and a press made
 ##   just before he lands is kept for when he does, so a jump isn't lost to a wobble on a moving platform
 ##   or a tap a hair too early.
 ## - The aim line points where he'll actually go (flight_velocity: the launch, less the tick of standing
-##   friction before he's off the platform).
+##   friction before he's off the platform; and off a mushroom, the mushroom's throw: shown_velocity).
 
 const COYOTE_MS := 120  # (ms after leaving a platform that a jump still goes)
 const FLOOR_FRICTION := 300.0  # (the frog's SPEED: how much standing slows him sideways each tick)
+const KNEE := 350.0  # (sideways stretch up to which a jump is the original's to the number)
+const FULL := 800.0  # (sideways stretch at full power: the original's cap)
+const FULL_FLIGHT := 500.0  # (how fast full power sends him sideways: the original's, after the friction tick)
 
 var mouseOrigin = Vector2()
 var mousePosition = Vector2()
@@ -41,19 +46,38 @@ func _ready():
 		_cursor_x = load("res://assets/cursor-x.png")
 
 
-## Where a drag sends him: the original's numbers (the sideways stretch, the push short drags get, the
-## caps), for the jump and the aim line alike.
+## Where a drag sends him, for the jump and the aim line alike (launch_for).
 func launch_velocity(path: Vector2) -> Vector2:
-	var velocity: Vector2 = path * sensitivity
-	velocity.x *= 1.5
-	velocity.y *= 1.1
-	velocity.x = clampf(velocity.x, -800, 800)
-	velocity.y = clampf(velocity.y, -450, 450)
-	if absf(velocity.x) < 450:
-		velocity.x = 200 * signf(velocity.x) + velocity.x
-	if absf(velocity.x) < 450 and absf(velocity.y) > 350:
-		velocity.x = 50 * signf(velocity.x) + velocity.x
-	return velocity
+	return launch_for(path, sensitivity)
+
+
+## The launch for a drag (before the one tick of standing friction it gets). Upward it's the original's:
+## stretched 1.1, capped at 450. Sideways the original stretched 1.5, capped at 800, and gave drags under
+## 450 a push of 200 (and steep ones under 250 another 50) that the friction tick takes back; past 450 the
+## push stopped, so pulling further suddenly flew 200 slower. Here the flight is the original's up to KNEE
+## (and for steep drags the extra 50, faded out from 200 to 300 instead of stopping at 250), then rises
+## evenly to full power's 500. A near-upright drag still gets the small push, so it goes straight up and a
+## mushroom still feels it moving sideways.
+static func launch_for(path: Vector2, sensitivity: float) -> Vector2:
+	var stretch := path * sensitivity
+	var vy := clampf(stretch.y * 1.1, -450.0, 450.0)
+	var ax := minf(absf(stretch.x * 1.5), FULL)
+	var side := signf(stretch.x)
+	var steep := smoothstep(330.0, 370.0, absf(vy))
+	var fly := flight_x(ax, steep)
+	if fly <= 0.0:
+		return Vector2(side * minf(ax + 200.0 + 50.0 * steep, FLOOR_FRICTION), vy)
+	return Vector2(side * (fly + FLOOR_FRICTION), vy)
+
+
+## How fast a drag this strong sideways (0 to FULL) sends him sideways, once he's off the ground; steep is
+## 0 to 1, how upright the drag is (the original's extra push for steep drags).
+static func flight_x(ax: float, steep: float) -> float:
+	if ax <= KNEE:
+		var push := 50.0 * steep * clampf((300.0 - ax) / 100.0, 0.0, 1.0)
+		return maxf(0.0, ax - 100.0 + push)
+	var at_knee := KNEE - 100.0
+	return at_knee + (ax - KNEE) * (FULL_FLIGHT - at_knee) / (FULL - KNEE)
 
 ## Where he really goes: the launch, less the one tick of standing friction it gets before he's off the
 ## platform (on the frame he jumps he's still standing, and standing he's slowed by his SPEED sideways;
@@ -61,6 +85,26 @@ func launch_velocity(path: Vector2) -> Vector2:
 func flight_velocity(path: Vector2) -> Vector2:
 	var v := launch_velocity(path)
 	v.x = move_toward(v.x, 0.0, FLOOR_FRICTION)
+	return v
+
+
+## What letting go gives him: on the ground, the launch (the friction tick takes the push back); just off
+## an edge, where there's no friction tick, the flight itself, so he goes where the line showed.
+func release_velocity(path: Vector2) -> Vector2:
+	return launch_velocity(path) if get_parent().is_on_floor() else flight_velocity(path)
+
+
+## What the aim line shows: the flight, and standing on a mushroom (or the bed), the mushroom's throw
+## instead of his own upward speed, the way the TileMap gives it the moment he lets go moving sideways
+## (scenes/TileMap.gd). Before, the line showed a little hop and the mushroom threw him sky high.
+func shown_velocity(path: Vector2) -> Vector2:
+	var v := flight_velocity(path)
+	var frog := get_parent()
+	var map := frog.get_node_or_null("../TileMap")
+	if map and map.has_method("pad_jump_at") and frog.is_on_floor() and launch_velocity(path).x != 0.0:
+		var pad: float = map.pad_jump_at(frog.position)
+		if pad != 0.0:
+			v.y = pad
 	return v
 
 
@@ -102,7 +146,7 @@ func _process(delta):
 
 		if Input.is_action_just_released("ui_mouse"):
 			if can_go and mouseOrigin != Vector2(0, 0):
-				get_parent().velocity = launch_velocity(mousePath)
+				get_parent().velocity = release_velocity(mousePath)
 				_floor_ms = -100000  # (one jump per moment off the edge)
 				$"../frogjump".pitch_scale = randf_range(0.8, 1.2)
 				$"../frogjump".play()
@@ -116,7 +160,7 @@ func _process(delta):
 ## The aim line: along the jump he'll make, longer and whiter the stronger it is.
 func _draw():
 	if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0) and can_jump():
-		var launch := flight_velocity(mousePath)
+		var launch := shown_velocity(mousePath)
 		var power := clampf(launch.length() / Vector2(800, 450).length(), 0.0, 1.0)
 		draw_line(Vector2(0,0), launch / 10.8, Color(255, 1.2 - power, 1.2 - power, 1), 2.0)
 

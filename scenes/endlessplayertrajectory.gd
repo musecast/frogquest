@@ -1,8 +1,9 @@
 extends Node2D
 ## Froggy's slingshot in Endless, as the story's (scripts/Trajectory.gd): the drag-to-jump numbers are the
-## original's (launch_velocity), times a spring's boost; a jump let go just after leaving a platform's
-## edge still goes, a press just before landing is kept for the landing, and the aim line points where
-## he'll really go (flight_velocity; gold and longer off a spring).
+## story's (launch_velocity: the original's, joined up smoothly where they jumped), times a spring's boost;
+## a jump let go just after leaving a platform's edge still goes, a press just before landing is kept for
+## the landing, and the aim line points where he'll really go (flight_velocity; gold and longer off a
+## spring).
 
 const COYOTE_MS := 120  # (ms after leaving a platform that a jump still goes)
 const FLOOR_FRICTION := 300.0  # (the frog's SPEED: how much standing slows him sideways each tick)
@@ -38,18 +39,10 @@ func _ready():
 		_cursor_x = load("res://assets/cursor-x.png")
 
 
-## Where a drag sends him: the original's numbers (the sideways stretch, the push short drags get, the
-## caps), times a spring's boost, for the jump and the aim line alike.
+## Where a drag sends him: the story's slingshot (Trajectory.launch_for: the original's numbers, joined up
+## smoothly where they jumped), times a spring's boost, for the jump and the aim line alike.
 func launch_velocity(path: Vector2) -> Vector2:
-	var velocity: Vector2 = path * sensitivity
-	velocity.x *= 1.5
-	velocity.y *= 1.1
-	velocity.x = clampf(velocity.x, -800, 800)
-	velocity.y = clampf(velocity.y, -450, 450)
-	if absf(velocity.x) < 450:
-		velocity.x = 200 * signf(velocity.x) + velocity.x
-	if absf(velocity.x) < 450 and absf(velocity.y) > 350:
-		velocity.x = 50 * signf(velocity.x) + velocity.x
+	var velocity: Vector2 = load("res://scripts/Trajectory.gd").launch_for(path, sensitivity)
 	if get_parent().has_method("launch_boost"):
 		velocity *= get_parent().launch_boost()  # (off a spring: much higher)
 	return velocity
@@ -61,6 +54,12 @@ func flight_velocity(path: Vector2) -> Vector2:
 	var v := launch_velocity(path)
 	v.x = move_toward(v.x, 0.0, FLOOR_FRICTION)
 	return v
+
+
+## What letting go gives him: on the ground, the launch (the friction tick takes the push back); just off
+## an edge, where there's no friction tick, the flight itself, so he goes where the line showed.
+func release_velocity(path: Vector2) -> Vector2:
+	return launch_velocity(path) if get_parent().is_on_floor() else flight_velocity(path)
 
 
 ## A press on a button (pause) isn't the start of a jump.
@@ -101,7 +100,7 @@ func _process(delta):
 
 		if Input.is_action_just_released("ui_mouse"):
 			if can_go and mouseOrigin != Vector2(0, 0):
-				get_parent().velocity = launch_velocity(mousePath)
+				get_parent().velocity = release_velocity(mousePath)
 				_floor_ms = -100000  # (one jump per moment off the edge)
 				$"../frogjump".pitch_scale = randf_range(0.8, 1.2)
 				$"../frogjump".play()

@@ -64,6 +64,30 @@ func _run() -> void:
 	main._on_area_2d_body_shape_entered(RID(), player, 0, 0)
 	_expect(main.get_node("frogNPC1/npc1speechbubble").text == main.FELL_LINES[1][2], "said when he comes back past them")
 
+	# On a bouncy mushroom, the aim line shows the mushroom's throw (and letting go sideways gets it); aimed
+	# straight up, his own jump.
+	var map: TileMap = main.get_node("TileMap")
+	var pad := Vector2i(-99999, 0)
+	for cell in map.get_used_cells(1):
+		var clear: bool = map.get_cell_source_id(0, cell + Vector2i.UP) == -1 and map.get_cell_source_id(1, cell + Vector2i.UP) == -1 \
+			and map.get_cell_source_id(0, cell + Vector2i.UP * 2) == -1 and map.get_cell_source_id(1, cell + Vector2i.UP * 2) == -1
+		if clear and map.get_cell_source_id(1, cell) == map.PAD_SOURCE and map.get_cell_atlas_coords(1, cell) in map.MUSHROOMS:
+			pad = cell
+			break
+	_expect(pad.x != -99999, "the level has its bouncy mushrooms")
+	if pad.x != -99999:
+		var top: Vector2 = map.to_global(map.map_to_local(pad)) - Vector2(0.0, map.tile_set.tile_size.y * map.global_scale.y)
+		await _put(player, top)
+		var sling: Node2D = player.get_node("Trajectory")
+		var sideways := Vector2(40, -60)
+		_expect(player.is_on_floor() and map.pad_jump_at(player.position) == map.jump_velocity, "he can stand on a mushroom (%s)" % player.position)
+		_expect(sling.shown_velocity(sideways).y == map.jump_velocity, "and aimed sideways there, the line shows the mushroom's throw (%s)" % sling.shown_velocity(sideways))
+		_expect(sling.shown_velocity(Vector2(0, -60)) == sling.flight_velocity(Vector2(0, -60)), "aimed straight up, his own jump")
+		player.velocity = sling.release_velocity(sideways)
+		await process_frame
+		await process_frame
+		_expect(player.velocity.y < -700.0, "and letting go sideways, the mushroom does throw him (%.0f up)" % player.velocity.y)
+
 	# A frog waits while he's out of earshot, and goes on when he's back.
 	var area: Area2D = main.get_node("frogNPC2/Area2D2")
 	var bubble: Label = main.get_node("frogNPC2/npc2speechbubble")
