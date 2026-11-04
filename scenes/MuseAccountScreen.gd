@@ -32,10 +32,13 @@ var _sent_to := ""  # where the code went, between "Email Me a Code" and "Sign I
 var _busy := false
 var _friends: Button  # (Friends and Leaderboard: signed in, once Muse Social's there)
 var _leaderboard: Button
+var _keyboard: Node  # (KeyboardHelp: a tap off the box puts the keyboard away; how far to lift for it)
 
 
 func _ready() -> void:
 	layer = 60  # over the title screen (layer 58) and Remove Ads
+	_keyboard = load("res://scripts/KeyboardHelp.gd").new()
+	add_child(_keyboard)
 	_build_ui()
 	_show_state()
 	_fit()
@@ -95,7 +98,9 @@ func _build_ui() -> void:
 	_input.custom_minimum_size = Vector2(0, BTN_HEIGHT)
 	_input.add_theme_font_override("font", _font)
 	_input.add_theme_font_size_override("font_size", BTN_FONT_SZ)
-	_input.text_submitted.connect(func(_text: String) -> void: _on_primary())
+	_input.text_submitted.connect(func(text: String) -> void:
+		if text.strip_edges() != "":  # (empty, Return just puts the keyboard away)
+			_on_primary())
 	box.add_child(_input)
 
 	_primary = _button("", _on_primary, "go")
@@ -326,8 +331,8 @@ func _fit() -> void:
 	var s: float = ui.panel_zoom(vp, room)
 	# (sideways, wider: the words wrap onto fewer lines, so less of it has to scroll)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
-	var keyboard := float(DisplayServer.virtual_keyboard_get_height())
-	if keyboard > 0.0 and _input.visible and _input.has_focus():
+	var keyboard: float = _keyboard.height_for(_input if _input.visible else null)
+	if keyboard > 0.0 and _input.visible:
 		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var primary_bottom := (_panel.get_global_transform().affine_inverse() * _primary.get_global_rect().end).y

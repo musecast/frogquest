@@ -21,6 +21,7 @@ const BLACK := Color(0.0, 0.0, 0.0, 1.0)
 
 func _ready() -> void:
 	layer = 20
+	add_child(load("res://scripts/KeyboardHelp.gd").new())  # (a tap off the code box puts the keyboard away)
 	_build_ui()
 	_fit()
 

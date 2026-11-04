@@ -25,10 +25,13 @@ var _mode := "menu"  # menu, join, host (your party) or joined (someone else's)
 var _note := ""
 var _note_colour := GOLD
 var _typed := ""
+var _keyboard: Node  # (KeyboardHelp: a tap off the box puts the keyboard away; how far to lift for it)
 
 
 func _ready() -> void:
 	layer = 60  # over the title screen (layer 58)
+	_keyboard = load("res://scripts/KeyboardHelp.gd").new()
+	add_child(_keyboard)
 	if Party.is_on():
 		_mode = "host" if Party.is_host() else "joined"
 	_build_ui()
@@ -80,7 +83,9 @@ func _show() -> void:
 		"join":
 			_box.add_child(_label("Type the party code from the host's screen. You both need to be on the same Wi-Fi.", BODY_FONT_SZ, GOLD))
 			_input = _line("Party code", 4)
-			_input.text_submitted.connect(func(_text: String) -> void: _join())
+			_input.text_submitted.connect(func(text: String) -> void:
+				if text.strip_edges() != "":  # (empty, Return just puts the keyboard away)
+					_join())
 			_box.add_child(_input)
 			_box.add_child(_button("Join", _join, "go"))
 			_say_note()
@@ -310,8 +315,8 @@ func _fit() -> void:
 	var portrait := vp.y > vp.x * 1.3
 	var s: float = ui.panel_zoom(vp, room)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
-	var keyboard := float(DisplayServer.virtual_keyboard_get_height())
-	if keyboard > 0.0 and _input and _input.has_focus():
+	var keyboard: float = _keyboard.height_for(_input)
+	if keyboard > 0.0 and _input:
 		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var input_bottom := (_panel.get_global_transform().affine_inverse() * _input.get_global_rect().end).y

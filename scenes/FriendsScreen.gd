@@ -30,14 +30,19 @@ var _note_colour := GOLD
 var _open := ""  # the friend whose actions are showing, or "status" for the status choices
 var _reporting := ""  # the friend being reported (the reasons are showing)
 var _typed := ""  # (what's in the @handle box, kept as the list is rebuilt)
+var _confirming := ""  # your new @handle, waiting on a last yes before it's saved
+var _stale := false  # Muse had news while you were typing: shown once you've stopped
 var _busy := false
+var _keyboard: Node  # (KeyboardHelp: a tap off the box puts the keyboard away; how far to lift for it)
 
 
 func _ready() -> void:
 	layer = 61  # over the Muse Account screen (60)
+	_keyboard = load("res://scripts/KeyboardHelp.gd").new()
+	add_child(_keyboard)
 	_build_ui()
 	_show()
-	MuseSocial.changed.connect(_show)
+	MuseSocial.changed.connect(_on_social_changed)
 	MuseSocial.watching += 1
 	MuseSocial.refresh()
 
@@ -108,13 +113,10 @@ func _show() -> void:
 	_input.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
 	_input.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
 	_input.add_theme_font_size_override("font_size", BTN_FONT_SZ)
-	_input.text = _typed
-	_input.text_submitted.connect(func(_text: String) -> void: _add())
+	_input.text = _typed  # (Return only puts the keyboard away: Add Friend sends it)
 	_box.add_child(_input)
 	_box.add_child(_button("Add Friend", _add, "go"))
-	_note = _label(_note_text, BODY_FONT_SZ, _note_colour)
-	_note.visible = _note_text != ""
-	_box.add_child(_note)
+	_add_note()
 	if not MuseSocial.incoming.is_empty():
 		_box.add_child(_label("Want to be your friend", BODY_FONT_SZ, GOLD))
 		for card in MuseSocial.incoming:
@@ -137,8 +139,17 @@ func _finish_list() -> void:
 
 ## Picking your @handle (the first time): it's how friends find you, the same in every Muse app. Saving
 ## it agrees to Muse's community rules, shown first (App Review wants them agreed to before anything
-## social).
+## social), and it's asked once more before it's yours. Return only puts the keyboard away: it used to
+## save it, for someone just closing the keyboard.
 func _handle_step() -> void:
+	if _confirming != "":
+		_box.add_child(_label("You'll be @%s in every Muse app: it's how friends find you. Is that right?" % _confirming, BODY_FONT_SZ, GOLD))
+		_box.add_child(_button("Yes, Save It", _save_handle, "go"))
+		_box.add_child(_button("Change It", func() -> void:
+			_confirming = ""
+			_show(), "quiet"))
+		_add_note()
+		return
 	_box.add_child(_label("Pick your @handle: it's how friends find you, the same in every Muse app.", BODY_FONT_SZ, GOLD))
 	_input = LineEdit.new()
 	_input.placeholder_text = "your_handle"
@@ -148,27 +159,34 @@ func _handle_step() -> void:
 	_input.add_theme_font_override("font", load("res://assets/fibberish.ttf"))
 	_input.add_theme_font_size_override("font_size", BTN_FONT_SZ)
 	_input.text = _typed
-	_input.text_submitted.connect(func(_text: String) -> void: _save_handle())
 	_box.add_child(_input)
 	_box.add_child(_label("3 to 20 letters, numbers or underscores.", BODY_FONT_SZ, DIM))
 	_box.add_child(_label("Be kind: no bullying, hate, or anything sexual. Muse can hide anyone who breaks the community rules.", BODY_FONT_SZ, GOLD))
 	_box.add_child(_button("Read the Community Rules", func() -> void: OS.shell_open(MuseSocial.COMMUNITY_RULES), "quiet"))
-	_box.add_child(_button("Agree and Save", _save_handle, "go"))
-	_note = _label(_note_text, BODY_FONT_SZ, _note_colour)
-	_note.visible = _note_text != ""
-	_box.add_child(_note)
+	_box.add_child(_button("Agree and Save", _check_handle, "go"))
+	_add_note()
 
 
-func _save_handle() -> void:
+## Agree and Save: a handle Muse could take (its rules: muse_social_handle_problem) gets the last look.
+func _check_handle() -> void:
 	var wanted := (_input.text if _input else _typed).strip_edges().trim_prefix("@").to_lower()
-	if wanted.length() < 3:
-		_say("Your @handle needs at least 3 letters or numbers.", RED)
+	if not RegEx.create_from_string("^[a-z0-9_]{3,20}$").search(wanted) or not RegEx.create_from_string("[a-z]").search(wanted):
+		_say("Use 3 to 20 letters, numbers or underscores, with at least one letter.", RED)
 		return
-	if _busy:
+	_confirming = wanted
+	_note_text = ""
+	_show()
+
+
+## Yes, Save It. Muse saying no (taken, say) goes back to the box, the handle still in it to change.
+func _save_handle() -> void:
+	if _busy or _confirming == "":
 		return
 	_busy = true
+	var wanted := _confirming
 	var problem: String = await MuseSocial.save_profile(wanted, true)
 	_busy = false
+	_confirming = ""
 	if problem == "":
 		_typed = ""
 		_say("You're @%s! Now add a friend by their @handle." % wanted, GREEN)
@@ -355,7 +373,27 @@ func _say(what: String, colour: Color) -> void:
 	_show()
 
 
+## What just happened, under the buttons (hidden when there's nothing to say).
+func _add_note() -> void:
+	_note = _label(_note_text, BODY_FONT_SZ, _note_colour)
+	_note.visible = _note_text != ""
+	_box.add_child(_note)
+
+
+## Muse had news (it's asked every half a minute while this is open): shown at once, unless you're
+## typing in the box or a finger's down, when it waits (the box would be rebuilt under your fingers,
+## and the keyboard dropped).
+func _on_social_changed() -> void:
+	if (_input and _input.is_editing()) or _keyboard.finger_down:
+		_stale = true
+	else:
+		_show()
+
+
 func _process(_delta: float) -> void:
+	if _stale and not (_input and _input.is_editing()) and not _keyboard.finger_down:
+		_stale = false
+		_show()
 	_fit()
 
 
@@ -370,8 +408,8 @@ func _fit() -> void:
 	var portrait := vp.y > vp.x * 1.3
 	var s: float = ui.panel_zoom(vp, room)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
-	var keyboard := float(DisplayServer.virtual_keyboard_get_height())
-	if keyboard > 0.0 and _input and _input.has_focus():
+	var keyboard: float = _keyboard.height_for(_input)
+	if keyboard > 0.0 and _input:
 		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var input_bottom := (_panel.get_global_transform().affine_inverse() * _input.get_global_rect().end).y
