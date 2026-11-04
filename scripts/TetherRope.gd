@@ -12,6 +12,7 @@ const GRAVITY := 700.0
 const DAMP := 0.96
 const SOLVE := 10  # (passes a frame that pull its points back together)
 const EDGE := Color(0.10, 0.07, 0.06)
+const JUMP := 240.0  # (an end that's gone this far in a frame was moved, not swung: the rope's laid afresh)
 const NUDGES := [Vector2(0, -2), Vector2(0, -4), Vector2(-2, 0), Vector2(2, 0), Vector2(0, -7), Vector2(-4, -2),
 	Vector2(4, -2), Vector2(0, -11)]  # (a point that's gone into something steps out to the nearest open spot: up off a ledge, out from a wall)
 
@@ -25,7 +26,7 @@ var _old := PackedVector2Array()
 ## A frame of it: hung from a to b (its ends at the frogs), slack (its give, before it's pulled
 ## straight), against what's solid in space for the mask (none: it hangs through everything).
 func step(a: Vector2, b: Vector2, slack: float, delta: float, space: PhysicsDirectSpaceState2D = null, mask := 1) -> void:
-	if _pts.size() != POINTS:
+	if _pts.size() != POINTS or a.distance_to(_pts[0]) > JUMP or b.distance_to(_pts[POINTS - 1]) > JUMP:
 		_pts.resize(POINTS)
 		_old.resize(POINTS)
 		for i in POINTS:

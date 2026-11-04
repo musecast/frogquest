@@ -65,12 +65,15 @@ func dress(info: Dictionary) -> void:
 	_sprite.material = look.material(info.get("look"), _skin)
 
 
+const SNAP := 320.0  # (further than a frog goes between two of its updates: it's been moved, not jumped)
+
+
 ## Where their phone says their frog is, and how it looks: [x, y, animation, frame, flip, turn, score,
 ## metres, band, where] (the band and where only from some: up the World Tree, where they are).
 func show_state(state: Array) -> void:
 	_target = Vector2(float(state[0]), float(state[1]))
-	if not _placed:
-		position = _target
+	if not _placed or position.distance_to(_target) > SNAP:
+		position = _target  # (first seen, or moved a long way at once: there, not flying across the screen)
 		_placed = true
 	var anim := StringName(str(state[2]))
 	if _sprite.sprite_frames and _sprite.sprite_frames.has_animation(anim):
