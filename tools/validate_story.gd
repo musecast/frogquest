@@ -49,9 +49,13 @@ func _run() -> void:
 	for _i in 3:
 		await process_frame
 	_expect(main._tv_done and main._tv_bubble.visible and main._tv_bubble.text == main.TV_LINES[0], "the TV talks as he starts at home")
+	_expect(_tv_words_seen(main), "its words on the screen (upright)")
 	await _game_time(3.0)
 	_expect(main._tv_bubble.text == main.TV_LINES[1], "line by line (%s)" % main._tv_bubble.text.c_escape())
-	await _game_time(9.0)
+	_expect(_tv_words_seen(main), "all of them on the screen, not off its edge: %s" % main._tv_bubble.text.c_escape())
+	await _game_time(2.8)
+	_expect(main._tv_bubble.text == main.TV_LINES[2] and _tv_words_seen(main), "all of them on the screen, not off its edge: %s" % main._tv_bubble.text.c_escape())
+	await _game_time(6.2)
 	_expect(not main._tv_bubble.visible, "and goes back to static")
 
 	# Coming back down past the hut frog after being far higher: their lines, in turn; not before.
@@ -196,6 +200,17 @@ func _put(player: CharacterBody2D, at: Vector2) -> void:
 func _physics(n: int) -> void:
 	for _i in n:
 		await physics_frame
+
+
+## The TV's words all on the screen: the widest of its lines (and its outline), centred in its box, inside
+## what the camera shows.
+func _tv_words_seen(main: Node) -> bool:
+	var words: Label = main._tv_bubble
+	var at: Transform2D = words.get_global_transform()
+	var mid := (at * Vector2(words.size.x * 0.5, 0.0)).x
+	var half := (words.get_minimum_size().x * 0.5 + words.get_theme_constant("outline_size")) * at.get_scale().x
+	var seen: Rect2 = _view.get_canvas_transform().affine_inverse() * _view.get_visible_rect()
+	return mid - half >= seen.position.x and mid + half <= seen.end.x
 
 
 ## Game time going by quicker (timers only: no one's moving meanwhile).

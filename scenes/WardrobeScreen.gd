@@ -24,11 +24,11 @@ const ITEMS: Dictionary = {
 	"negative_skin":  {"label": "Negative",      "type": "skin", "icon": "res://assets/frog.png",
 					  "shader": "res://assets/negative.gdshader",
 					  "how": "Score 50 in Endless"},
-	# (the hats drawn in code, FroggyLook.HATS: every one found by playing)
-	"leaf":           {"label": "Leaf",          "type": "hat", "pixel": true, "how": "Climb 50 m up the World Tree"},
-	"bow":            {"label": "Bow",           "type": "hat", "pixel": true, "how": "Climb 150 m up the World Tree"},
-	"flower":         {"label": "Flower",        "type": "hat", "pixel": true, "how": "Climb 300 m up the World Tree"},
-	"cap":            {"label": "Cap",           "type": "hat", "pixel": true, "how": "Bounce off a mushroom in the World Tree"},
+	# (the hats drawn in code, FroggyLook.HATS: every one earned by playing)
+	"leaf":           {"label": "Leaf",          "type": "hat", "pixel": true, "how": "Talk with the first frog you meet in the World Tree"},
+	"bow":            {"label": "Bow",           "type": "hat", "pixel": true, "how": "Hear the joking frog's joke in the World Tree"},
+	"flower":         {"label": "Flower",        "type": "hat", "pixel": true, "how": "Get the lantern from the frog by the campfire"},
+	"cap":            {"label": "Cap",           "type": "hat", "pixel": true, "how": "Catch a fly in Endless"},
 	"beanie":         {"label": "Beanie",        "type": "hat", "pixel": true, "how": "Score 10 in Endless"},
 	"tophat":         {"label": "Top Hat",       "type": "hat", "pixel": true, "how": "Score 150 in Endless"},
 	"partyhat":       {"label": "Party Hat",     "type": "hat", "pixel": true, "how": "Climb with a friend (Play Together)"},
@@ -43,14 +43,13 @@ const ITEMS: Dictionary = {
 	"starry":         {"label": "Starry",        "type": "skin", "how": "Climb all the way to space in Endless"},
 	"holo":           {"label": "Holo",          "type": "skin", "how": "Climb with 3 friends at once"},
 	"shadow":         {"label": "God's Shadow", "type": "skin", "how": "Beat Frog Quest"},
-	# (patterns over your froggy, in his colours: found by playing; one at a time. Their colour's chosen
+	# (patterns over your froggy, in his colours: earned by playing; one at a time. Their colour's chosen
 	# in CHANGE YOUR LOOK)
-	"pattern_freckles": {"label": "Freckles",    "type": "pattern", "pattern": 3, "how": "Climb out of your bedroom"},
-	"pattern_spots":    {"label": "Spots",       "type": "pattern", "pattern": 1, "how": "Climb 100 m up the World Tree"},
-	"pattern_stripes":  {"label": "Stripes",     "type": "pattern", "pattern": 2, "how": "Climb 200 m up the World Tree"},
-	"pattern_twotone":  {"label": "Two-Tone",    "type": "pattern", "pattern": 4, "how": "Climb 400 m up the World Tree"},
-	"pattern_hearts":   {"label": "Hearts",      "type": "pattern", "pattern": 5, "how": "Climb 500 m up the World Tree"},
-	"pattern_stars":    {"label": "Stars",       "type": "pattern", "pattern": 6, "how": "Climb 100 m in Endless"},
+	"pattern_spots":    {"label": "Spots",       "type": "pattern", "pattern": 1, "how": "Find the key in the dark"},
+	"pattern_stripes":  {"label": "Stripes",     "type": "pattern", "pattern": 2, "how": "Open the gate"},
+	"pattern_hearts":   {"label": "Hearts",      "type": "pattern", "pattern": 5, "how": "Show the lost frog the way out"},
+	"pattern_twotone":  {"label": "Two-Tone",    "type": "pattern", "pattern": 4, "how": "Hear the joking frog's second joke"},
+	"pattern_stars":    {"label": "Stars",       "type": "pattern", "pattern": 6, "how": "Reach the frog at the castle door"},
 	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop", "icon": "res://assets/frog.png",
 					  "how": "He lives on your desktop. Right-click him or his tray icon for more."},
 }

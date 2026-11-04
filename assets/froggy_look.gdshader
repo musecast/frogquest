@@ -18,6 +18,7 @@ uniform vec2 tex_px = vec2(32.0, 32.0);  // (his frame, in its own pixels)
 
 const vec3 BODY_BASE = vec3(0.627, 1.0, 0.671);
 const vec3 BELLY_BASE = vec3(0.988, 1.0, 0.804);
+const vec3 MOUTH = vec3(1.0, 0.647, 0.647);  // (his mouth's pink, as drawn)
 const vec3 SHADOW = vec3(0.035, 0.025, 0.075);
 const vec3 SHADOW_RIM = vec3(0.52, 0.38, 0.95);
 const vec3 SHADOW_EYE = vec3(0.94, 0.88, 1.0);
@@ -105,21 +106,32 @@ void fragment() {
 	vec4 px = texture(TEXTURE, uv);
 	vec2 cell = floor(uv * tex_px);
 	vec3 hsv = rgb2hsv(px.rgb);
-	bool body = hsv.x > 0.25 && hsv.x < 0.48 && hsv.y > 0.12;
-	bool belly = !body && hsv.x > 0.10 && hsv.x < 0.25 && hsv.y > 0.08 && hsv.z > 0.6;
 	bool eye = hsv.z < 0.12;
+	// (where his pink mouth meets his green, the art blends the two: those pixels are that mix of the
+	// pink and his own colour, not left green, nor taken for his belly)
+	vec3 across = BODY_BASE - MOUTH;
+	float toward = clamp(dot(px.rgb - MOUTH, across) / dot(across, across), 0.0, 1.0);
+	bool mouth = !eye && toward > 0.05 && toward < 0.97 && distance(px.rgb, MOUTH + across * toward) < 0.04;
+	bool body = !mouth && hsv.x > 0.25 && hsv.x < 0.48 && hsv.y > 0.12;
+	bool belly = !mouth && !body && hsv.x > 0.10 && hsv.x <= 0.25 && hsv.y > 0.08 && hsv.z > 0.6;
+	// (and the faint green in the greys and whites round his eyes, where his green meets them: his tint)
+	bool tinted = !mouth && !body && !belly && !eye && hsv.x > 0.2 && hsv.x < 0.5 && hsv.y > 0.015;
 	vec3 col = px.rgb;
 	vec3 skin = body_colour;
 	if (effect == 2) {  // rainbow: his colour runs round the rainbow, down him
 		skin = hsv2rgb(vec3(fract(TIME * 0.18 + cell.y / 40.0), 0.42, 1.0));
 	}
+	vec3 base = mix(skin, pattern_colour, pattern_at(cell));
 	if (body) {
-		vec3 base = mix(skin, pattern_colour, pattern_at(cell));
 		col = base * (lum(px.rgb) / lum(BODY_BASE));
+	} else if (mouth) {
+		col = mix(MOUTH, base, toward);
 	} else if (belly) {
 		col = belly_colour * (lum(px.rgb) / lum(BELLY_BASE));
 	} else if (eye) {
 		col = eye_colour + px.rgb;
+	} else if (tinted) {
+		col = mix(vec3(lum(px.rgb)), base * (lum(px.rgb) / lum(BODY_BASE)), clamp(hsv.y / 0.12, 0.0, 1.0));
 	}
 	float alpha = px.a;
 

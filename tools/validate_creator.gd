@@ -1,16 +1,17 @@
 extends SceneTree
 ## Your froggy (FroggyLook) and the frog god's intro (CreatorIntro), in the real level: a new player's
-## START brings the frog god first, as a shadow (the TV's static quiet); tapping goes through its words
-## to one question at a time (his skin's colour, his eyes', his belly's: any colour along the strips,
-## gliding onto him; NEXT and BACK); "Is this you?" No goes back, Yes keeps it (in the wardrobe's save:
-## no hat, no pattern, they're found by playing); it cuts to black, the climb begins behind it, and he
+## game starts with it, no title, out of the dark with a low hum (the TV's static quiet), the frog god's
+## shadow speaking; tapping goes through its words to "what do you look like?" (in even lines), his skin,
+## then his eyes, then his belly, each from a palette of 40 (a tap or a slide, gliding onto him; NEXT and
+## BACK); "Is this you?" No goes back, Yes keeps it (in the wardrobe's save: no hat, no pattern, they're
+## earned by playing); it cuts to black, the hum cut off, the climb begins behind it, and he
 ## fades in in his bedroom as that froggy, the TV's static up and the TV talking; he's lil froggy, and
 ## his look goes to his party. A hat he's found is worn in front of his head. Next time START's straight
 ## to the climb; not made yet, ENDLESS and PLAY TOGETHER bring the frog god first too (then Play
 ## Together's menu); the wardrobe's CHANGE YOUR LOOK is just the choosing (his pattern's colour too, and
-## his band's), and the climb goes on. Then the unlocks (once each; the Cap at the first mushroom, the
-## Mushroom hat at 25; a big fall; climbing finds patterns and hats), a friend's frog in their look, and
-## the wardrobe's PATTERNS and STILL TO FIND. Scratch saves only.
+## his band's), and the climb goes on. Then the unlocks (once each; the Mushroom hat at 25 bounces; a
+## big fall; nothing for just climbing; the key's Spots, the first frog's Leaf), a friend's frog in their
+## look, and the wardrobe's PATTERNS and STILL TO FIND. Scratch saves only.
 ##   Godot --headless --path . --script res://tools/validate_creator.gd
 
 const SCRATCH_SAVE := "user://test_creator_save.save"
@@ -38,59 +39,66 @@ func _run() -> void:
 	mm.mushroom_bounces = 0
 	mm.froggyCrown = 0
 
-	# A new player: START brings the frog god first.
+	# A new player: no title; out of the dark, the frog god (and a low hum, not its song).
 	var main: Node = await _game()
 	var player: Node = main.get_node("Player")
 	var start: Vector2 = player.global_position
 	var tv: AudioStreamPlayer2D = main.get_node("Musecrtquarterview/AudioStreamPlayer2D")
-	var tv_db := tv.volume_db
-	player._on_button_pressed()
-	await _frames(3)
+	var tv_db := 0.0  # (the TV's static, as the level has it)
 	var intro = player.get_node_or_null("CreatorIntro")
-	_expect(intro != null and not player.get_node("titlescreen").visible and player.get_node("Trajectory").endGame != 0,
-		"a new player's START brings the frog god, not the climb")
+	_expect(intro != null and intro.fade_in and not player.get_node("titlescreen").visible and player.get_node("Trajectory").endGame != 0,
+		"a new player's game starts with the frog god, not the title")
 	if intro == null:
 		await _finish(real, main)
 		return
-	_expect(intro._words.text == "...LITTLE ONE..." and intro._shadow > 0.9, "he's the frog god's shadow, and it speaks")
-	_expect(tv.volume_db < -70.0, "the TV's static quiet while it speaks")
-	await _wait(1.2)
+	_expect(intro._black.color.a > 0.2 and intro._words.text == "", "fading in out of the dark, before it speaks (%.2f)" % intro._black.color.a)
+	_expect(intro._hum.playing and intro._hum.stream is AudioStreamWAV and (intro._hum.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED,
+		"a low hum under it, looping (not the frog god's song)")
+	_expect(tv.volume_db < -70.0, "the TV's static quiet while it's there")
+	await _until(func() -> bool: return intro._words.text != "", 4.0)
+	_expect(intro._words.text == "...LITTLE ONE..." and intro._shadow > 0.9 and intro._black.color.a < 0.5, "he's the frog god's shadow, and it speaks")
+	await _wait(1.0)
 	_expect(not main._tv_done, "and the TV keeps its words till he's woken in his bedroom")
 	for _i in 12:
 		if intro._step != "talk":
 			break
 		intro._advance()
 		await _frames(1)
+	await _frames(2)
 	_expect(intro._step == "choose" and intro._steps == ["body", "eyes", "belly"] and intro._at == 0
-		and intro._words.text == "WHAT COLOUR IS YOUR SKIN?" and intro._strips.visible,
-		"then it asks one thing at a time: first, the colour of his skin")
+		and intro._said == "WHAT DO YOU LOOK LIKE?" and intro._part.text == "SKIN" and intro._choosing.visible,
+		"then it asks what he looks like: his skin first")
+	var lines: PackedStringArray = intro._words.text.split("\n")
+	_expect(lines.size() == 1 or (lines.size() == 2 and lines[0].split(" ").size() >= 2 and lines[1].split(" ").size() >= 2),
+		"its words in even lines, never one word left on its own (%s)" % [lines])
+	intro._even("YOU HAVE COME FROM BELOW.", 230.0)
+	var even: PackedStringArray = intro._even("YOU HAVE COME FROM BELOW.", 230.0).split("\n")
+	_expect(even.size() >= 2 and even[even.size() - 1].split(" ").size() >= 2, "a longer line broken evenly too (%s)" % [even])
 
-	# His skin: anywhere along the strips, any colour.
-	intro._hue.slide_to(intro._hue.size.x * 0.62)
-	intro._shade.slide_to(intro._shade.size.x * 0.3)
-	var skin: Color = look.chosen("skin", intro._hue.at, intro._shade.at)
-	_expect(_near(look.colour(intro._look, "body"), skin), "sliding the strips, his skin's that colour (%s)" % skin.to_html(false))
-	intro._hue.slide_to(intro._hue.size.x * 0.64)
-	var further: Color = look.colour(intro._look, "body")
-	_expect(not _near(further, skin, 0.004) and _near(further, skin, 0.15),
-		"a little further along, a little different colour: any colour, not a few to pick from")
+	# His skin: a palette of colours, one tapped.
+	var grid = intro._grid
+	_expect(grid.colours.size() == 40 and grid.at == 8, "a palette of 40 colours, his own mint framed (%d, at %d)" % [grid.colours.size(), grid.at])
+	grid._choose_at(grid.cell(21).get_center())
+	var skin: Color = grid.colours[21]
+	_expect(grid.at == 21 and str(intro._look.body) == skin.to_html(false), "a tap on a colour: his skin's that colour")
+	grid._choose_at(grid.cell(22).get_center())
+	grid._choose_at(grid.cell(21).get_center())
+	_expect(str(intro._look.body) == skin.to_html(false), "and a finger slid across them, the one it stops on")
 	await _wait(1.7)
-	_expect(intro._shadow < 0.05 and _near(intro._frog.material.get_shader_parameter("body_colour"), further, 0.02),
+	_expect(intro._shadow < 0.05 and _near(intro._frog.material.get_shader_parameter("body_colour"), skin, 0.02),
 		"his colours fill in, gliding onto him (shadow %.2f)" % intro._shadow)
 	intro._next_pressed()
-	_expect(intro._at == 1 and intro._words.text == "AND YOUR EYES?" and intro._back.visible, "NEXT: his eyes")
-	intro._hue.slide_to(intro._hue.size.x * 0.1)
-	intro._shade.slide_to(intro._shade.size.x * 0.5)
-	var eyes: Color = look.colour(intro._look, "eyes")
+	_expect(intro._at == 1 and intro._part.text == "EYES" and intro._said == "WHAT DO YOU LOOK LIKE?" and intro._back.visible, "NEXT: his eyes")
+	grid._choose_at(grid.cell(10).get_center())
+	var eyes: Color = grid.colours[10]
 	intro._back_pressed()
-	_expect(intro._at == 0 and _near(look.colour(intro._look, "body"), further), "BACK: his skin again, as he left it")
+	_expect(intro._at == 0 and intro._part.text == "SKIN" and grid.at == 21, "BACK: his skin again, as he left it")
 	intro._next_pressed()
 	intro._next_pressed()
-	_expect(intro._at == 2 and intro._words.text == "AND YOUR BELLY?" and _near(look.colour(intro._look, "eyes"), eyes),
-		"then his belly (his eyes kept)")
-	intro._shade.slide_to(intro._shade.size.x * 0.2)
+	_expect(intro._at == 2 and intro._part.text == "BELLY" and _near(look.colour(intro._look, "eyes"), eyes), "then his belly (his eyes kept)")
+	grid._choose_at(grid.cell(33).get_center())
 	intro._next_pressed()
-	_expect(intro._step == "sure" and intro._sure.visible and intro._words.text == "IS THIS YOU?",
+	_expect(intro._step == "sure" and intro._sure.visible and intro._said == "IS THIS YOU?",
 		"and that's all it asks (no name, no hat, no pattern): is this you?")
 	intro._no()
 	_expect(intro._step == "choose" and intro._at == 0, "No goes back to the start of it")
@@ -99,9 +107,9 @@ func _run() -> void:
 	intro._yes()
 	await _frames(1)
 	_expect(mm.look_made and str(mm.look.body) == made.body and str(mm.look.eyes) == made.eyes and str(mm.look.belly) == made.belly
-		and mm.equipped_hat == "" and int(mm.look.pattern) == 0, "Yes keeps him as he is (hats and patterns are found by playing)")
-	_expect(intro._black.color.a > 0.99 and not intro._root.visible and player.get_node("Trajectory").endGame == 0,
-		"it cuts to black, and the climb's begun behind it")
+		and mm.equipped_hat == "" and int(mm.look.pattern) == 0, "Yes keeps him as he is (hats and patterns are earned by playing)")
+	_expect(intro._black.color.a > 0.99 and not intro._root.visible and not intro._hum.playing and player.get_node("Trajectory").endGame == 0,
+		"it cuts to black, the hum cut off, and the climb's begun behind it")
 	var kept: Dictionary = mm.look.duplicate()
 	mm.look = {}
 	mm.look_made = false
@@ -207,17 +215,17 @@ func _run() -> void:
 		change.pressed.emit()
 		await _frames(3)
 		var again = root.get_node_or_null("CreatorIntro")
-		_expect(again != null and again.from_wardrobe and again._words.text == "WHAT COLOUR IS YOUR SKIN?" and again._shadow < 0.05,
-			"which goes straight to the choosing, no shadow")
+		_expect(again != null and again.from_wardrobe and again._said == "WHAT DO YOU LOOK LIKE?" and again._part.text == "SKIN"
+			and again._shadow < 0.05, "which goes straight to the choosing, no shadow")
 		if again:
 			_expect(again._steps == ["body", "eyes", "belly", "pattern_colour", "band"], "his skin, eyes and belly, his pattern's colour, his band's")
-			again._hue.slide_to(again._hue.size.x * 0.4)
+			again._grid._choose_at(again._grid.cell(4).get_center())
 			var new_skin: Color = look.colour(again._look, "body")
 			for _i in 4:
 				again._next_pressed()
 			await _frames(1)
-			_expect(again._words.text == "AND YOUR BAND?" and again._next.text == "DONE" and again._band.visible, "his band's colour last, shown under him")
-			again._shade.slide_to(again._shade.size.x * 0.7)
+			_expect(again._part.text == "BAND" and again._next.text == "DONE" and again._band.visible, "his band's colour last, shown under him")
+			again._grid._choose_at(again._grid.cell(13).get_center())
 			var band: Color = look.colour(again._look, "band")
 			again._next_pressed()
 			await _until(func() -> bool: return not is_instance_valid(again), 3.0)
@@ -232,11 +240,10 @@ func _run() -> void:
 	# Unlocks: once each.
 	_expect(mm.unlock("shiny") and not mm.unlock("shiny") and "shiny" in mm.unlocked_skins, "an unlock's yours once (and again does nothing)")
 	var tiles: Node = main.get_node("TileMap")
-	tiles._counted_bounce()
-	_expect("cap" in mm.unlocked_skins, "his first mushroom bounce: the Cap")
-	for _i in 23:
+	for _i in 24:
 		tiles._counted_bounce()
-	_expect(not "mushroom" in mm.unlocked_skins and mm.mushroom_bounces == 24, "24 mushroom bounces: not the Mushroom hat yet")
+	_expect(not "mushroom" in mm.unlocked_skins and mm.mushroom_bounces == 24 and not "cap" in mm.unlocked_skins,
+		"24 mushroom bounces: not the Mushroom hat yet (and nothing for just bouncing)")
 	tiles._counted_bounce()
 	_expect("mushroom" in mm.unlocked_skins, "the 25th: the Mushroom hat")
 	await _until(func() -> bool: return player.is_on_floor(), 2.0)
@@ -244,10 +251,14 @@ func _run() -> void:
 	player._fall_top = player.currentHeight + 160.0
 	await _frames(4)
 	_expect("ghost" in mm.unlocked_skins, "a really big fall: the Ghost skin")
-	player._climbed_to = 120.0
-	player._find_up_here()
-	_expect("pattern_freckles" in mm.unlocked_skins and "leaf" in mm.unlocked_skins and "pattern_spots" in mm.unlocked_skins
-		and not "bow" in mm.unlocked_skins, "120 m up the tree: Freckles, the Leaf and Spots found; the Bow's at 150")
+	_expect(not "leaf" in mm.unlocked_skins and not "pattern_spots" in mm.unlocked_skins, "nothing's given just for climbing")
+	main._on_area_2dkey_body_shape_entered(RID(), player, 0, 0)
+	_expect("pattern_spots" in mm.unlocked_skins, "finding the key in the dark: the Spots pattern")
+	main.npc1 = 1
+	main._catch_up_gifts()
+	_expect("leaf" in mm.unlocked_skins and not "bow" in mm.unlocked_skins,
+		"a save that's talked with the first frog gets his Leaf (and not the joking frog's Bow)")
+	_expect(not look.UNLOCKS.has("pattern_freckles") and look.PATTERN_UNLOCKS[3] == "-", "no Freckles")
 
 	# A friend's frog, in their look.
 	var frog := Node2D.new()
@@ -273,9 +284,10 @@ func _run() -> void:
 	for l in ws2.find_children("*", "Label", true, false):
 		words += l.text + " | "
 	_expect(words.contains("PATTERNS") and words.contains("Spots") and words.contains("STILL TO FIND")
-		and words.contains("Climb 150 m up the World Tree") and words.contains("Score 10 in Endless") and words.contains("Climb 100 m in Endless")
-		and words.contains("Climb all the way to space in Endless") and not words.contains("Yours from the start"),
-		"the wardrobe: the patterns he's found, and everything still to find says how")
+		and words.contains("Hear the joking frog's joke in the World Tree") and words.contains("Catch a fly in Endless")
+		and words.contains("Reach the frog at the castle door") and words.contains("Climb all the way to space in Endless")
+		and not words.contains("Freckles") and not words.contains("Climb 50 m") and not words.contains("Yours from the start"),
+		"the wardrobe: the patterns he's earned, and everything still to earn says how")
 	var spots_btn: Button = ws2._item_buttons.get("pattern_spots")
 	if spots_btn:
 		spots_btn.pressed.emit()

@@ -155,17 +155,6 @@ func _ready():
 	_trace("Player ready end")
 
 
-var _climbed_to := -INF  # (the highest he's climbed to, this time: what's found up there is his)
-
-
-## What's found by climbing past its height up the World Tree (FroggyLook.CLIMB_UNLOCKS): a pattern or a
-## hat, his as he passes it.
-func _find_up_here() -> void:
-	for each in load("res://scripts/FroggyLook.gd").CLIMB_UNLOCKS:
-		if _climbed_to >= float(each[0]) and not each[1] in MusicManager.unlocked_skins:
-			MusicManager.unlock(each[1])
-
-
 func _physics_process(delta):
 	if Engine.is_editor_hint():
 		return
@@ -187,9 +176,6 @@ func _physics_process(delta):
 	
 	
 	currentHeight = (-position.y - 472) /10
-	if $Trajectory.endGame == 0 and currentHeight > _climbed_to:
-		_climbed_to = currentHeight
-		_find_up_here()
 	
 	if Engine.time_scale != 0.05 and $Trajectory.endGame == 0:
 		time_now = Time.get_unix_time_from_system()
@@ -456,6 +442,7 @@ func _on_area_2_dkeyhole_body_shape_entered(body_rid, body, body_shape_index, lo
 		$"../World Sprites/Keyhole".visible = false
 		$"../World Sprites/Keyhole/havekey".play()
 		$"../frogNPC6/pathopen".play()
+		MusicManager.unlock("pattern_stripes")  # (the gate open: the Stripes pattern)
 		await get_tree().create_timer(0.5).timeout
 		$"../World Sprites/Keyhole".queue_free()
 	else:
@@ -511,16 +498,18 @@ func _on_button_pressed():
 	
 
 
-## The first time he plays anything (a climb, Endless, or Play Together), the frog god asks what he
-## looks like first (CreatorIntro): it's how the game starts. At its cut to black (with the finale's
-## closing-in sound: `cut_sound`, unless what comes next plays it) on he goes (`then`: the climb, Endless,
-## or Play Together's menu), and the TV's static (quiet till then) comes up as he fades in.
-func _meet_the_frog_god(then: Callable, cut_sound := true) -> void:
+## How the game starts the first time (no title: `fade_in`, out of the dark), and before anything else he
+## plays while he hasn't made his froggy (a climb, Endless, or Play Together): the frog god asks what he
+## looks like (CreatorIntro). At its cut to black (with the finale's closing-in sound: `cut_sound`, unless
+## what comes next plays it) on he goes (`then`: the climb, Endless, or Play Together's menu), and the
+## TV's static (quiet till then) comes up as he fades in.
+func _meet_the_frog_god(then: Callable, cut_sound := true, fade_in := false) -> void:
 	if get_node_or_null("CreatorIntro"):
 		return
 	$titlescreen.visible = false
 	var intro: CanvasLayer = load("res://scenes/CreatorIntro.gd").new()
 	intro.cut_sound = cut_sound
+	intro.fade_in = fade_in
 	add_child(intro)
 	var tv := get_node_or_null("../Musecrtquarterview/AudioStreamPlayer2D") as AudioStreamPlayer2D
 	var tv_db := tv.volume_db if tv else 0.0
@@ -1350,6 +1339,10 @@ func _byline(label: Label, font_size: int, gap: float) -> Vector2:
 
 func _initial_title_layout() -> void:
 	_apply_ui_layout()
+	if not MusicManager.look_made and get_node_or_null("CreatorIntro") == null:
+		# (the very first time: no title; out of the dark, the frog god asks what he looks like, then the climb)
+		_meet_the_frog_god(_on_button_pressed, false, true)
+		return
 	$titlescreen.visible = true
 
 

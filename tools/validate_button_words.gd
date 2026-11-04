@@ -43,8 +43,9 @@ func _run() -> void:
 	var real_wardrobe: String = mm.wardrobe_path
 	var real_bytes := FileAccess.get_file_as_bytes(real_wardrobe) if FileAccess.file_exists(real_wardrobe) else PackedByteArray()
 	mm.wardrobe_path = SCRATCH_WARDROBE
-	var real := [mm.froggyCrown, mm.ads_removed, mm.unlocked_skins.duplicate(), mm.seen_cosmetics.duplicate()]
+	var real := [mm.froggyCrown, mm.ads_removed, mm.unlocked_skins.duplicate(), mm.seen_cosmetics.duplicate(), mm.look_made]
 	mm.froggyCrown = 1
+	mm.look_made = true  # (he's made his froggy already: the title, not the frog god's intro over it)
 	mm.ads_removed = false
 	for id in load("res://scenes/WardrobeScreen.gd").ITEMS:
 		if id != "froggycrown" and id not in mm.unlocked_skins:
@@ -77,6 +78,7 @@ func _run() -> void:
 	mm.ads_removed = real[1]
 	mm.unlocked_skins = real[2]
 	mm.seen_cosmetics = real[3]
+	mm.look_made = real[4]
 	mm.wardrobe_path = real_wardrobe
 	for f in [SCRATCH_SAVE, SCRATCH_WARDROBE]:
 		if FileAccess.file_exists(f):

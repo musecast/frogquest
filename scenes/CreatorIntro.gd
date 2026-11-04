@@ -1,30 +1,32 @@
 extends CanvasLayer
-## How the game starts, the first time: a dark place between the stars, and the frog god's voice. He's a
-## shadow, the frog god's own, and it asks what he looks like, one thing at a time: the colour of his
-## skin, then his eyes, then his belly (any colour at all: a strip of colours to slide along, and under
-## it a strip of its shades), and as he chooses he fills in, his colours gliding to each. "Is this you?"
-## Yes: it cuts to black (with the sound the finale makes as it closes in), the TV's static comes up,
-## and he fades into his bedroom as that froggy. Nothing else is asked, not even a name (he's lil froggy,
-## as everyone is; friends know you by your Muse @handle): hats, patterns and skins are found by playing.
-## His look is kept (MusicManager.look) and goes online with him (Party). From the wardrobe
-## (from_wardrobe): just the choosing, with his pattern's colour (when he's wearing one) and his band's.
-## (The mood's a dream-like void; the words, the frog god's and the art are Frog Quest's own.)
+## How the game starts, the first time: out of the dark, slowly, a place between the stars and the frog
+## god's voice, a low hum under it. He's a shadow, the frog god's own; it asks what he looks like, and he
+## chooses, one thing at a time (his skin, then his eyes, then his belly), each from a palette of
+## colours to tap or slide a finger across, his colours gliding to each as he fills in. "Is this you?"
+## Yes: it cuts to black (the hum cut off, with the sound the finale makes as it closes in), the TV's
+## static comes up, and he fades into his bedroom as that froggy. Nothing else is asked, not even a name
+## (he's lil froggy, as everyone is; friends know you by your Muse @handle): hats, patterns and skins are
+## earned by playing. His look is kept (MusicManager.look) and goes online with him (Party). From the
+## wardrobe (from_wardrobe): just the choosing, with his pattern's colour (when he's wearing one) and his
+## band's. (The mood's a dream-like void; the words, the frog god's and the art are Frog Quest's own.)
 
 signal done
 
 const LINES := ["...LITTLE ONE...", "YOU HAVE COME FROM BELOW.", "BEFORE THE TREE CAN KNOW YOU...", "TELL ME."]
-const ASK := {"body": "WHAT COLOUR IS YOUR SKIN?", "eyes": "AND YOUR EYES?", "belly": "AND YOUR BELLY?",
-	"pattern_colour": "AND YOUR PATTERN?", "band": "AND YOUR BAND?"}
+const ASK := "WHAT DO YOU LOOK LIKE?"
 const SURE := "IS THIS YOU?"
+const PARTS := {"body": "SKIN", "eyes": "EYES", "belly": "BELLY", "pattern_colour": "PATTERN", "band": "BAND"}
+const PALETTES := {"body": "skin", "eyes": "eyes", "belly": "belly", "pattern_colour": "skin", "band": "band"}
 const SHADER_KEYS := {"body": "body_colour", "belly": "belly_colour", "eyes": "eye_colour", "pattern_colour": "pattern_colour"}
+const FADE_IN := 3.0  # (the first time: out of the dark, slowly)
 const HOLD := 1.1  # (seconds of black after the cut, its sound ringing, before he fades in)
 const FADE := 1.8  # (and the fade into the game)
+const HUM_DB := -10.0
 const IDLE := ["res://assets/frog.png", "res://assets/frog2.png"]
 const TYPE_SPEED := 24.0  # letters a second
 const CREAM := Color(0.97, 0.92, 0.80)
 const DIM := Color(0.70, 0.66, 0.82)
 const VOICE := Color(0.93, 0.90, 1.0)
-const INK := Color(0.10, 0.08, 0.12)
 const HAT_Y := -10.75  # (where his hats sit, from his middle, in his own pixels: player.gd's at -9.17, him at -1, at 0.76)
 # (the fly by YES, as the cursor: his wings, his light edge, his dark body, his red eyes; wings up, then down)
 const FLY := [[".WW.....WW.", "WWWW...WWWW", "WWWWW.WWWWW", ".WWWKKKWWW.", "...KBBBK...", "..KRBBBRK..", "..KBBBBBK..",
@@ -36,28 +38,30 @@ const ART_HATS := {"froggycrown": ["res://assets/froggycrown.png", 1.0, -7.25], 
 	"wizhat": ["res://assets/froggywizhat.png", 1.0, 0.0], "cakehat": ["res://assets/froggycakehat.png", 0.71, 0.0]}
 
 var from_wardrobe := false
+var fade_in := false  # (the game's very first moments: out of the black, slowly)
 var cut_sound := true  # (the finale's closing-in sound at the cut; START plays it itself, so not from there)
 
 var _looks: GDScript = load("res://scripts/FroggyLook.gd")
 var _look := {}
 var _hat := ""
-var _steps: Array = []  # (what's asked, in turn: "body", "eyes", "belly"; from the wardrobe, maybe more)
+var _steps: Array = []  # (what's chosen, in turn: "body", "eyes", "belly"; from the wardrobe, maybe more)
 var _at := 0  # (which of them)
 var _step := ""  # talk, choose, sure ("" once he's going)
 var _line := 0
+var _said := ""  # (the words, before they're broken into even lines)
 var _typed := 0.0
 var _shadow := 1.0
 var _frame := 0
 var _frame_t := 0.0
 var _clock := 0.0  # (its own time: the bob, the fly, the band; steady in a recording too)
 var _centred := 1.0  # (1: him in the middle, as the frog god speaks or asks; 0: where he is as he chooses)
-var _strips_in := 0.0  # (the strips coming in, each question)
+var _palette_in := 0.0  # (each part's palette coming in)
 var _voice_px := 0
 var _fly_on := 0.0  # (0: by YES; 1: by NO, with the mouse over it)
 var _fly_want := 0.0
 var _shown := {}  # (his colours as shown: gliding to what's chosen)
-var _ticked := -1  # (the last tick of the strips' little sound)
 var _ending := false
+var _quiet := 0.0  # (the first time: before the frog god speaks, out of the dark)
 
 var _root: Control  # (everything, to fade it all at once)
 var _bg: ColorRect
@@ -66,11 +70,9 @@ var _frog: TextureRect
 var _hat_rect: TextureRect
 var _band: Control  # (his band, under him, while its colour's chosen)
 var _tap: Button
-var _strips: Control
-var _colour_label: Label
-var _hue: ColourStrip
-var _shade_label: Label
-var _shade: ColourStrip
+var _choosing: Control
+var _part: Label
+var _grid: ColourGrid
 var _dots: Control
 var _back: Button
 var _next: Button
@@ -78,70 +80,94 @@ var _sure: HBoxContainer
 var _fly: Control
 var _spaced: FontVariation
 var _black: ColorRect
-var _music: AudioStreamPlayer
+var _hum: AudioStreamPlayer
 var _blip: AudioStreamPlayer
 
 
-## A strip to choose a colour along (drag along it, or tap it): its colours from `paint` (where along
-## it, 0 to 1), and a knob where it's at, gliding there when it's moved for you.
-class ColourStrip extends Control:
-	signal moved
+## A palette to choose a colour from: little squares in rows, tapped (or a finger slid across them), a
+## frame gliding to the one that's chosen.
+class ColourGrid extends Control:
+	signal picked
 	const EDGE := Color(0.10, 0.08, 0.12)
-	const KNOB := Color(0.97, 0.92, 0.80)
-	var at := 0.0
-	var paint: Callable
-	var _shown := 0.0
+	const FRAME := Color(0.97, 0.92, 0.80)
+	var colours: Array = []
+	var across := 8
+	var at := -1  # (which is chosen)
+	var _shown := Rect2()  # (where the frame is, gliding)
 	var _held := false
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_STOP
 		focus_mode = Control.FOCUS_NONE
 
-	func set_at(where: float, glide := true) -> void:
-		at = clampf(where, 0.0, 1.0)
-		if not glide:
-			_shown = at
+	## The palette, and which of it is chosen (the frame glides there; at once when it's new).
+	func show_colours(list: Array, chosen: int) -> void:
+		colours = list
+		at = chosen
+		_shown = cell(at)
 		queue_redraw()
 
-	## Moved by a finger (or the mouse) to x across it.
-	func slide_to(x: float) -> void:
-		at = clampf((x - 3.0) / maxf(1.0, size.x - 6.0), 0.0, 1.0)
-		_shown = at
-		moved.emit()
-		queue_redraw()
+	func rows() -> int:
+		return ceili(float(colours.size()) / float(across))
+
+	## Each square's size and the gap between them, to fill its width (and fit its height).
+	func cell_size() -> float:
+		var gap := gap_size()
+		return floorf(minf((size.x - gap * (across - 1)) / across, (size.y - gap * (rows() - 1)) / maxi(1, rows())))
+
+	func gap_size() -> float:
+		return clampf(roundf(size.x / across * 0.14), 3.0, 7.0)
+
+	func cell(i: int) -> Rect2:
+		if i < 0 or colours.is_empty():
+			return Rect2()
+		var s := cell_size()
+		var gap := gap_size()
+		var span := Vector2(across * s + (across - 1) * gap, rows() * s + (rows() - 1) * gap)
+		var origin := ((size - span) * 0.5).floor()
+		return Rect2(origin + Vector2(i % across, i / across) * (s + gap), Vector2(s, s))
 
 	func _process(delta: float) -> void:
+		if at < 0:
+			return
+		var want := cell(at)
+		var k := 1.0 - exp(-delta * 16.0)
 		var was := _shown
-		_shown = lerpf(_shown, at, 1.0 - exp(-delta * 14.0))
-		if absf(_shown - was) > 0.0005:
+		_shown = Rect2(_shown.position.lerp(want.position, k), _shown.size.lerp(want.size, k))
+		if not _shown.position.is_equal_approx(was.position):
 			queue_redraw()
 
 	func _gui_input(e: InputEvent) -> void:
 		if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_LEFT:
 			_held = e.pressed
 			if e.pressed:
-				slide_to(e.position.x)
+				_choose_at(e.position)
 			accept_event()
 		elif e is InputEventMouseMotion and _held:
-			slide_to(e.position.x)
+			_choose_at(e.position)
 			accept_event()
 
+	## The square under a finger: chosen.
+	func _choose_at(p: Vector2) -> void:
+		for i in colours.size():
+			if cell(i).grow(gap_size() * 0.5).has_point(p):
+				if i != at:
+					at = i
+					picked.emit()
+				return
+
 	func _draw() -> void:
-		if not paint.is_valid():
-			return
-		var w := size.x
-		var h := size.y
-		draw_rect(Rect2(0, 0, w, h), EDGE)
-		var inner := Rect2(3, 3, w - 6, h - 6)
-		var n := maxi(8, int(inner.size.x / 2.0))
-		for i in n:
-			var x0 := floorf(inner.position.x + inner.size.x * i / n)
-			var x1 := floorf(inner.position.x + inner.size.x * (i + 1) / n)
-			draw_rect(Rect2(x0, inner.position.y, x1 - x0, inner.size.y), paint.call((float(i) + 0.5) / n))
-		var x := roundf(inner.position.x + inner.size.x * _shown)
-		draw_rect(Rect2(x - 6, -4, 12, h + 8), EDGE)  # (the knob: dark round the edge,
-		draw_rect(Rect2(x - 4, -2, 8, h + 4), KNOB)  # cream,
-		draw_rect(Rect2(x - 2, 0, 4, h), paint.call(_shown))  # the colour it's on in it)
+		for i in colours.size():
+			var r := cell(i)
+			var c: Color = colours[i]
+			draw_rect(r, EDGE)
+			draw_rect(r.grow(-2.0), c)
+			draw_rect(Rect2(r.position + Vector2(2, 2), Vector2(r.size.x - 4.0, 2.0)), c.lightened(0.28))  # (a light edge on top,
+			draw_rect(Rect2(r.position + Vector2(2, r.size.y - 4.0), Vector2(r.size.x - 4.0, 2.0)), c.darkened(0.2))  # dark below)
+		if at >= 0:
+			var f := _shown.grow(4.0)
+			draw_rect(f.grow(2.0), EDGE, false, 2.0)
+			draw_rect(f, FRAME, false, 3.0)
 
 
 func _ready() -> void:
@@ -204,7 +230,7 @@ func _ready() -> void:
 	_words = Label.new()
 	_words.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_words.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_words.autowrap_mode = TextServer.AUTOWRAP_OFF  # (broken into even lines here: _even)
 	_words.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING  # (typed out in place, not reflowing)
 	ui.style_label(_words, 16, VOICE)
 	_spaced = FontVariation.new()  # (the frog god's words, spread out)
@@ -213,28 +239,27 @@ func _ready() -> void:
 	_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_words)
 
-	_strips = Control.new()  # (a colour, its shade, which question this is, and back and next)
-	_strips.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_strips.visible = false
-	_root.add_child(_strips)
-	_colour_label = _label("COLOUR")
-	_strips.add_child(_colour_label)
-	_hue = ColourStrip.new()
-	_hue.moved.connect(_pick)
-	_strips.add_child(_hue)
-	_shade_label = _label("SHADE")
-	_strips.add_child(_shade_label)
-	_shade = ColourStrip.new()
-	_shade.moved.connect(_pick)
-	_strips.add_child(_shade)
+	_choosing = Control.new()  # (which part, its palette, which of them this is, and back and next)
+	_choosing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_choosing.visible = false
+	_root.add_child(_choosing)
+	_part = Label.new()
+	_part.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_part.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_part.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.style_label(_part, 16, CREAM)
+	_choosing.add_child(_part)
+	_grid = ColourGrid.new()
+	_grid.picked.connect(_pick)
+	_choosing.add_child(_grid)
 	_dots = Control.new()
 	_dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_dots.draw.connect(_draw_dots)
-	_strips.add_child(_dots)
+	_choosing.add_child(_dots)
 	_back = _button("BACK", _back_pressed, "quiet")
-	_strips.add_child(_back)
+	_choosing.add_child(_back)
 	_next = _button("NEXT", _next_pressed, "go")
-	_strips.add_child(_next)
+	_choosing.add_child(_next)
 
 	_sure = HBoxContainer.new()
 	_sure.add_theme_constant_override("separation", 24)
@@ -251,19 +276,19 @@ func _ready() -> void:
 	_root.add_child(_fly)
 	_fly.draw.connect(_draw_fly)
 
-	_black = ColorRect.new()  # (the cut to black, at the end: the game fades in from it)
-	_black.color = Color(0, 0, 0, 0)
+	_black = ColorRect.new()  # (the dark it comes out of, the first time, and the cut to black at the end)
+	_black.color = Color(0, 0, 0, 1.0 if fade_in else 0.0)
 	_black.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_black)
 
-	_music = AudioStreamPlayer.new()
-	_music.stream = load("res://assets/GOD FROG.ogg")
-	_music.bus = &"Music"
-	_music.volume_db = -40.0
-	add_child(_music)
-	_music.play()
-	_music.create_tween().tween_property(_music, "volume_db", -12.0, 2.5)
+	_hum = AudioStreamPlayer.new()  # (a low hum: it comes in, and it's cut off at the end)
+	_hum.stream = _hum_sound()
+	_hum.bus = &"Music"
+	_hum.volume_db = -50.0
+	add_child(_hum)
+	_hum.play()
+	_hum.create_tween().tween_property(_hum, "volume_db", HUM_DB, FADE_IN if fade_in else 2.0).set_ease(Tween.EASE_OUT)
 	_blip = AudioStreamPlayer.new()
 	_blip.stream = load("res://assets/frogaim.wav")
 	_blip.bus = &"FX"
@@ -276,19 +301,54 @@ func _ready() -> void:
 		_choose(0)
 	else:
 		_step = "talk"
-		_say(LINES[0])
+		if fade_in:
+			_quiet = FADE_IN * 0.6  # (the frog god speaks once it's mostly out of the dark)
+			create_tween().tween_property(_black, "color:a", 0.0, FADE_IN).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			_say("")
+		else:
+			_say(LINES[0])
 	_fit()
+
+
+## A low hum, made here: a deep note and the note an octave up, a hair apart so it slowly throbs, with
+## a little of the notes over it (so it's heard on a phone's small speaker too), two seconds, looped.
+static func _hum_sound() -> AudioStreamWAV:
+	var rate := 11025
+	var n := rate * 2
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	var notes := [[55.0, 0.30], [110.0, 0.36], [110.5, 0.30], [220.0, 0.16], [330.0, 0.07], [440.0, 0.03]]
+	for i in n:
+		var t := float(i) / rate
+		var v := 0.0
+		for each in notes:
+			v += sin(TAU * each[0] * t) * each[1]
+		data.encode_s16(i * 2, int(clampf(v * 0.55, -1.0, 1.0) * 32767.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = rate
+	wav.stereo = false
+	wav.data = data
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_begin = 0
+	wav.loop_end = n
+	return wav
 
 
 func _process(delta: float) -> void:
 	_clock += delta
+	if _quiet > 0.0:
+		_quiet -= delta
+		if _quiet <= 0.0:
+			_say(LINES[0])
 	_fit()
 	var total := _words.text.length()
 	if _typed < total:
 		var before := int(_typed)
 		_typed = minf(float(total), _typed + delta * TYPE_SPEED)
 		_words.visible_characters = int(_typed)
-		if int(_typed) / 2 != before / 2 and _words.text.substr(int(_typed) - 1, 1) != " ":
+		var ch := _words.text.substr(int(_typed) - 1, 1)
+		if int(_typed) / 2 != before / 2 and ch != " " and ch != "\n":
 			_blip.pitch_scale = randf_range(0.55, 0.7)
 			_blip.play()
 	_frame_t += delta
@@ -300,7 +360,7 @@ func _process(delta: float) -> void:
 	_shadow = move_toward(_shadow, dark, delta * 0.7)
 	if _step != "":
 		_centred = move_toward(_centred, 0.0 if _step == "choose" else 1.0, delta * 2.4)
-	_strips_in = move_toward(_strips_in, 1.0, delta * 4.0)
+	_palette_in = move_toward(_palette_in, 1.0, delta * 4.0)
 	_fly_on = move_toward(_fly_on, _fly_want, delta * 6.0)
 	var mat := _frog.material as ShaderMaterial
 	var glide := 1.0 - exp(-delta * 12.0)  # (his colours glide to what's chosen)
@@ -315,15 +375,18 @@ func _process(delta: float) -> void:
 	_fly.queue_redraw()
 
 
-## Words in the frog god's voice, typed out.
+## Words in the frog god's voice, typed out (broken into even lines as they're laid out: _fit).
 func _say(words: String) -> void:
+	_said = words
 	_words.text = words
 	_typed = 0.0
 	_words.visible_characters = 0
 
 
-## A tap while it speaks: all of these words at once, or the next ones; after them, the first question.
+## A tap while it speaks: all of these words at once, or the next ones; after them, the choosing.
 func _advance() -> void:
+	if _quiet > 0.0:
+		return
 	if _typed < _words.text.length():
 		_typed = _words.text.length()
 		_words.visible_characters = -1
@@ -337,44 +400,33 @@ func _advance() -> void:
 		_choose(0)
 
 
-## The question `at` (its strips set to what he is now): the frog god asks it.
+## Part `at` to choose (its palette, with what he is now framed): the frog god asks what he looks like.
 func _choose(at: int) -> void:
+	var first := _step != "choose"
 	_at = clampi(at, 0, _steps.size() - 1)
 	_step = "choose"
 	_tap.visible = false
-	_strips_in = 0.0
+	_palette_in = 0.0
 	_sure.visible = false
 	_fly.visible = false
 	var kind: String = _steps[_at]
-	var paints := _paint_kind(kind)
-	_hue.paint = func(t: float) -> Color: return _looks.chosen(paints, t, _shade.at)
-	_shade.paint = func(t: float) -> Color: return _looks.chosen(paints, _hue.at, t)
-	var where: Vector2 = _looks.place(paints, _looks.colour(_look, kind))
-	_hue.set_at(where.x)
-	_shade.set_at(where.y)
+	var colours: Array = _looks.palette(PALETTES[kind])
+	_grid.show_colours(colours, _looks.nearest(colours, _looks.colour(_look, kind)))
+	_part.text = PARTS[kind]
 	_back.visible = _at > 0 or from_wardrobe
 	_back.text = "BACK" if _at > 0 else "CANCEL"
 	_next.text = "DONE" if (from_wardrobe and _at == _steps.size() - 1) else "NEXT"
 	_dots.queue_redraw()
-	_say(ASK[kind])
+	if first or _said != ASK:
+		_say(ASK)
 
 
-## Which strips a question's colours come from (FroggyLook.chosen): his skin's, his eyes'...
-static func _paint_kind(kind: String) -> String:
-	return {"body": "skin", "pattern_colour": "pattern"}.get(kind, kind)
-
-
-## The strips moved: that colour's his now (shown at once on the strips, gliding onto him).
+## A colour tapped: that's his now (gliding onto him).
 func _pick() -> void:
 	var kind: String = _steps[_at]
-	_look[kind] = _looks.chosen(_paint_kind(kind), _hue.at, _shade.at).to_html(false)
-	_hue.queue_redraw()
-	_shade.queue_redraw()
-	var tick := int((_hue.at + _shade.at) * 24.0)  # (a soft tick as it slides, higher along it)
-	if tick != _ticked:
-		_ticked = tick
-		_blip.pitch_scale = 0.8 + (_hue.at + _shade.at) * 0.3
-		_blip.play()
+	_look[kind] = (_grid.colours[_grid.at] as Color).to_html(false)
+	_blip.pitch_scale = 0.85 + float(_grid.at % _grid.across) * 0.06
+	_blip.play()
 
 
 func _next_pressed() -> void:
@@ -420,8 +472,9 @@ func _keep() -> void:
 	MusicManager.save_wardrobe()
 
 
-## The end of it. The first time: it cuts to black (the finale's closing-in sound), the game takes over
-## behind it (done), and it fades in from the black. From the wardrobe: it just fades back to it.
+## The end of it. The first time: it cuts to black, the hum cut off (with the finale's closing-in sound),
+## the game takes over behind it (done), and it fades in from the black. From the wardrobe: it just
+## fades back to it.
 func _end() -> void:
 	if _ending:
 		return
@@ -431,13 +484,14 @@ func _end() -> void:
 	if from_wardrobe:
 		var away := create_tween()
 		away.tween_property(_root, "modulate:a", 0.0, 0.35)
+		away.parallel().tween_property(_hum, "volume_db", -50.0, 0.35)
 		await away.finished
 		done.emit()
 		queue_free()
 		return
 	_black.color = Color(0, 0, 0, 1)
 	_root.visible = false
-	_music.stop()
+	_hum.stop()
 	if cut_sound:
 		var boom := AudioStreamPlayer.new()
 		boom.stream = load("res://assets/appear.mp3")
@@ -454,7 +508,7 @@ func _end() -> void:
 	queue_free()
 
 
-## His hat (the one he's wearing, if any: they're found by playing), as in the game.
+## His hat (the one he's wearing, if any: they're earned by playing), as in the game.
 func _dress_hat() -> void:
 	var pic: Texture2D = _looks.hat_texture(_hat)
 	if pic == null and ART_HATS.has(_hat):
@@ -478,7 +532,7 @@ func _dress_hat() -> void:
 
 ## Laid out for the screen. As the frog god speaks, or asks "is this you?", he's in the middle, its
 ## words over him (YES and NO under him); as he chooses, he moves up (upright) or to the left
-## (sideways), the strips under him or beside him.
+## (sideways), the palette under him or beside him.
 func _fit() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	if vp.x < 50.0:
@@ -488,7 +542,7 @@ func _fit() -> void:
 	var portrait := vp.y > vp.x * 1.3
 	(_bg.material as ShaderMaterial).set_shader_parameter("pixels", (vp * 0.5).floor())
 	_voice(32 if portrait else 16)
-	var px := (5.0 if room.size.y >= 640.0 else 4.0) if portrait else 3.0  # (each of his pixels, in the screen's)
+	var px := (5.0 if room.size.y >= 660.0 else 4.0) if portrait else 3.0  # (each of his pixels, in the screen's)
 	var frog_size := Vector2(32, 32) * px
 	var bob := sin(_clock * 1.6) * 3.0
 	var k := smoothstep(0.0, 1.0, _centred)
@@ -498,27 +552,32 @@ func _fit() -> void:
 	var choosing: Vector2  # (where he is as he chooses)
 	var words_w: float
 	if portrait:
-		var w := roundf(minf(room.size.x * 0.86, 400.0))
-		var strips_h := 24.0 + 34.0 + 14.0 + 24.0 + 34.0 + 14.0 + 8.0 + 14.0 + 34.0
-		var block := words_h + gap + frog_size.y + 30.0 + strips_h  # (the question, him and the strips: in the middle)
-		var top := room.position.y + maxf(12.0, (room.size.y - block) * 0.42)
+		var w := roundf(minf(room.size.x * 0.86, 380.0))
+		var grid_h := roundf(w * 5.0 / 8.0)
+		var below := 26.0 + grid_h + 14.0 + 8.0 + 14.0 + 34.0  # (the part's name, the palette, the dots, the buttons)
+		var block := words_h + gap + frog_size.y + 22.0 + below  # (the question, him and the palette: in the middle)
+		var top := room.position.y + maxf(10.0, (room.size.y - block) * 0.42)
 		choosing = Vector2(vp.x * 0.5, top + words_h + gap + frog_size.y * 0.5)
 		words_w = room.size.x - 32.0
-		_lay_strips(Vector2(roundf((vp.x - w) * 0.5), roundf(choosing.y + frog_size.y * 0.5 + 30.0)), w, 34.0, 24.0, 14.0, 34.0)
+		_lay_choosing(Vector2(roundf((vp.x - w) * 0.5), roundf(choosing.y + frog_size.y * 0.5 + 22.0)), w, grid_h, 26.0, 14.0, 34.0)
 	else:
-		var w := roundf(clampf(room.size.x - 190.0, 220.0, 300.0))
+		var w := roundf(clampf(room.size.x - 196.0, 220.0, 300.0))
 		var left := room.size.x - w - 20.0  # (his side)
 		choosing = Vector2(room.position.x + left * 0.5 + 4.0,
 			maxf(room.position.y + 6.0 + words_h + gap + frog_size.y * 0.5, room.position.y + room.size.y * 0.55))
 		words_w = left
-		_lay_strips(Vector2(roundf(room.end.x - w - 12.0), roundf(room.position.y + 8.0)), w, 20.0, 17.0, 5.0, 24.0)
+		var grid_h := minf(roundf(w * 5.0 / 8.0), room.size.y - 18.0 - 6.0 - 8.0 - 6.0 - 24.0 - 12.0)
+		_lay_choosing(Vector2(roundf(room.end.x - w - 12.0), roundf(room.position.y + 6.0)), w, grid_h, 18.0, 6.0, 24.0)
 	var centre := choosing.lerp(middle, k)
 	words_w = lerpf(words_w, room.size.x - 32.0, k)
 	_words.size = Vector2(words_w, words_h)
 	_words.position = Vector2(centre.x - words_w * 0.5, centre.y - frog_size.y * 0.5 - gap - words_h).round()
-	_strips.modulate.a = (1.0 - k) * _strips_in
-	_strips.visible = _step == "choose" or _strips.modulate.a > 0.02
-	_strips.position.y += roundf((1.0 - _strips_in) * 10.0)  # (each question's strips rise into place)
+	var even := _even(_said, words_w - 8.0)  # (in even lines: never one word left alone on the last)
+	if _words.text != even:
+		_words.text = even
+	_choosing.modulate.a = (1.0 - k) * _palette_in
+	_choosing.visible = _step == "choose" or _choosing.modulate.a > 0.02
+	_choosing.position.y += roundf((1.0 - _palette_in) * 10.0)  # (each part's palette rises into place)
 	_frog.size = frog_size
 	_frog.position = (centre - frog_size * 0.5 + Vector2(0, bob)).round()
 	if _hat_rect.texture:
@@ -532,8 +591,8 @@ func _fit() -> void:
 		var mid: Vector2 = centre + Vector2(0, bob) + (Vector2(0.0, HAT_Y + drop) + off * rel) * px
 		_hat_rect.size = t * rel * px
 		_hat_rect.position = (mid - _hat_rect.size * 0.5).round()
-	_band.size = Vector2(frog_size.x * 1.5, frog_size.y * 0.45)
-	_band.position = (centre + Vector2(-_band.size.x * 0.5, frog_size.y * 0.38 + bob)).round()
+	_band.size = Vector2(frog_size.x * 1.4, frog_size.y * 0.28)
+	_band.position = (centre + Vector2(-_band.size.x * 0.5, frog_size.y * 0.3 + bob)).round()
 	var sure_size := _sure.get_combined_minimum_size()
 	_sure.size = sure_size
 	_sure.position = Vector2(centre.x - sure_size.x * 0.5, centre.y + frog_size.y * 0.5 + (28.0 if portrait else 10.0)).round()
@@ -548,22 +607,16 @@ func _fit() -> void:
 		_fly.modulate.a = k
 
 
-## The strips and what goes with them, from `at` down, `w` across.
-func _lay_strips(at: Vector2, w: float, strip_h: float, label_h: float, gap: float, button_h: float) -> void:
-	_strips.position = at
+## The part's name, its palette, the dots and the buttons, from `at` down, `w` across.
+func _lay_choosing(at: Vector2, w: float, grid_h: float, label_h: float, gap: float, button_h: float) -> void:
+	_choosing.position = at
 	var y := 0.0
-	_colour_label.position = Vector2(0, y)
-	_colour_label.size = Vector2(w, label_h)
+	_part.position = Vector2(0, y)
+	_part.size = Vector2(w, label_h)
 	y += label_h
-	_hue.position = Vector2(0, y)
-	_hue.size = Vector2(w, strip_h)
-	y += strip_h + gap
-	_shade_label.position = Vector2(0, y)
-	_shade_label.size = Vector2(w, label_h)
-	y += label_h
-	_shade.position = Vector2(0, y)
-	_shade.size = Vector2(w, strip_h)
-	y += strip_h + gap
+	_grid.position = Vector2(0, y)
+	_grid.size = Vector2(w, grid_h)
+	y += grid_h + gap
 	_dots.position = Vector2(0, y)
 	_dots.size = Vector2(w, 8)
 	y += 8 + gap
@@ -572,7 +625,47 @@ func _lay_strips(at: Vector2, w: float, strip_h: float, label_h: float, gap: flo
 	_back.size = Vector2(bw, button_h)
 	_next.position = Vector2(w - bw, y)
 	_next.size = Vector2(bw, button_h)
-	_strips.size = Vector2(w, y + button_h)
+	_choosing.size = Vector2(w, y + button_h)
+
+
+## Words broken into as few lines as fit `room` across, as even as they can be (the longest line as
+## short as it can be: never one word on its own under the rest). Spaces become the breaks, so it's
+## as long as it was (what's typed out stays where it is).
+func _even(words: String, room: float) -> String:
+	var parts := words.split(" ", false)
+	var size := _voice_px
+	if parts.size() < 2 or _spaced.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= room:
+		return words
+	for lines in range(2, parts.size() + 1):
+		var best := ""
+		var widest_best := INF
+		for breaks in _ways_to_break(parts.size() - 1, lines - 1):
+			var out := ""
+			var widest := 0.0
+			var line := ""
+			for i in parts.size():
+				line += ("" if line == "" else " ") + parts[i]
+				if i in breaks or i == parts.size() - 1:
+					widest = maxf(widest, _spaced.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+					out += line + ("\n" if i in breaks else "")
+					line = ""
+			if widest <= room and widest < widest_best:
+				widest_best = widest
+				best = out
+		if best != "":
+			return best
+	return words
+
+
+## Every way to choose `count` of the `gaps` places between words (as the index of the word before).
+static func _ways_to_break(gaps: int, count: int, from := 0) -> Array:
+	if count == 0:
+		return [[]]
+	var out := []
+	for i in range(from, gaps - count + 1):
+		for rest in _ways_to_break(gaps, count - 1, i + 1):
+			out.append([i] + rest)
+	return out
 
 
 ## The frog god's words at this size (32 upright, 16 sideways: twice the font's own, or the same),
@@ -587,7 +680,7 @@ func _voice(size: int) -> void:
 	_spaced.spacing_space = size * 3 / 8
 
 
-## Which question this is, of them all: a little square each, this one filled.
+## Which part this is, of them all: a little square each, this one filled.
 func _draw_dots() -> void:
 	var n := _steps.size()
 	var span := n * 8.0 + (n - 1) * 8.0
@@ -621,15 +714,6 @@ func _draw_fly() -> void:
 			var c := row[x]
 			if c != ".":
 				_fly.draw_rect(Rect2(Vector2(x, y) * 2.0 + Vector2(0, lift), Vector2(2, 2)), FLY_COLOURS[c])
-
-
-func _label(text: String) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	load("res://scripts/UIStyle.gd").style_label(l, 16, DIM)
-	return l
 
 
 func _button(text: String, on_press: Callable, kind: String) -> Button:

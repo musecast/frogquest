@@ -31,6 +31,7 @@ const LOST_FROG_TOP := Vector2(2950, -5626)  # (where the lost frog turns up onc
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
+var _tv_over := 0.0  # (the middle of the TV, across: its words go over it, unless that's off the screen)
 var _tv_done := false
 var _lost_frog_up := false
 var _lost_frog_thanked := false
@@ -81,6 +82,7 @@ func _ready():
 			set(n, 0)
 	if npc3 == 3:
 		npc3 = 1  # (he has the lantern: that part's done)
+	_catch_up_gifts()
 
 	_make_tv_bubble()
 	_make_no_gods_line()
@@ -136,13 +138,45 @@ func _while_away(area: Area2D, bubble: Label) -> void:
 
 
 ## The TV's speech bubble: a frog's (same look), over the TV.
+## The frogs' gifts (and the key's, and the gate's) for what a save from before they gave them had
+## already done: his, quietly (the wardrobe shows them new).
+func _catch_up_gifts() -> void:
+	var earned := {"leaf": npc1 == 1, "bow": npc2 == 1, "flower": npc3 == 1 and $Player.has_lantern,
+		"pattern_spots": $Player.has_key or gateDestroyed == 1, "pattern_stripes": gateDestroyed == 1,
+		"pattern_twotone": npc5 == 1, "pattern_stars": npc6 == 1}
+	var any := false
+	for id in earned:
+		if earned[id] and not id in MusicManager.unlocked_skins:
+			MusicManager.unlocked_skins.append(id)
+			any = true
+	if any:
+		MusicManager.save_wardrobe()
+
+
 func _make_tv_bubble() -> void:
 	var frog_bubble: Label = $frogNPC1/npc1speechbubble
 	_tv_bubble = frog_bubble.duplicate()
 	_tv_bubble.visible = false
 	add_child(_tv_bubble)
 	_tv_bubble.scale = frog_bubble.get_global_transform().get_scale()
-	_tv_bubble.position = $Musecrtquarterview.position + Vector2(-_tv_bubble.pivot_offset.x, -100.0)
+	_tv_bubble.size.x = 400.0  # (wider than any of its lines: each is centred in it)
+	_tv_bubble.pivot_offset.x = 200.0
+	_tv_over = $Musecrtquarterview.position.x
+	_tv_bubble.position = Vector2(_tv_over - _tv_bubble.pivot_offset.x, $Musecrtquarterview.position.y - 100.0)
+
+
+## The TV's words over it, but kept on the screen: upright, a phone shows less of the room either side of
+## it, and they'd run off the edge.
+func _keep_tv_words_in_view() -> void:
+	var vp := get_viewport()
+	var to_world := vp.get_canvas_transform().affine_inverse()
+	var seen: Rect2 = to_world * vp.get_visible_rect()
+	var rim := float(_tv_bubble.get_theme_constant("outline_size") + 4)  # (its outline, and a little room)
+	var half := (_tv_bubble.get_minimum_size().x * 0.5 + rim) * _tv_bubble.scale.x
+	var mid := _tv_over
+	if seen.size.x > half * 2.0:
+		mid = clampf(mid, seen.position.x + half, seen.end.x - half)
+	_tv_bubble.position.x = mid - _tv_bubble.pivot_offset.x
 
 
 ## The TV at home, through the static.
@@ -178,6 +212,8 @@ func _process(delta):
 			and $Player.global_position.distance_to($Musecrtquarterview.global_position) < 220.0:
 		_tv_done = true
 		_tv_talk()
+	if _tv_bubble.visible:
+		_keep_tv_words_in_view()
 	# The lost frog, let out by the gate he opened, turns up by the castle (while he's well away from both).
 	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > 400.0:
 		_lost_frog_up = true
@@ -275,6 +311,7 @@ func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_sh
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC1/npc1speechbubble.visible = false
 		npc1 = 1
+		MusicManager.unlock("leaf")  # (his gift: the Leaf hat)
 		
 
 
@@ -355,6 +392,7 @@ func _on_area_2d_2_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC2/npc2speechbubble.visible = false
 			npc2 = 1
 			jokeCheck = 1
+			MusicManager.unlock("bow")  # (for listening to his joke: the Bow)
 
 
 func _on_area_2d_2_body_shape_exited(_body_rid, body, _body_shape_index, local_shape_index):
@@ -403,6 +441,7 @@ func _on_area_2d_3_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC3/npc3speechbubble.visible = false
 		npc3 = 1
+		MusicManager.unlock("flower")  # (with the lantern, a flower: the Flower hat)
 		
 
 
@@ -430,6 +469,7 @@ func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_
 		await get_tree().create_timer(3.0).timeout
 		$frogNPC4/npc4talk.play()
 		bubble.text = "thank you for showing\nme the way out..."
+		MusicManager.unlock("pattern_hearts")  # (his thanks: the Hearts pattern)
 		await get_tree().create_timer(3.5).timeout
 		$frogNPC4/npc4talk.play()
 		bubble.text = "go on...\nthey're waiting for you"
@@ -480,6 +520,7 @@ func _on_area_2dkey_body_shape_entered(body_rid, body, body_shape_index, local_s
 	$"World Sprites/Key/Area2DKEY".queue_free()
 	$Player.has_key = true
 	$"World Sprites/Key/keypickup".play()
+	MusicManager.unlock("pattern_spots")  # (the key found: the Spots pattern)
 	$Player.setup_key_trail()
 
 
@@ -714,6 +755,7 @@ func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_
 				await get_tree().create_timer(4.0).timeout
 			$frogNPC5/npc5speechbubble.visible = false
 			npc5 = 1
+			MusicManager.unlock("pattern_twotone")  # (his second joke heard: the Two-Tone pattern)
 
 
 func _on_area_2d_5_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
@@ -771,6 +813,7 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC6/pathopen.play()
 			$frogNPC6.visible = false
 			npc6 = 1
+			MusicManager.unlock("pattern_stars")  # (the frog at the castle door: the Stars pattern)
 			#$frogNPC6.queue_free()
 
 

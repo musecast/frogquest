@@ -1,7 +1,7 @@
 extends RefCounted
-## Your froggy (MusicManager.look): his skin's colour, his eyes' and his belly's (any colour at all:
-## chosen one by one in the intro, CreatorIntro, and again in the wardrobe), a pattern over him and its
-## colour (the patterns are found by playing, UNLOCKS), and his stretchy band's colour (the tether, when
+## Your froggy (MusicManager.look): his skin's colour, his eyes' and his belly's (chosen one by one in
+## the intro, CreatorIntro, from a palette of each, and again in the wardrobe), a pattern over him and its
+## colour (the patterns are earned by playing, UNLOCKS), and his stretchy band's colour (the tether, when
 ## you climb with friends). Froggy's own frames are never redrawn: a shader recolours his mint body, cream
 ## belly and black eyes, keeping their shading and soft edges (FroggyLook.material). Friends online see
 ## your froggy as you made him (Party sends the look). Colours are kept as "rrggbb"; a look from before
@@ -21,9 +21,9 @@ const BELLY := [["Cream", Color(0.988, 1.0, 0.804)], ["Snow", Color(1.0, 1.0, 1.
 const EYES := [["Black", Color(0.0, 0.0, 0.0)], ["Brown", Color(0.36, 0.21, 0.10)], ["Blue", Color(0.10, 0.27, 0.62)],
 	["Green", Color(0.08, 0.40, 0.16)], ["Purple", Color(0.34, 0.13, 0.52)], ["Red", Color(0.56, 0.08, 0.10)]]
 const PATTERNS := ["None", "Spots", "Stripes", "Freckles", "Two-Tone", "Hearts", "Stars"]
-## Each pattern's unlock (UNLOCKS): they're found by playing, not chosen at the start.
-const PATTERN_UNLOCKS := ["", "pattern_spots", "pattern_stripes", "pattern_freckles", "pattern_twotone", "pattern_hearts",
-	"pattern_stars"]
+## Each pattern's unlock (UNLOCKS): they're earned by playing, not chosen at the start. ("-": Freckles,
+## gone; one worn from before comes off.)
+const PATTERN_UNLOCKS := ["", "pattern_spots", "pattern_stripes", "-", "pattern_twotone", "pattern_hearts", "pattern_stars"]
 const BANDS := [["Sunny", Color(1.0, 0.82, 0.30)], ["Sky", Color(0.45, 0.76, 1.0)], ["Mint", Color(0.50, 1.0, 0.76)],
 	["Lilac", Color(0.76, 0.62, 1.0)], ["Coral", Color(1.0, 0.58, 0.46)], ["Snow", Color(0.95, 0.97, 1.0)],
 	["Lime", Color(0.72, 1.0, 0.36)], ["Ocean", Color(0.28, 0.56, 1.0)], ["Berry", Color(0.86, 0.32, 0.62)],
@@ -91,47 +91,50 @@ static func _apart(a: Color, b: Color) -> float:
 	return Vector3(a.r - b.r, a.g - b.g, a.b - b.b).length()
 
 
-# ── choosing a colour (the intro's strips) ──────────────────────────────────────────────────────
+# ── choosing a colour (the intro's palettes) ────────────────────────────────────────────────────
 
-## The colour strip runs round the rainbow, then into the greys; the shade strip under it runs from
-## light to dark, each kind of colour in the shades that suit it (skin and a pattern: pastel to deep;
-## eyes: bright down to black; belly: white to soft; band: bright to deep). Any spot on them, any colour.
-const GREYS_FROM := 0.88
-
-
-static func chosen(kind: String, along: float, shade: float) -> Color:
-	var grey := along >= GREYS_FROM
-	var hue := clampf(along / GREYS_FROM, 0.0, 0.9999)
-	var u := clampf(shade, 0.0, 1.0)
-	var s := 0.0
-	var v := 1.0
-	match kind:
-		"eyes":
-			s = 0.0 if grey else 0.78
-			v = lerpf(0.85, 0.0, u)
-		"belly":
-			s = 0.0 if grey else lerpf(0.0, 0.42, u)
-			v = lerpf(1.0, 0.72, u) if grey else lerpf(1.0, 0.86, u)
-		"band":
-			s = 0.0 if grey else lerpf(0.28, 0.85, minf(1.0, u * 1.5))
-			v = lerpf(1.0, 0.3, u) if grey else lerpf(1.0, 0.38, clampf((u - 0.6) / 0.4, 0.0, 1.0))
-		_:  # (skin, and a pattern's colour)
-			s = 0.0 if grey else lerpf(0.10, 0.64, minf(1.0, u * 1.6))
-			v = lerpf(1.0, 0.4, u) if grey else lerpf(1.0, 0.42, clampf((u - 0.45) / 0.55, 0.0, 1.0))
-	return Color.from_hsv(hue, s, v)
+## Each kind of colour's palette (CreatorIntro): eight colours across (green, teal, blue, purple, pink,
+## red, orange, yellow), each in four shades down (pale to deep; for eyes, light to dark), and a row of
+## whites, greys and browns. Froggy's own colours are among them. 40 to choose from.
+const HUES := [125.0, 168.0, 205.0, 268.0, 320.0, 356.0, 28.0, 52.0]
+const SHADES := {
+	"skin": [[0.20, 1.0], [0.37, 1.0], [0.60, 0.96], [0.62, 0.64]],
+	"eyes": [[0.45, 0.95], [0.75, 0.85], [0.80, 0.58], [0.80, 0.36]],
+	"belly": [[0.06, 1.0], [0.16, 1.0], [0.30, 0.98], [0.42, 0.92]],
+	"band": [[0.35, 1.0], [0.62, 1.0], [0.85, 0.95], [0.80, 0.62]],
+}
+const NEUTRALS := {
+	"skin": ["f7faff", "bdc2cc", "8c919c", "5c5e80", "f0d6a8", "bd8a66", "8c5e40", "4d3a2e"],
+	"eyes": ["000000", "2e2e33", "73757f", "bfc2cc", "f2f2f7", "5c361a", "8c6b2e", "cc8c26"],
+	"belly": ["fcffcd", "ffffff", "ffdbba", "f0e0bd", "dbdee6", "b3b8bf", "dbbd99", "b38f70"],
+	"band": ["ffd14d", "ffffff", "c7cad1", "6b6e78", "26262b", "d9a621", "a6703f", "5c3d29"],
+}
+const ACROSS := 8  # (colours in a row)
 
 
-## Where a colour is on the strips (x: along the colour strip, y: along the shade strip): the closest spot.
-static func place(kind: String, c: Color) -> Vector2:
-	var best := Vector2.ZERO
+## A kind's palette ("skin", "eyes", "belly", "band"; a pattern's colour is from his skin's), row by row.
+static func palette(kind: String) -> Array:
+	var shades: Array = SHADES.get(kind, SHADES.skin)
+	var out := []
+	for row in shades:
+		for hue in HUES:
+			out.append(Color.from_hsv(hue / 360.0, row[0], row[1]))
+	for hex in NEUTRALS.get(kind, NEUTRALS.skin):
+		out.append(Color.html(hex))
+	if not SHADES.has(kind) or kind == "skin":
+		out[ACROSS] = BODY[0][1]  # (his own mint, where it'd be: light, green)
+	return out
+
+
+## Which of a palette's colours is nearest to `c` (the one shown chosen).
+static func nearest(colours: Array, c: Color) -> int:
+	var best := 0
 	var near := INF
-	for along in [clampf(c.h, 0.0, 0.9999) * GREYS_FROM, (GREYS_FROM + 1.0) * 0.5]:
-		for i in 65:
-			var shade := float(i) / 64.0
-			var d := _apart(chosen(kind, along, shade), c)
-			if d < near:
-				near = d
-				best = Vector2(along, shade)
+	for i in colours.size():
+		var d := _apart(colours[i], c)
+		if d < near:
+			near = d
+			best = i
 	return best
 
 
@@ -248,21 +251,20 @@ static func hat_offset(id: String) -> Vector2:
 
 # ── what you can unlock, and how ────────────────────────────────────────────────────────────────
 
-## [type, name, how]: the hats, patterns and skins found by playing, new and old (the wardrobe's list,
-## and its "Still to find"). Each is unlocked where it happens (MusicManager.unlock); the climbing ones
-## as he passes their heights (CLIMB_UNLOCKS).
+## [type, name, how]: the hats, patterns and skins earned by playing, new and old (the wardrobe's list,
+## and its "Still to find"): found, or given by the frogs up the World Tree for what you do there, never
+## just for getting somewhere. Each is unlocked where it happens (MusicManager.unlock).
 const UNLOCKS := {
-	"pattern_freckles": ["pattern", "Freckles", "Climb out of your bedroom"],
-	"leaf": ["hat", "Leaf", "Climb 50 m up the World Tree"],
-	"pattern_spots": ["pattern", "Spots", "Climb 100 m up the World Tree"],
-	"bow": ["hat", "Bow", "Climb 150 m up the World Tree"],
-	"pattern_stripes": ["pattern", "Stripes", "Climb 200 m up the World Tree"],
-	"flower": ["hat", "Flower", "Climb 300 m up the World Tree"],
-	"pattern_twotone": ["pattern", "Two-Tone", "Climb 400 m up the World Tree"],
-	"pattern_hearts": ["pattern", "Hearts", "Climb 500 m up the World Tree"],
-	"cap": ["hat", "Cap", "Bounce off a mushroom in the World Tree"],
+	"leaf": ["hat", "Leaf", "Talk with the first frog you meet in the World Tree"],
+	"bow": ["hat", "Bow", "Hear the joking frog's joke in the World Tree"],
+	"flower": ["hat", "Flower", "Get the lantern from the frog by the campfire"],
+	"pattern_spots": ["pattern", "Spots", "Find the key in the dark"],
+	"pattern_stripes": ["pattern", "Stripes", "Open the gate"],
+	"pattern_hearts": ["pattern", "Hearts", "Show the lost frog the way out"],
+	"pattern_twotone": ["pattern", "Two-Tone", "Hear the joking frog's second joke"],
+	"pattern_stars": ["pattern", "Stars", "Reach the frog at the castle door"],
+	"cap": ["hat", "Cap", "Catch a fly in Endless"],
 	"beanie": ["hat", "Beanie", "Score 10 in Endless"],
-	"pattern_stars": ["pattern", "Stars", "Climb 100 m in Endless"],
 	"froggycrown": ["hat", "Froggy Crown", "Beat Frog Quest"],
 	"blackcrown": ["hat", "Black Crown", "Score 100 in Endless"],
 	"wizhat": ["hat", "Wiz Hat", "Find the wizard frog in the World Tree"],
@@ -283,6 +285,3 @@ const UNLOCKS := {
 	"holo": ["skin", "Holo", "Climb with 3 friends at once"],
 	"shadow": ["skin", "Frog God's Shadow", "Beat Frog Quest"],
 }
-## Up the World Tree (player.gd's currentHeight, in metres): climbing past each height finds its unlock.
-const CLIMB_UNLOCKS := [[0.0, "pattern_freckles"], [50.0, "leaf"], [100.0, "pattern_spots"], [150.0, "bow"],
-	[200.0, "pattern_stripes"], [300.0, "flower"], [400.0, "pattern_twotone"], [500.0, "pattern_hearts"]]

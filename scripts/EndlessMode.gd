@@ -404,10 +404,6 @@ func _fit_banner() -> void:
 func _climbed() -> void:
 	var metres := int(-highest_player_y / 10.0)
 	_height_label.text = "%d m" % maxi(metres, 0)
-	if metres >= 100 and "pattern_stars" not in MusicManager.unlocked_skins:
-		MusicManager.unlocked_skins.append("pattern_stars")  # (100 m up: the Stars pattern)
-		MusicManager.save_wardrobe()
-		_pending_notification = ["pattern", "pattern_stars"]
 	var zone: int = _zones.index_at(-highest_player_y)
 	if zone > _zone_reached:
 		_zone_reached = zone
@@ -712,6 +708,10 @@ func _on_fly_caught(fly) -> void:
 	_play("res://assets/pickupCoin.wav", 1.2 if fly.golden else 1.0, -8.0)
 	_update_score_label()
 	_check_score_unlocks()
+	if "cap" not in MusicManager.unlocked_skins:
+		MusicManager.unlocked_skins.append("cap")  # (a fly caught: the Cap)
+		MusicManager.save_wardrobe()
+		_pending_notification = ["hat", "cap"]
 
 
 func _popup(at: Vector2, text: String, colour: Color, size: int) -> void:

@@ -24,11 +24,9 @@ func _process(_delta):
 		_last_bounce_ms = Time.get_ticks_msec()
 
 
-## Another bounce off a mushroom: the first finds the Cap; 25, the Mushroom hat.
+## Another bounce off a mushroom: 25 and the Mushroom hat's yours.
 func _counted_bounce() -> void:
 	MusicManager.mushroom_bounces += 1
-	if MusicManager.mushroom_bounces >= 1:
-		MusicManager.unlock("cap")
 	if MusicManager.mushroom_bounces >= 25:
 		MusicManager.unlock("mushroom")
 	if MusicManager.mushroom_bounces <= 25:
