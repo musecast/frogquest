@@ -404,6 +404,10 @@ func _fit_banner() -> void:
 func _climbed() -> void:
 	var metres := int(-highest_player_y / 10.0)
 	_height_label.text = "%d m" % maxi(metres, 0)
+	if metres >= 100 and "pattern_stars" not in MusicManager.unlocked_skins:
+		MusicManager.unlocked_skins.append("pattern_stars")  # (100 m up: the Stars pattern)
+		MusicManager.save_wardrobe()
+		_pending_notification = ["pattern", "pattern_stars"]
 	var zone: int = _zones.index_at(-highest_player_y)
 	if zone > _zone_reached:
 		_zone_reached = zone
@@ -769,10 +773,10 @@ func _cleanup_old_platforms() -> void:
 	_flies = kept
 
 
-## The score unlocks: passing 25, 50, 75, 100, 150 and 200 (points come in more than ones now, so
+## The score unlocks: passing 10, 25, 50, 75, 100, 150 and 200 (points come in more than ones now, so
 ## "passing").
 func _check_score_unlocks() -> void:
-	var milestones := {25: ["skin", "grayscale_skin"], 50: ["skin", "negative_skin"], 75: ["skin", "shiny"],
+	var milestones := {10: ["hat", "beanie"], 25: ["skin", "grayscale_skin"], 50: ["skin", "negative_skin"], 75: ["skin", "shiny"],
 		100: ["hat", "blackcrown"], 150: ["hat", "tophat"], 200: ["skin", "rainbow"]}
 	for need in milestones:
 		var id: String = milestones[need][1]
@@ -1058,7 +1062,7 @@ func _place_tags() -> void:
 	if Party.name_tags and Party.in_run and Party.players.size() > 1:
 		want[0] = [player, Party.display_name(), GOLD]
 		for peer in _party_frogs:
-			want[peer] = [_party_frogs[peer], str(Party.players.get(peer, {}).get("name", "Froggy")), CREAM]
+			want[peer] = [_party_frogs[peer], str(Party.players.get(peer, {}).get("name", Party.NAME)), CREAM]
 	for tag in _party_tags.get_children():
 		if not want.has(int(tag.get_meta("peer", -1))):
 			tag.queue_free()

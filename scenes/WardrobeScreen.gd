@@ -24,12 +24,12 @@ const ITEMS: Dictionary = {
 	"negative_skin":  {"label": "Negative",      "type": "skin", "icon": "res://assets/frog.png",
 					  "shader": "res://assets/negative.gdshader",
 					  "how": "Score 50 in Endless"},
-	# (the hats drawn in code, FroggyLook.HATS: the starters are yours from the start, the intro's)
-	"bow":            {"label": "Bow",           "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
-	"beanie":         {"label": "Beanie",        "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
-	"leaf":           {"label": "Leaf",          "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
-	"flower":         {"label": "Flower",        "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
-	"cap":            {"label": "Cap",           "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
+	# (the hats drawn in code, FroggyLook.HATS: every one found by playing)
+	"leaf":           {"label": "Leaf",          "type": "hat", "pixel": true, "how": "Climb 50 m up the World Tree"},
+	"bow":            {"label": "Bow",           "type": "hat", "pixel": true, "how": "Climb 150 m up the World Tree"},
+	"flower":         {"label": "Flower",        "type": "hat", "pixel": true, "how": "Climb 300 m up the World Tree"},
+	"cap":            {"label": "Cap",           "type": "hat", "pixel": true, "how": "Bounce off a mushroom in the World Tree"},
+	"beanie":         {"label": "Beanie",        "type": "hat", "pixel": true, "how": "Score 10 in Endless"},
 	"tophat":         {"label": "Top Hat",       "type": "hat", "pixel": true, "how": "Score 150 in Endless"},
 	"partyhat":       {"label": "Party Hat",     "type": "hat", "pixel": true, "how": "Climb with a friend (Play Together)"},
 	"halo":           {"label": "Halo",          "type": "hat", "pixel": true, "how": "Beat Frog Quest in under an hour"},
@@ -43,6 +43,14 @@ const ITEMS: Dictionary = {
 	"starry":         {"label": "Starry",        "type": "skin", "how": "Climb all the way to space in Endless"},
 	"holo":           {"label": "Holo",          "type": "skin", "how": "Climb with 3 friends at once"},
 	"shadow":         {"label": "God's Shadow", "type": "skin", "how": "Beat Frog Quest"},
+	# (patterns over your froggy, in his colours: found by playing; one at a time. Their colour's chosen
+	# in CHANGE YOUR LOOK)
+	"pattern_freckles": {"label": "Freckles",    "type": "pattern", "pattern": 3, "how": "Climb out of your bedroom"},
+	"pattern_spots":    {"label": "Spots",       "type": "pattern", "pattern": 1, "how": "Climb 100 m up the World Tree"},
+	"pattern_stripes":  {"label": "Stripes",     "type": "pattern", "pattern": 2, "how": "Climb 200 m up the World Tree"},
+	"pattern_twotone":  {"label": "Two-Tone",    "type": "pattern", "pattern": 4, "how": "Climb 400 m up the World Tree"},
+	"pattern_hearts":   {"label": "Hearts",      "type": "pattern", "pattern": 5, "how": "Climb 500 m up the World Tree"},
+	"pattern_stars":    {"label": "Stars",       "type": "pattern", "pattern": 6, "how": "Climb 100 m in Endless"},
 	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop", "icon": "res://assets/frog.png",
 					  "how": "He lives on your desktop. Right-click him or his tray icon for more."},
 }
@@ -203,7 +211,7 @@ func _build_ui() -> void:
 		if _is_unlocked(id) and not _fits_beside(id, action_btn_min, font_size_body, info_btn_size, icon_size, row_width):
 			stack_rows = true
 
-	for section in [["HATS", "hat"], ["SKINS", "skin"], ["DESKTOP", "desktop"]]:
+	for section in [["HATS", "hat"], ["PATTERNS", "pattern"], ["SKINS", "skin"], ["DESKTOP", "desktop"]]:
 		var ids := []
 		for id in ITEMS:
 			if ITEMS[id]["type"] == section[1] and _is_unlocked(id):
@@ -373,6 +381,10 @@ static func item_icon(id: String, size: float) -> TextureRect:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if def.get("type") == "skin":
 		icon.material = look.material(MusicManager.look, id)  # (your froggy, wearing it)
+	elif def.get("type") == "pattern":
+		var with_it: Dictionary = look.clean(MusicManager.look)  # (your froggy, in it)
+		with_it.pattern = int(def["pattern"])
+		icon.material = look.material(with_it)
 	elif def.has("shader"):
 		var mat := ShaderMaterial.new()
 		mat.shader = load(def["shader"])
@@ -479,8 +491,6 @@ func _rebuild() -> void:
 
 
 func _is_unlocked(id: String) -> bool:
-	if ITEMS.get(id, {}).get("starter", false):
-		return true  # (the hats you start with)
 	if id == "froggycrown":
 		return MusicManager.froggyCrown != 0
 	if id == "lil_froggy":
@@ -499,6 +509,8 @@ func _is_equipped(id: String) -> bool:
 	var def = ITEMS[id]
 	if def["type"] == "hat":
 		return MusicManager.equipped_hat == id
+	if def["type"] == "pattern":
+		return int(load("res://scripts/FroggyLook.gd").clean(MusicManager.look).pattern) == int(def["pattern"])
 	return MusicManager.equipped_skin == id
 
 
@@ -551,6 +563,10 @@ func _on_item_button_pressed(id: String, btn: Button) -> void:
 	var def = ITEMS[id]
 	if def["type"] == "hat":
 		MusicManager.equipped_hat = "" if _is_equipped(id) else id
+	elif def["type"] == "pattern":
+		var l: Dictionary = load("res://scripts/FroggyLook.gd").clean(MusicManager.look)
+		l.pattern = 0 if _is_equipped(id) else int(def["pattern"])
+		MusicManager.look = l
 	else:
 		MusicManager.equipped_skin = "" if _is_equipped(id) else id
 	MusicManager.save_wardrobe()

@@ -92,10 +92,26 @@ func load_wardrobe() -> void:
 	look                = d.get("look",                 {}) if d.get("look") is Dictionary else {}
 	look_made           = bool(d.get("look_made",       false))
 	mushroom_bounces    = int(d.get("mushroom_bounces", 0))
+	_take_off_unfound()
 	_trace("MusicManager load_wardrobe end")
 
+## The hats drawn in code and the patterns are found by playing: one worn that isn't found yet (from
+## before they were) comes off.
+func _take_off_unfound() -> void:
+	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	if looks.HATS.has(equipped_hat) and not equipped_hat in unlocked_skins:
+		equipped_hat = ""
+	if look.is_empty():
+		return
+	var l: Dictionary = looks.clean(look)
+	var found: String = looks.PATTERN_UNLOCKS[int(l.pattern)]
+	if found != "" and not found in unlocked_skins:
+		l.pattern = 0
+	look = l
+
+
 ## Something you've earned (FroggyLook.UNLOCKS): yours from now on, kept, and "New Hat Unlocked!" (or
-## Skin) to say so. Again, it does nothing. True the first time.
+## Pattern, or Skin) to say so. Again, it does nothing. True the first time.
 func unlock(id: String) -> bool:
 	if id in unlocked_skins:
 		return false
@@ -114,7 +130,7 @@ func show_unlock_notification(item_type: String, item_id := "") -> void:
 	if wardrobe.ITEMS.has(item_id):
 		icon = wardrobe.item_icon(item_id, 0.0)
 		detail = "%s, in your wardrobe" % wardrobe.ITEMS[item_id]["label"]
-	show_toast("New %s Unlocked!" % ("Hat" if item_type == "hat" else "Skin"), icon, detail)
+	show_toast("New %s Unlocked!" % {"hat": "Hat", "pattern": "Pattern"}.get(item_type, "Skin"), icon, detail)
 
 
 var _toasts: Array = []  # waiting their turn: [text, icon, detail]

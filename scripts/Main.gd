@@ -173,7 +173,8 @@ func _make_no_gods_line() -> void:
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
-	if not _tv_done and not MusicManager.game_beaten and not $Player/titlescreen.visible \
+	# (not while the frog god's still asking what he looks like: once he's woken, in his bedroom)
+	if not _tv_done and not MusicManager.game_beaten and not $Player/titlescreen.visible and not $Player.has_node("CreatorIntro") \
 			and $Player.global_position.distance_to($Musecrtquarterview.global_position) < 220.0:
 		_tv_done = true
 		_tv_talk()

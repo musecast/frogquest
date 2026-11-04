@@ -155,6 +155,17 @@ func _ready():
 	_trace("Player ready end")
 
 
+var _climbed_to := -INF  # (the highest he's climbed to, this time: what's found up there is his)
+
+
+## What's found by climbing past its height up the World Tree (FroggyLook.CLIMB_UNLOCKS): a pattern or a
+## hat, his as he passes it.
+func _find_up_here() -> void:
+	for each in load("res://scripts/FroggyLook.gd").CLIMB_UNLOCKS:
+		if _climbed_to >= float(each[0]) and not each[1] in MusicManager.unlocked_skins:
+			MusicManager.unlock(each[1])
+
+
 func _physics_process(delta):
 	if Engine.is_editor_hint():
 		return
@@ -176,6 +187,9 @@ func _physics_process(delta):
 	
 	
 	currentHeight = (-position.y - 472) /10
+	if $Trajectory.endGame == 0 and currentHeight > _climbed_to:
+		_climbed_to = currentHeight
+		_find_up_here()
 	
 	if Engine.time_scale != 0.05 and $Trajectory.endGame == 0:
 		time_now = Time.get_unix_time_from_system()
@@ -480,7 +494,8 @@ func _on_blockedpath_body_shape_entered(body_rid, body, body_shape_index, local_
 
 func _on_button_pressed():
 	if not MusicManager.look_made:
-		_meet_the_frog_god(_on_button_pressed)  # (his first climb: what does he look like? then he wakes, and climbs)
+		# (his first climb: what does he look like? then he wakes, and climbs; START's own sounds are the cut's)
+		_meet_the_frog_god(_on_button_pressed, false)
 		return
 	$Trajectory.endGame = 0
 	$".".visible = true
@@ -497,18 +512,32 @@ func _on_button_pressed():
 
 
 ## The first time he plays anything (a climb, Endless, or Play Together), the frog god asks what he
-## looks like first (CreatorIntro): it's how the game starts. He wakes as that froggy, and on he goes
-## (`then`, at the intro's flash: the climb, Endless, or Play Together's menu).
-func _meet_the_frog_god(then: Callable) -> void:
+## looks like first (CreatorIntro): it's how the game starts. At its cut to black (with the finale's
+## closing-in sound: `cut_sound`, unless what comes next plays it) on he goes (`then`: the climb, Endless,
+## or Play Together's menu), and the TV's static (quiet till then) comes up as he fades in.
+func _meet_the_frog_god(then: Callable, cut_sound := true) -> void:
 	if get_node_or_null("CreatorIntro"):
 		return
 	$titlescreen.visible = false
 	var intro: CanvasLayer = load("res://scenes/CreatorIntro.gd").new()
+	intro.cut_sound = cut_sound
 	add_child(intro)
+	var tv := get_node_or_null("../Musecrtquarterview/AudioStreamPlayer2D") as AudioStreamPlayer2D
+	var tv_db := tv.volume_db if tv else 0.0
+	if tv:
+		tv.volume_db = -80.0
+	intro.tree_exited.connect(func() -> void:
+		if is_instance_valid(tv) and tv.volume_db <= -79.0:
+			tv.volume_db = tv_db)  # (gone some other way: the static as it was)
 	intro.done.connect(func() -> void:
 		_apply_equipped_cosmetics()
 		_refresh_title_menu()
-		then.call())
+		then.call()
+		if is_instance_valid(tv):
+			var up := tv.create_tween()
+			up.tween_interval(intro.HOLD * 0.8)
+			up.tween_callback(func() -> void: tv.volume_db = -30.0)
+			up.tween_property(tv, "volume_db", tv_db, intro.FADE + 0.4).set_ease(Tween.EASE_OUT))
 
 
 func _on_thanksforplaying_timer_timeout():

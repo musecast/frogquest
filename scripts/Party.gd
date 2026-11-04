@@ -44,7 +44,8 @@ var players := {}  # peer id -> {name, hat, skin, color}: everyone in the party,
 var run_seed := 0
 var in_run := false  # climbing (or between climbs) with the party
 var run_started_ms := 0  # when the party's climb started, on this phone's clock
-var my_name := "Froggy"  # (when there's no Muse @handle to go by)
+const NAME := "lil froggy"  # (everyone's lil froggy: there's no name to give, only a Muse @handle to go by)
+var my_name := NAME
 var color := 0  # your party colour (COLORS)
 var name_tags := true
 var tethers := true  # a stretchy band to your nearest friend, that catches you falling
@@ -126,7 +127,7 @@ func peer_named(who: String) -> int:
 func display_name() -> String:
 	if MuseSocial.is_member():
 		return "@" + MuseSocial.handle()
-	return my_name
+	return NAME
 
 
 func my_info() -> Dictionary:
@@ -383,7 +384,7 @@ func _on_relay(text: String) -> void:
 		"look":
 			if d.get("i") is Dictionary:
 				var look := _clean(d.i)
-				look.name = str(players.get(from, {}).get("name", "Froggy"))  # (the room's own @handle, not a typed name)
+				look.name = str(players.get(from, {}).get("name", NAME))  # (the room's own @handle, not a typed name)
 				players[from] = look
 				players_changed.emit()
 		"start":
@@ -396,7 +397,7 @@ func _on_relay(text: String) -> void:
 func _look_of(card: Dictionary, before := {}) -> Dictionary:
 	var look := _clean(before)
 	var handle := str(card.get("handle", ""))
-	look.name = "@" + handle if handle != "" else "Froggy"
+	look.name = "@" + handle if handle != "" else NAME
 	return look
 
 
@@ -485,7 +486,7 @@ func set_my_name(typed: String) -> void:
 	for ch in typed.strip_edges():
 		if ch.unicode_at(0) >= 32 and ch.unicode_at(0) < 127:
 			clean += ch
-	my_name = clean.substr(0, 16) if clean != "" else "Froggy"
+	my_name = clean.substr(0, 16) if clean != "" else NAME
 	_save()
 	share_look()
 
@@ -640,7 +641,7 @@ func _end(why: String) -> void:
 
 static func _clean(info) -> Dictionary:
 	var d: Dictionary = info if info is Dictionary else {}
-	return {"name": str(d.get("name", "Froggy")).substr(0, 21), "hat": str(d.get("hat", "")),
+	return {"name": str(d.get("name", NAME)).substr(0, 21), "hat": str(d.get("hat", "")),
 		"skin": str(d.get("skin", "")), "color": clampi(int(d.get("color", 0)), 0, COLORS.size() - 1),
 		"look": load("res://scripts/FroggyLook.gd").clean(d.get("look"))}
 

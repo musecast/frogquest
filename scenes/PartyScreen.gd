@@ -21,7 +21,7 @@ var _panel: PanelContainer
 var _scroll: ScrollContainer
 var _box: VBoxContainer
 var _bottom: Button  # Close, or Leave Party in a party
-var _input: LineEdit  # the code to join, or your name
+var _input: LineEdit  # the code to join
 var _mode := "menu"  # menu, join, host (your party) or joined (someone else's)
 var _note := ""
 var _note_colour := GOLD
@@ -149,7 +149,7 @@ func _players() -> void:
 	var ids := Party.players.keys()
 	ids.sort()
 	for id in ids:
-		var who := str(Party.players[id].get("name", "Froggy"))
+		var who := str(Party.players[id].get("name", Party.NAME))
 		_box.add_child(_label(who + (" (you)" if int(id) == Party.me() else ""), BODY_FONT_SZ, GREEN if int(id) == Party.me() else DIM))
 
 
@@ -160,17 +160,14 @@ func _starts() -> void:
 	_box.add_child(_button("Climb Endless", func() -> void: Party.start("endless")))
 
 
-## You, as your friends see you: your name over your frog (your froggy's your look: FroggyLook), name
-## tags and tethers.
+## You, as your friends see you: your froggy (your look: FroggyLook) and, signed in to Muse, your
+## @handle over him (there's no name to give: everyone's lil froggy), name tags and tethers.
 func _look() -> void:
 	_header("You")
 	if MuseSocial.is_member():
 		_box.add_child(_label("Friends see you as %s" % Party.display_name(), BODY_FONT_SZ, GOLD))
 	else:
-		_input = _line("Your name", 16)
-		_input.text = Party.my_name if _typed == "" else _typed
-		_input.text_changed.connect(func(text: String) -> void: Party.set_my_name(text))
-		_box.add_child(_input)
+		_box.add_child(_label("Sign in to Muse and friends see your @handle over you.", BODY_FONT_SZ, DIM))
 	_box.add_child(_label("You climb as your froggy. Change your look in the Wardrobe.", BODY_FONT_SZ, DIM))
 	_box.add_child(_button("Name Tags: %s" % ("On" if Party.name_tags else "Off"), func() -> void:
 		Party.set_name_tags(not Party.name_tags)
