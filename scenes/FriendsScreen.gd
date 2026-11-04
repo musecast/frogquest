@@ -18,7 +18,7 @@ const DIM := Color(0.78, 0.74, 0.68)
 const DOTS := {"online": Color(0.45, 0.95, 0.45), "away": Color(1.0, 0.8, 0.3), "dnd": Color(1.0, 0.42, 0.38), "offline": Color(0.5, 0.5, 0.5)}
 const STATUS_WORDS := {"online": "Online", "away": "Away", "dnd": "Do Not Disturb", "invisible": "Invisible"}
 const APP_NAMES := {"frog-quest": "Frog Quest", "muse-shelf": "Muse Shelf", "muse-penguin": "Muse Penguin", "muse-jukebox": "Muse Jukebox"}
-const ACTIVITIES := {"title": "In Frog Quest", "story": "Playing the story", "endless": "Playing Endless"}
+const ACTIVITIES := {"title": "In Frog Quest", "story": "Climbing the World Tree", "endless": "Playing Endless"}
 
 var _panel: PanelContainer
 var _scroll: ScrollContainer
@@ -161,7 +161,7 @@ func _handle_step() -> void:
 	_input.text = _typed
 	_box.add_child(_input)
 	_box.add_child(_label("3 to 20 letters, numbers or underscores.", BODY_FONT_SZ, DIM))
-	_box.add_child(_label("Be kind: no bullying, hate, or anything sexual. Muse can hide anyone who breaks the community rules.", BODY_FONT_SZ, GOLD))
+	_box.add_child(_label("Be kind and keep it friendly! Muse can hide anyone who breaks the community rules.", BODY_FONT_SZ, GOLD))
 	_box.add_child(_button("Read the Community Rules", func() -> void: OS.shell_open(MuseSocial.COMMUNITY_RULES), "quiet"))
 	_box.add_child(_button("Agree and Save", _check_handle, "go"))
 	_add_note()
@@ -228,7 +228,8 @@ func _friend_row(card: Dictionary) -> void:
 	_box.add_child(row)
 	var room := str(card.get("joinable", {}).get("room", "")) if card.get("joinable") is Dictionary else ""
 	if room != "" and room != Party.online_room and state == "online":
-		_box.add_child(_button("Join @%s's Party" % who, _join_friend.bind(who, room), "go"))
+		var up_the_tree: bool = str(card.joinable.get("mode", "")) == "story"
+		_box.add_child(_button(("Climb with @%s" if up_the_tree else "Join @%s's Party") % who, _join_friend.bind(who, room), "go"))
 	elif Party.online_room != "" and room != Party.online_room and state in ["online", "away"]:
 		_box.add_child(_button("Invite to Your Party", _invite.bind(who), "quiet"))
 	if _open == who:
@@ -351,8 +352,8 @@ func _invite(who: String) -> void:
 func _join_friend(who: String, room: String) -> void:
 	if not _start_action():
 		return
-	var problem: String = await Party.join_room(room)
-	_end_action(problem, "Joining @%s's party..." % who)
+	var problem: String = await Party.join_room(room, "@" + who)  # (beside them, up the World Tree)
+	_end_action(problem, "Joining @%s..." % who)
 
 
 ## One of MuseSocial's actions at a time (a second tap meanwhile does nothing).
@@ -411,12 +412,14 @@ func _fit() -> void:
 	var s: float = ui.panel_zoom(vp, room)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
 	var keyboard: float = _keyboard.height_for(_input)
+	var lift := 0.0
 	if keyboard > 0.0 and _input:
 		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var input_bottom := (_panel.get_global_transform().affine_inverse() * _input.get_global_rect().end).y
-		_panel.position.y -= maxf(0.0, _panel.position.y + (input_bottom + BTN_HEIGHT + 10.0) * s + 8.0 - keyboard_top)
-		_panel.position = _panel.position.round()
+		lift = maxf(0.0, _panel.position.y + (input_bottom + BTN_HEIGHT + 10.0) * s + 8.0 - keyboard_top)
+	_panel.position.y = _keyboard.glide(_panel.position.y, _panel.position.y - lift)
+	_panel.position = _panel.position.round()
 
 
 func _label(text: String, font_size: int, color: Color) -> Label:

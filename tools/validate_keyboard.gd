@@ -145,11 +145,14 @@ func _adding_a_friend() -> void:
 	await _frames(2)
 	var resting: Vector2 = screen._panel.position
 	_keyboard_up()
-	await _frames(3)
+	await _frames(1)
+	var on_its_way: Vector2 = screen._panel.position
+	await _glided()
 	var add := _button(screen, "Add Friend")
 	var lifted: Vector2 = screen._panel.position
 	_expect(lifted.y < resting.y - 10.0 and _bottom(add) <= _keyboard_top + 0.5,
 		"typing, the box and Add Friend are lifted above the keyboard (Add Friend's bottom %.0f, its top %.0f)" % [_bottom(add), _keyboard_top])
+	_expect(on_its_way.y > lifted.y + 2.0, "it glides up to it, not in one jump (a frame in: %s, then %s)" % [on_its_way, lifted])
 	var at := _centre(add)
 	_press(at, true)
 	await _frames(3)
@@ -161,10 +164,16 @@ func _adding_a_friend() -> void:
 	var asks := _asked("muse_social_request_friend")
 	_expect(asks.size() == 1 and asks[0].get("p_handle") == "pal", "and the tap (with a wobble) asks @pal")
 	await _frames(2)
-	_expect(screen._panel.position == lifted, "the panel stays up while the keyboard slides away")
+	_expect(screen._panel.position == lifted, "the panel stays up while the keyboard slides away (it's at %s, was %s)"
+		% [screen._panel.position, lifted])
 	_keyboard_px = 0.0
-	await _frames(2)
-	_expect(screen._panel.position.y > lifted.y + 10.0, "and comes down once it's gone")
+	await _frames(1)
+	var coming_down: Vector2 = screen._panel.position
+	await _glided()
+	var down: Vector2 = screen._panel.position
+	await _frames(3)
+	_expect(down.y > lifted.y + 10.0 and coming_down.y < down.y - 2.0 and screen._panel.position == down,
+		"and glides back down once it's gone, then rests (a frame in: %s, then %s, lifted %s)" % [coming_down, down, lifted])
 
 	await _tap(_box(screen))
 	var typing_in: LineEdit = _box(screen)
@@ -197,7 +206,7 @@ func _signing_in() -> void:
 	_expect(not box.is_editing() and not screen._status.visible, "Return on an empty box just puts the keyboard away (no telling off)")
 	await _tap(box)
 	_keyboard_up()
-	await _frames(3)
+	await _glided()
 	_expect(_bottom(screen._primary) <= _keyboard_top + 0.5, "typing your email, it and Email Me a Code are above the keyboard")
 	await _tap(screen._body)
 	_expect(not box.is_editing(), "a tap off the box puts the keyboard away")
@@ -219,7 +228,7 @@ func _joining_a_party() -> void:
 	_expect(not box.is_editing() and screen._note == "", "Play Together: Return on an empty code just puts the keyboard away")
 	await _tap(_box(screen))
 	_keyboard_up()
-	await _frames(3)
+	await _glided()
 	_expect(_bottom(_button(screen, "Join")) <= _keyboard_top + 0.5, "typing the code, it and Join are above the keyboard")
 	await _tap(_label(screen, "party code"))
 	_expect(not _box(screen).is_editing(), "a tap off the box puts the keyboard away")
@@ -237,6 +246,12 @@ func _open(path: String, ready: Callable) -> Node:
 	_expect(ready.call(screen), "%s opens ready to type in" % path.get_file())
 	await _frames(2)
 	return screen
+
+
+## Long enough for a panel gliding to the keyboard (or back) to get there: KeyboardHelp.glide is most
+## of the way in a seventh of a second, all of it well inside half a second.
+func _glided() -> void:
+	await _until(func() -> bool: return false, 0.6)
 
 
 ## The keyboard up, as tall as an iPhone's over half the screen.

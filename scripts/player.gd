@@ -795,11 +795,11 @@ func _on_wardrobe_button_pressed() -> void:
 	)
 
 
-## The title's menu, in the menus' chunky buttons (UIStyle): CONTINUE (START with no climb saved),
-## ENDLESS, PLAY TOGETHER (a party climbing Endless together: PartyScreen), WARDROBE (once there's
-## something in it: it can turn up mid-game, Muse Pro brings Lil Froggy on a computer), MUSE ACCOUNT
-## and SETTINGS. _layout_title places it. (It took over from the
-## scene's own buttons and from MUSE ACCOUNT up in the corner.)
+## The title's menu, in the menus' chunky buttons (UIStyle): CONTINUE (START with no climb saved) big;
+## ENDLESS and PLAY TOGETHER (a party: PartyScreen); then little square ones with a picture each: the
+## wardrobe's crown (once there's something in it: it can turn up mid-game, Muse Pro brings Lil Froggy
+## on a computer), Muse (gold with Muse Pro) and the settings' gear. _layout_title places it. (It took
+## over from the scene's own buttons and from MUSE ACCOUNT up in the corner.)
 func _build_title_menu() -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var menu := VBoxContainer.new()
@@ -807,14 +807,21 @@ func _build_title_menu() -> void:
 	$titlescreen.add_child(menu)
 	var play := _title_button(menu, "PlayButton", _on_button_pressed)
 	play.text = "CONTINUE" if FileAccess.file_exists(save_path) else "START"
-	_title_button(menu, "EndlessButton", _on_endlessmodebutton_pressed).set_meta("words", "ENDLESS")
-	_title_button(menu, "PartyButton", _on_party_button_pressed).set_meta("words", "PLAY TOGETHER")
-	var wardrobe := _title_button(menu, "WardrobeButton", _on_wardrobe_button_pressed)
-	wardrobe.set_meta("words", "WARDROBE")
+	var modes := BoxContainer.new()  # (side by side upright, one over the other sideways: _layout_title)
+	modes.name = "Modes"
+	menu.add_child(modes)
+	_title_button(modes, "EndlessButton", _on_endlessmodebutton_pressed).set_meta("words", "ENDLESS")
+	_title_button(modes, "PartyButton", _on_party_button_pressed).set_meta("words", "PLAY TOGETHER")
+	var extras := HBoxContainer.new()  # (little square buttons, a picture on each and no words)
+	extras.name = "Extras"
+	extras.alignment = BoxContainer.ALIGNMENT_CENTER
+	menu.add_child(extras)
+	var wardrobe := _title_button(extras, "WardrobeButton", _on_wardrobe_button_pressed)
+	wardrobe.tooltip_text = "Wardrobe"
 	_attach_new_badge(wardrobe)
-	_title_button(menu, "MuseButton", _on_muse_button_pressed)
-	_title_button(menu, "SettingsButton", _on_title_settings_pressed).set_meta("words", "SETTINGS")
-	for b in menu.get_children():  # (each one's picture at its left end, its words in the middle: UIStyle.button_face)
+	_title_button(extras, "MuseButton", _on_muse_button_pressed)
+	_title_button(extras, "SettingsButton", _on_title_settings_pressed).tooltip_text = "Settings"
+	for b in modes.get_children() + extras.get_children():  # (UIStyle.button_face)
 		b.set_meta("icon", {"EndlessButton": [load("res://assets/infinity.png"), false],
 			"PartyButton": [ui.pixel_icon(ui.PARTY), true],
 			"WardrobeButton": [load("res://assets/crownicon.png"), false],
@@ -832,38 +839,42 @@ func _title_button(menu: Control, button_name: String, on_press: Callable) -> Bu
 	return b
 
 
-## What the title's menu shows: WARDROBE once there's something in it (and NEW on it), MUSE PRO in gold
-## with Muse Pro.
+## What the title's menu shows: the wardrobe's button once there's something in it (and NEW on it), the
+## Muse button in gold with Muse Pro.
 func _refresh_title_menu() -> void:
 	var menu := $titlescreen.get_node_or_null("TitleMenu")
 	if menu == null:
 		return
-	menu.get_node("WardrobeButton").visible = MusicManager.has_any_cosmetic()
-	_refresh_new_badge(menu.get_node("WardrobeButton"))
-	menu.get_node("MuseButton").set_meta("words", "MUSE PRO" if MuseAccount.has_pro() else "MUSE ACCOUNT")  # (shown by _layout_title)
+	var wardrobe: Button = menu.find_child("WardrobeButton", true, false)
+	wardrobe.visible = MusicManager.has_any_cosmetic()
+	_refresh_new_badge(wardrobe)
+	menu.find_child("MuseButton", true, false).tooltip_text = "Muse Pro" if MuseAccount.has_pro() else "Muse Account"
 
 
 ## The title: the logo, then its menu under it upright (or beside it sideways), and "made by muse"
 ## at the bottom, all in the room clear of the notch and the bottom banner, which is kept from the
 ## very first frame (UIStyle.title_spots, where the loading screen put its logo too): nothing moves
-## when the banner turns up. The buttons are the biggest that fit: on a short screen (an upright iPad,
-## a foldable) they come down a size.
+## when the banner turns up. The menu: CONTINUE (or START) big, ENDLESS and PLAY TOGETHER side by side
+## under it upright (one over the other sideways), then the little square buttons, a picture on each
+## (the wardrobe, Muse, settings). It was six big buttons one over another. The biggest sizes that fit:
+## on a short screen (an upright iPad, a foldable) they come down a step.
 func _layout_title(vp: Vector2, is_portrait: bool) -> void:
 	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	var title := $titlescreen/Title
 	var by_muse := $"titlescreen/by muse"
 	var menu: VBoxContainer = $titlescreen/TitleMenu
+	var play: Button = menu.get_node("PlayButton")
+	var modes: BoxContainer = menu.get_node("Modes")
+	var extras: HBoxContainer = menu.get_node("Extras")
 	var spots: Dictionary = ui.title_spots(vp)
 	var room: Rect2 = spots.room
 	var byline := _byline(by_muse, spots.byline_size, spots.byline_gap)
 	var bottom: float = spots.floor  # (just over "made by muse")
-	var shown: Array = menu.get_children().filter(func(b: Control) -> bool: return b.visible)
-	var count := shown.size()
-	# [words, first button's height, the others', gap]. (With six buttons, the big words dropped to the small
-	# ones on a closed iPhone Duo, short of room by under a pixel: the third size keeps them big on slimmer
-	# buttons.)
-	var sizes := [[32, 72.0, 60.0, 10.0], [32, 56.0, 48.0, 8.0], [32, 50.0, 42.0, 6.0], [16, 44.0, 38.0, 6.0], [16, 34.0, 30.0, 4.0]] \
-		if is_portrait else [[16, 40.0, 34.0, 6.0], [16, 34.0, 28.0, 4.0]]
+	modes.vertical = not is_portrait
+	# [CONTINUE's words, its height, ENDLESS and PLAY TOGETHER's, the little buttons', the gap]
+	var sizes := [[32, 80.0, 52.0, 56.0, 12.0], [32, 72.0, 48.0, 48.0, 10.0], [32, 56.0, 44.0, 44.0, 8.0],
+		[16, 44.0, 38.0, 38.0, 6.0], [16, 34.0, 30.0, 30.0, 4.0]] \
+		if is_portrait else [[16, 40.0, 34.0, 34.0, 6.0], [16, 34.0, 28.0, 28.0, 4.0]]
 	var logo: Vector2 = spots.logo
 	title.scale = Vector2.ONE * spots.logo_scale
 	var top: float
@@ -876,22 +887,52 @@ func _layout_title(vp: Vector2, is_portrait: bool) -> void:
 		width = floorf(minf(vp.x * 0.4, 260.0))
 	var pick: Array = sizes[-1]
 	for each in sizes:
-		if each[1] + (count - 1) * (each[2] + each[3]) <= bottom - top:
+		if _title_height(each, is_portrait) <= bottom - top:
 			pick = each
 			break
-	var height: float = pick[1] + (count - 1) * (pick[2] + pick[3])
-	menu.add_theme_constant_override("separation", int(pick[3]))
-	for b: Button in shown:
-		var first: bool = b == shown[0]
-		ui.style_button(b, pick[0], "go" if first else ("gold" if b.name == "MuseButton" and MuseAccount.has_pro() else
-			("wood" if b.name in ["EndlessButton", "PartyButton", "WardrobeButton"] else "quiet")))
-		b.custom_minimum_size = Vector2(0, pick[1] if first else pick[2])
-		var icon: Array = b.get_meta("icon", [])
-		if not icon.is_empty():
-			ui.button_face(b, icon[0], icon[1], b.get_meta("words", ""), pick[0])
+	var gap: float = pick[4]
+	var height := _title_height(pick, is_portrait)
+	menu.add_theme_constant_override("separation", int(gap))
+	modes.add_theme_constant_override("separation", int(gap))
+	extras.add_theme_constant_override("separation", int(gap * 1.5))
+	ui.style_button(play, pick[0], "go")
+	play.custom_minimum_size = Vector2(0, pick[1])
+	# ENDLESS and PLAY TOGETHER: their words as big as CONTINUE's when both fit by their pictures, else a step down.
+	var across: float = floorf((width - gap) * 0.5) if is_portrait else width
+	var words_size: int = pick[0]
+	for b: Button in modes.get_children():
+		if not _words_fit(b.get_meta("words", ""), words_size, across, pick[2]):
+			words_size = 16
+	for b: Button in modes.get_children():
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ui.style_button(b, words_size, "wood")
+		b.custom_minimum_size = Vector2(0, pick[2])
+		ui.button_face(b, b.get_meta("icon")[0], b.get_meta("icon")[1], b.get_meta("words", ""), words_size,
+			(pick[2] - 2.0 - ui.lip_px(words_size)) * 0.5)
+	for b: Button in extras.get_children():
+		ui.style_button(b, 16, "gold" if b.name == "MuseButton" and MuseAccount.has_pro() else "quiet")
+		b.custom_minimum_size = Vector2(pick[3], pick[3])
+		var face: float = pick[3] - 2.0 - ui.lip_px(16)
+		ui.button_face(b, b.get_meta("icon")[0], b.get_meta("icon")[1], "", 16, face * 0.62)
 	menu.size = Vector2(width, height)
 	var x: float = (vp.x - width) * 0.5 if is_portrait else vp.x * 0.72 - width * 0.5
 	_place_title(vp, logo, Vector2(x, top + (bottom - top - height) * 0.5).round(), byline)
+
+
+## How tall the title's menu is at these sizes (_layout_title's): CONTINUE, the two modes side by side
+## (or one over the other), the little buttons, and the gaps between.
+static func _title_height(s: Array, is_portrait: bool) -> float:
+	return s[1] + s[4] + (s[2] if is_portrait else s[2] * 2.0 + s[4]) + s[4] + s[3]
+
+
+## Whether words fit on a button this wide and tall at this size, clear of the picture at its left end
+## (UIStyle.button_face: the words go in the middle of the face, the picture in its left end's square).
+static func _words_fit(words: String, size: int, across: float, tall: float) -> bool:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var w: float = ui.font().get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + ui.outline_px(size) * 2.0
+	var face: float = tall - 2.0 - ui.lip_px(size)
+	var picture_end: float = 2.0 + face * 0.5 + face * 0.25 + 4.0  # (its middle, half of it, a little room)
+	return (across - w) * 0.5 >= picture_end
 
 
 ## Puts the logo, the menu and "made by muse" where they go: straight there the first time and when the
@@ -1474,7 +1515,8 @@ func _refresh_all_wardrobe_badges() -> void:
 	var wpb := $PauseScreen.get_node_or_null("WardrobePauseBtn") as Button
 	if wpb:
 		_refresh_new_badge(wpb)
-	var wb := get_node_or_null("titlescreen/TitleMenu/WardrobeButton") as Button
+	var menu := get_node_or_null("titlescreen/TitleMenu")
+	var wb := menu.find_child("WardrobeButton", true, false) as Button if menu else null
 	if wb:
 		_refresh_new_badge(wb)
 

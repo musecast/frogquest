@@ -55,6 +55,10 @@ func _run() -> void:
 	await _until(func() -> bool: return host.players.size() == 2, 5.0)
 	await _until(func() -> bool: return _started.size() == 3, 3.0)
 	_expect(_started.size() == 3, "a friend joining mid-climb is caught up with it")
+	host.start("story")
+	await _until(func() -> bool: return _started.size() == 5, 3.0)
+	_expect(host.mode == "story" and friend.mode == "story" and host.beside == "" and friend.beside == str(host.players[1].get("name")),
+		"Climb the World Tree: both up the tree, the friend to appear beside the host (%s)" % friend.beside)
 	host.leave()
 	await _until(func() -> bool: return why[0] != "", 5.0)
 	_expect(why[0] != "" and not friend.is_on(), "the host leaving ends the party for the friend (%s)" % why[0])

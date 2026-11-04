@@ -5,6 +5,10 @@ extends Node
 ## a button still presses it). And height_for() tells the screen how tall the keyboard is, to lift what
 ## you're typing above it: kept after the typing ends until the keyboard's gone and no finger's down, so
 ## a button tapped then (it takes the box's focus as the finger lands) doesn't drop out from under it.
+## glide() eases the screen up to that and back down (it jumped there once the keyboard was all the way
+## up), and holds it still while a finger's down.
+
+const GLIDE := 16.0  # (how quickly: most of the way in a seventh of a second)
 
 var height_source := _real_height  # (a test's pretend keyboard goes here instead)
 var finger_down := false  # a finger (or the mouse button) on the screen
@@ -12,6 +16,10 @@ var finger_down := false  # a finger (or the mouse button) on the screen
 var _from_off_box := false  # (the finger came down off the box being typed in)
 var _lifting := false  # (the box was being typed in, and the keyboard isn't gone yet)
 var _height := 0.0  # (how tall the keyboard was while you typed)
+var _y := NAN  # (where the screen's panel's top is while it's off its resting place for the keyboard)
+var _from := NAN  # (where it was as this frame began: a screen can lay itself out more than once a
+                  # frame, half-built the first time, as it's rebuilt; its last say goes)
+var _glided_on := -1
 
 
 func _input(event: InputEvent) -> void:
@@ -41,6 +49,32 @@ func height_for(box: LineEdit) -> float:
 		return maxf(height, _height)
 	_lifting = false
 	return 0.0
+
+
+## Where to put the top of the screen's panel this frame: rest (where the screen centres it) with the
+## keyboard down, want (lifted clear of it, from height_for) with it up, gliding from one to the other
+## as the keyboard comes and goes. Off its resting place it never moves while a finger's down, so
+## nothing slides out from under it, and it goes on where it is when the screen's words change under
+## the keyboard (rest and want move together then).
+func glide(rest: float, want: float) -> float:
+	var frame := Engine.get_process_frames()
+	if frame != _glided_on:
+		_glided_on = frame
+		_from = _y
+	var from := _from
+	if is_nan(from):
+		if absf(want - rest) < 0.5:
+			_y = NAN
+			return rest  # (resting: wherever the screen puts it)
+		from = rest  # (setting off from there)
+	if finger_down:
+		_y = from
+		return from
+	var y := lerpf(from, want, 1.0 - exp(-get_process_delta_time() * GLIDE))
+	if absf(y - want) < 0.5:
+		y = want
+	_y = NAN if absf(want - rest) < 0.5 and absf(y - rest) < 0.5 else y  # (NAN: back at rest)
+	return y
 
 
 func _real_height() -> float:

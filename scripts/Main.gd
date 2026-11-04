@@ -95,6 +95,9 @@ func _ready():
 	_loop_cave_audio($"Environmental Audio/darktreeAudio")
 
 	load("res://scripts/FlyHunt.gd").spawn_into(self)  # the little flies hiding around the tree (catch them all: the Golden Frog)
+	var together: Node2D = load("res://scripts/StoryParty.gd").new()  # (climbing with friends, and everyone online)
+	together.name = "StoryParty"
+	add_child(together)
 
 	_trace("Main ready end")
 	_request_ads_after_first_frames()

@@ -187,6 +187,8 @@ func _ready() -> void:
 	_fit_to_viewport()
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	player.connect("launched", _on_launched)
+	if Party.mode == "story" and (Party.is_on() or Party.online_room != ""):
+		Party.leave()  # (a party up the World Tree isn't one for Endless: on your own here)
 	if Party.in_run:
 		_rng.seed = Party.run_seed
 	else:

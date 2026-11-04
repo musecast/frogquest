@@ -92,7 +92,9 @@ static func style_button(btn: Button, font_size: int, kind := "wood") -> void:
 ## whole multiple of its size in square pixels, a smooth one (the infinity sign, the crown) at the size
 ## it'll fit. It sinks with the words when the button's pressed. Again on the same button, it just
 ## updates.
-static func button_face(btn: Button, texture: Texture2D, pixel: bool, words: String, font_size: int) -> void:
+##   With no words, the picture alone is in the middle of the face (the title's little square buttons),
+## about picture_size big when that's given.
+static func button_face(btn: Button, texture: Texture2D, pixel: bool, words: String, font_size: int, picture_size := 0.0) -> void:
 	font_size = px(font_size)
 	btn.text = words
 	var pic := btn.get_node_or_null("Picture") as TextureRect
@@ -107,7 +109,8 @@ static func button_face(btn: Button, texture: Texture2D, pixel: bool, words: Str
 	pic.texture = texture
 	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST if pixel else CanvasItem.TEXTURE_FILTER_LINEAR
 	var w := texture.get_width()
-	var side: float = w * maxi(1, roundi(font_size * 0.9 / w)) if pixel else roundf(font_size * 0.9)
+	var want := picture_size if picture_size > 0.0 else font_size * 0.9
+	var side: float = w * maxi(1, roundi(want / w)) if pixel else roundf(want)
 	pic.size = Vector2(side, side)
 	pic.set_meta("lip", lip_px(font_size))
 	btn.queue_redraw()
@@ -120,7 +123,8 @@ static func _place_picture(btn: Button, pic: TextureRect) -> void:
 	var lip: int = pic.get_meta("lip", 3)
 	var sunk := btn.get_draw_mode() in [BaseButton.DRAW_PRESSED, BaseButton.DRAW_HOVER_PRESSED]
 	var face := Rect2(2.0, 2.0, btn.size.x - 4.0, btn.size.y - 2.0 - (2.0 if sunk else float(lip)))
-	var middle := Vector2(face.position.x + roundf(face.size.y * 0.5), face.get_center().y)
+	var middle := face.get_center() if btn.text == "" \
+		else Vector2(face.position.x + roundf(face.size.y * 0.5), face.get_center().y)
 	pic.position = (middle - pic.size * 0.5).round()
 
 

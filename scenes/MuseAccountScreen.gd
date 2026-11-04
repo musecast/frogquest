@@ -332,12 +332,14 @@ func _fit() -> void:
 	# (sideways, wider: the words wrap onto fewer lines, so less of it has to scroll)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
 	var keyboard: float = _keyboard.height_for(_input if _input.visible else null)
+	var lift := 0.0
 	if keyboard > 0.0 and _input.visible:
 		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var primary_bottom := (_panel.get_global_transform().affine_inverse() * _primary.get_global_rect().end).y
-		_panel.position.y -= maxf(0.0, _panel.position.y + primary_bottom * s + 8.0 - keyboard_top)
-		_panel.position = _panel.position.round()
+		lift = maxf(0.0, _panel.position.y + primary_bottom * s + 8.0 - keyboard_top)
+	_panel.position.y = _keyboard.glide(_panel.position.y, _panel.position.y - lift)
+	_panel.position = _panel.position.round()
 
 
 func _label(text: String, font_size: int, color: Color, _outline: int) -> Label:

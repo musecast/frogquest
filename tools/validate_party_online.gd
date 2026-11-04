@@ -80,6 +80,8 @@ var _started := []
 var _frogs := {}
 var _relay := FakeRelay.new()
 var _tickets: Array[String] = []  # whose ticket each ticket call is (the next phone to connect)
+var _room_mode := "endless"  # (what Muse's stand-in says the room climbs)
+var _quick_open := false  # (whether Muse's stand-in has quick join yet)
 
 
 func _initialize() -> void:
@@ -92,7 +94,11 @@ func _fake_muse(path: String, _body: Dictionary, _bearer: String) -> Dictionary:
 		return {"code": 200, "data": {"ticket": who, "url": "ws://127.0.0.1:%d/api/rooms/R1/ws?ticket=%s" % [RELAY_PORT, who], "expires_in": 60, "max_players": 16}}
 	match path.trim_prefix("/rest/v1/rpc/"):
 		"muse_game_room_create", "muse_game_room_join":
-			return {"code": 200, "data": {"room": "R1", "app": "frog-quest", "mode": "endless", "maxPlayers": 16}}
+			return {"code": 200, "data": {"room": "R1", "app": "frog-quest", "mode": _room_mode, "maxPlayers": 16,
+				"public": _room_mode == "story"}}
+		"muse_game_quick_join":
+			if _quick_open:
+				return {"code": 200, "data": {"room": "R1", "app": "frog-quest", "mode": _room_mode, "maxPlayers": 16, "public": true}}
 		"muse_game_room_leave":
 			return {"code": 204, "data": null}
 		"muse_presence_ping":
@@ -165,6 +171,32 @@ func _run() -> void:
 	await _until(func() -> bool: return why[0] != "", 5.0)
 	_expect(why[0] != "" and not friend.is_on(), "the relay dropping ends the party (%s)" % why[0])
 	_expect(await friend.play_with_anyone() == "Play with Anyone isn't open yet.", "Play with Anyone says so while it isn't open")
+	_expect(await friend.climb_with_everyone() != "" and not friend.everyone, "so does climbing with everyone (quietly: StoryParty tries again later)")
+
+	# Up the World Tree with everyone online: Muse's quick join for "story" (a public room) and no start
+	# to wait for; a friend's Join (Climb with @climby) puts them beside you, everyone's room for them too.
+	_room_mode = "story"
+	_quick_open = true
+	var climber := _phone("OnC")
+	var buddy := _phone("OnD")
+	_tickets.append("climby")
+	_expect(await climber.climb_with_everyone() == "", "up the World Tree with everyone online")
+	await _until(func() -> bool: return climber.is_on() and climber.in_run, 5.0)
+	_expect(climber.in_run and climber.mode == "story" and climber.everyone and "OnC" in _started,
+		"in everyone's room up the tree, climbing at once (nobody starts it)")
+	var shows = climber.joinable()
+	_expect(shows is Dictionary and shows.get("mode") == "story" and shows.get("room") == "R1", "friends see they can climb with you (%s)" % [shows])
+	_tickets.append("buddy")
+	_expect(await buddy.join_room("R1", "@climby") == "", "a friend's Join gets them in")
+	await _until(func() -> bool: return buddy.in_run and buddy.players.size() == 2 and climber.players.size() == 2, 5.0)
+	_expect(buddy.in_run and buddy.mode == "story" and buddy.everyone and buddy.beside == "@climby"
+		and buddy.peer_named("@climby") == climber.me(), "up the tree beside @climby, who they joined (beside %s)" % buddy.beside)
+	climber.send_frog([10.0, -500.0, "default", 0, false, 0.0, 0, 50, 0, 0], 1.0)
+	await _until(func() -> bool: return _frogs.has("OnD") and _frogs.OnD[0] == climber.me(), 3.0)
+	_expect(_frogs.has("OnD") and _frogs.OnD[1].size() == 10 and int(_frogs.OnD[1][9]) == 0, "their frog comes through, with where they are")
+	climber.leave()
+	buddy.leave()
+	_expect(climber.mode == "endless" and not climber.everyone and climber.beside == "" and buddy.beside == "", "leaving clears all that")
 
 	process_frame.disconnect(_process_relay)
 	_relay.server.stop()

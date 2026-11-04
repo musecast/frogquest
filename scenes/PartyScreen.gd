@@ -1,5 +1,6 @@
 extends CanvasLayer
-## PLAY TOGETHER: a party of up to 16 frogs (Party.MAX_PLAYERS) climbing the same Endless tower, each on their own phone.
+## PLAY TOGETHER: a party of up to 16 frogs (Party.MAX_PLAYERS), each on their own phone, up the World Tree
+## (each in their own world: StoryParty) or the same Endless tower; the host picks which as they start.
 ## Host one (and read out its code) or join one by its code, on the same Wi-Fi; pick your party colour
 ## and the name over your frog (your Muse @handle when you have one), and turn name tags on or off.
 ## Opened from the title's PLAY TOGETHER. Party.gd does the networking; built in code and dressed like
@@ -38,6 +39,9 @@ func _ready() -> void:
 	_show()
 	Party.players_changed.connect(_on_players_changed)
 	Party.ended.connect(_on_ended)
+	Party.started.connect(func() -> void:
+		if Party.mode == "story":
+			closed.emit())  # (up the tree: the climb takes over from here)
 
 
 func _build_ui() -> void:
@@ -96,7 +100,7 @@ func _show() -> void:
 				_box.add_child(_label("Friends anywhere can tap Join by your name in their Friends list, or you can invite them.", BODY_FONT_SZ, GOLD))
 				_box.add_child(_button("Invite Friends", _open_friends))
 				_players()
-				_box.add_child(_button("Start Climbing", func() -> void: Party.start(), "go"))
+				_starts()
 				_say_note()
 				_bottom.text = "Leave Party"
 				load("res://scripts/UIStyle.gd").finger_scroll(_scroll)
@@ -110,7 +114,7 @@ func _show() -> void:
 			_box.add_child(_label("Friends on this Wi-Fi tap Play Together, then Join a Party, and type it in." if code != ""
 				else "This phone isn't on Wi-Fi: join one, then friends can find your party.", BODY_FONT_SZ, GOLD if code != "" else RED))
 			_players()
-			_box.add_child(_button("Start Climbing", func() -> void: Party.start(), "go"))
+			_starts()
 			_say_note()
 		"connecting":
 			_box.add_child(_label("Connecting to the party...", BODY_FONT_SZ, DIM))
@@ -122,7 +126,7 @@ func _show() -> void:
 			_box.add_child(_label("Waiting for the host to start the climb...", BODY_FONT_SZ, DIM))
 			_say_note()
 		_:
-			_box.add_child(_label("Up to %d frogs climbing one tower together." % Party.MAX_PLAYERS, BODY_FONT_SZ, DIM))
+			_box.add_child(_label("Up to %d frogs, up the World Tree or an Endless tower." % Party.MAX_PLAYERS, BODY_FONT_SZ, DIM))
 			_header("Same Wi-Fi")
 			_row([_button("Host", _host, "go"), _button("Join", func() -> void: _go("join"))])
 			if MuseSocial.rooms_live:  # (online only once Muse's rooms answer: nothing "coming soon" in a store build)
@@ -147,6 +151,13 @@ func _players() -> void:
 	for id in ids:
 		var who := str(Party.players[id].get("name", "Froggy"))
 		_box.add_child(_label(who + (" (you)" if int(id) == Party.me() else ""), BODY_FONT_SZ, GREEN if int(id) == Party.me() else DIM))
+
+
+## The host's two ways to start: up the World Tree (everyone appears beside you, each in their own world)
+## or a new Endless tower for all.
+func _starts() -> void:
+	_box.add_child(_button("Climb the World Tree", func() -> void: Party.start("story"), "go"))
+	_box.add_child(_button("Climb Endless", func() -> void: Party.start("endless")))
 
 
 ## You, as your friends see you: your name over your frog, your colour, name tags and tethers.
@@ -189,6 +200,11 @@ func _look() -> void:
 		Party.set_tethers(not Party.tethers)
 		_show(), "go" if Party.tethers else "quiet"))
 	_box.add_child(_label("With tethers, a friend pulls you up when you fall.", BODY_FONT_SZ, DIM))
+	if MuseSocial.rooms_live and MuseSocial.is_member():
+		_box.add_child(_button("Climb with Everyone: %s" % ("On" if Party.with_everyone else "Off"), func() -> void:
+			Party.set_with_everyone(not Party.with_everyone)
+			_show(), "go" if Party.with_everyone else "quiet"))
+		_box.add_child(_label("On the World Tree, see everyone online climbing too. Friends can join you from their Friends list.", BODY_FONT_SZ, DIM))
 
 
 ## A section's name, in gold, over a thin line.
@@ -316,12 +332,14 @@ func _fit() -> void:
 	var s: float = ui.panel_zoom(vp, room)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
 	var keyboard: float = _keyboard.height_for(_input)
+	var lift := 0.0
 	if keyboard > 0.0 and _input:
 		_scroll.ensure_control_visible(_input)
 		var keyboard_top := vp.y - keyboard * vp.y / maxf(1.0, float(DisplayServer.window_get_size().y))
 		var input_bottom := (_panel.get_global_transform().affine_inverse() * _input.get_global_rect().end).y
-		_panel.position.y -= maxf(0.0, _panel.position.y + (input_bottom + BTN_HEIGHT + 10.0) * s + 8.0 - keyboard_top)
-		_panel.position = _panel.position.round()
+		lift = maxf(0.0, _panel.position.y + (input_bottom + BTN_HEIGHT + 10.0) * s + 8.0 - keyboard_top)
+	_panel.position.y = _keyboard.glide(_panel.position.y, _panel.position.y - lift)
+	_panel.position = _panel.position.round()
 
 
 func _line(placeholder: String, longest: int) -> LineEdit:

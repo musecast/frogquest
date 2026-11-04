@@ -13,6 +13,12 @@ extends Node
 ## The code is the host's address on the Wi-Fi, its last two numbers (a home network's first two are
 ## the same for everyone on it): 192.168.1.37 is 1 and 37, written "0137" in base 36 as four letters
 ## and digits. A whole address (with dots) works too.
+##
+## A party climbs Endless or the story's World Tree (mode): the host picks when they start. On the World
+## Tree everyone's in their own world (their own gate, talks, finale and ending: StoryParty.gd) and sees
+## the others' frogs in it; whoever joins appears beside whoever they joined (beside). Signed in to Muse,
+## a climb up the World Tree is with everyone online, without asking (climb_with_everyone: a public room
+## Muse picks, friends first), unless with_everyone's turned off.
 
 signal players_changed  # someone joined or left, or changed their look
 signal started  # the climb starts (EndlessMode reads run_seed and the clock)
@@ -22,6 +28,8 @@ signal frog_moved(peer: int, state: Array)  # a friend's frog: [x, y, animation,
 const PORT := 47850
 const MAX_PLAYERS := 16
 const SEND_EVERY := 1.0 / 15.0  # seconds between your frog's updates to the others
+const STILL_EVERY := 1.0  # (on the World Tree, a frog that hasn't moved is only sent this often: it's
+                          # online with everyone, through Muse's relay, so the quiet ones cost little)
 const SEND_EVERY_BIG := 1.0 / 10.0  # (in a big party, a bit less often: the host passes every frog on to
                                      # everyone, so its load grows with the square of the party)
 const BIG_PARTY := 9
@@ -38,13 +46,19 @@ var my_name := "Froggy"  # (when there's no Muse @handle to go by)
 var color := 0  # your party colour (COLORS)
 var name_tags := true
 var tethers := true  # a stretchy band to your nearest friend, that catches you falling
+var with_everyone := true  # signed in, climbing the World Tree online with everyone (climb_with_everyone)
+var told_names := false  # (been told a tap on a name adds, blocks or reports them: StoryParty, once)
 var settings_path := SETTINGS_PATH  # (the tests point it elsewhere)
 var on_start := Callable()  # (what starting does; the tests swap it so the scene stays put)
 
+var mode := "endless"  # what the party climbs: "endless" (one tower, one seed) or "story" (the World Tree)
 var online_room := ""  # the Muse room you're in, online ("" on Wi-Fi or alone)
+var everyone := false  # (that room's a public one, everyone online: climb_with_everyone)
+var beside := ""  # whose side you appear at once their frog's seen (a name in players: "@avery"), "" for nobody
 var ws_ticket_path := "/api/rooms/ticket"  # (on MuseAccount.MUSE_API)
 
 var _send_left := 0.0
+var _since_sent := 0.0
 var _last_state := []
 var _ws: WebSocketPeer  # online: the relay
 var _seat := 0  # your seat in the room (0 until the relay's welcome)
@@ -89,7 +103,20 @@ func me() -> int:
 
 ## What friends see to join you by (Muse presence), online: {mode, room}; null otherwise.
 func joinable():
-	return {"mode": "endless", "room": online_room} if online_room != "" else null
+	return {"mode": mode, "room": online_room} if online_room != "" else null
+
+
+## Who's at a seat (or peer id), by their name in players: "@avery". "" for nobody.
+func name_of(peer: int) -> String:
+	return str(players.get(peer, {}).get("name", ""))
+
+
+## The seat (or peer id) of whoever goes by this name in the party, 0 if they're not in it.
+func peer_named(who: String) -> int:
+	for peer in players:
+		if str(players[peer].get("name", "")) == who and peer != me():
+			return peer
+	return 0
 
 
 ## The name others see over your frog: your Muse @handle, or the name you typed.
@@ -148,19 +175,22 @@ func leave() -> void:
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	players = {}
 	in_run = false
+	mode = "endless"
+	everyone = false
+	beside = ""
 	players_changed.emit()
 
 
-## The host starts everyone climbing: a new tower (a new seed) for all.
-func start() -> void:
+## The host starts everyone climbing: up the World Tree ("story"), or a new Endless tower (a new seed).
+func start(what := "endless") -> void:
 	if not is_host():
 		return
+	var the_seed := randi()
 	if _ws != null:
-		var the_seed := randi()
-		_relay({"data": {"t": "start", "seed": the_seed, "ago": 0}})
-		_begin(the_seed, 0)
+		_relay({"data": {"t": "start", "seed": the_seed, "ago": 0, "mode": what}})
+		_begin(the_seed, 0, what)
 	else:
-		_start.rpc(randi(), 0)
+		_start.rpc(the_seed, 0, what)
 
 
 # ── online ──────────────────────────────────────────────────────────────────────────────────────
@@ -170,9 +200,13 @@ func host_online() -> String:
 	return await _into_room("muse_game_room_create", {"p_app": MuseSocial.APP, "p_mode": "endless"})
 
 
-## Joins a friend's online party (their Join). "" or what went wrong.
-func join_room(room: String) -> String:
-	return await _into_room("muse_game_room_join", {"p_room": room})
+## Joins a friend's online party (their Join), appearing beside them on the World Tree (who: "@avery").
+## "" or what went wrong.
+func join_room(room: String, who := "") -> String:
+	var problem: String = await _into_room("muse_game_room_join", {"p_room": room})
+	if problem == "":
+		beside = who
+	return problem
 
 
 ## Play with Anyone: Muse puts you in an open public party, or starts one. "" or what went wrong.
@@ -180,9 +214,25 @@ func play_with_anyone() -> String:
 	return await _into_room("muse_game_quick_join", {"p_app": MuseSocial.APP, "p_mode": "endless"})
 
 
-## Into a room you're already in (an invite you said yes to): straight to its relay.
+## Up the World Tree with everyone online: Muse puts you in a public room of climbers (friends' first),
+## or starts one. Quietly, as a climb starts (StoryParty.gd). "" or what went wrong.
+func climb_with_everyone() -> String:
+	var problem: String = await _into_room("muse_game_quick_join", {"p_app": MuseSocial.APP, "p_mode": "story"})
+	if problem == "":
+		everyone = true
+	return problem
+
+
+## Into a room you're already in (an invite you said yes to): straight to its relay, beside whoever
+## asked you.
 func enter_room(room: Dictionary) -> String:
-	return await _connect_room(str(room.get("room", "")))
+	var problem: String = await _connect_room(str(room.get("room", "")))
+	if problem == "":
+		mode = _mode_of(room)
+		everyone = bool(room.get("public", false))
+		if room.get("from") is Dictionary:
+			beside = "@" + str(room.from.get("handle", ""))
+	return problem
 
 
 func _into_room(fn_name: String, args: Dictionary) -> String:
@@ -195,7 +245,16 @@ func _into_room(fn_name: String, args: Dictionary) -> String:
 		return "Online parties aren't open yet."
 	if r.code != 200 or not (r.data is Dictionary):
 		return MuseSocial._problem(r)
-	return await _connect_room(str(r.data.get("room", "")))
+	var problem: String = await _connect_room(str(r.data.get("room", "")))
+	if problem == "":
+		mode = _mode_of(r.data)
+		everyone = bool(r.data.get("public", false))  # (a public room: everyone online, strangers too)
+	return problem
+
+
+## What a room climbs, from Muse's summary of it: "story" or "endless".
+static func _mode_of(room: Dictionary) -> String:
+	return "story" if str(room.get("mode", "")) == "story" else "endless"
 
 
 ## A ticket from Muse's relay for the room, then its WebSocket. The welcome that follows seats you.
@@ -267,6 +326,8 @@ func _on_relay(text: String) -> void:
 				_relay({"data": {"t": "look", "i": my_info()}})
 				players_changed.emit()
 				MuseSocial.ping()  # (friends see they can join)
+				if mode == "story" and not in_run:
+					_begin(0, 0, "story")  # (the World Tree has no start: you're climbing with them now)
 			"join":
 				var card: Dictionary = msg.get("player", {}) if msg.get("player") is Dictionary else {}
 				var slot := int(card.get("slot", 0))
@@ -274,8 +335,10 @@ func _on_relay(text: String) -> void:
 				if slot > 0 and slot != _seat:
 					players[slot] = _look_of(card, players.get(slot, {}))
 					_relay({"to": slot, "data": {"t": "look", "i": my_info()}})
-					if is_host() and in_run:
-						_relay({"to": slot, "data": {"t": "start", "seed": run_seed, "ago": Time.get_ticks_msec() - run_started_ms}})
+					if is_host() and in_run and mode == "endless":
+						_relay({"to": slot, "data": {"t": "start", "seed": run_seed, "ago": Time.get_ticks_msec() - run_started_ms, "mode": mode}})
+					elif is_host() and in_run and not everyone:
+						_relay({"to": slot, "data": {"t": "start", "seed": 0, "ago": 0, "mode": mode}})  # (up the World Tree with you)
 				players_changed.emit()
 			"leave":
 				players.erase(int(msg.get("slot", 0)))
@@ -298,7 +361,7 @@ func _on_relay(text: String) -> void:
 				players_changed.emit()
 		"start":
 			if from == _host_seat:
-				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)))
+				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)), "story" if str(d.get("mode", "")) == "story" else "endless")
 
 
 ## A seat's look from the relay's card: their @handle (passed by Muse's filter), keeping any hat and
@@ -325,11 +388,13 @@ func send_frog(state: Array, delta: float) -> void:
 	if not is_on() or players.size() < 2:
 		return
 	_send_left -= delta
-	if _send_left > 0.0 and state == _last_state:
-		return
+	_since_sent += delta
 	if _send_left > 0.0:
 		return
+	if mode == "story" and state == _last_state and _since_sent < STILL_EVERY:
+		return  # (on the World Tree, still: now and then is enough)
 	_send_left = SEND_EVERY if players.size() < BIG_PARTY else SEND_EVERY_BIG
+	_since_sent = 0.0
 	_last_state = state
 	if _ws != null:
 		_relay({"data": {"t": "f", "s": state}})
@@ -370,6 +435,21 @@ func set_tethers(on: bool) -> void:
 func set_name_tags(on: bool) -> void:
 	name_tags = on
 	_save()
+	players_changed.emit()
+
+
+## Been told about tapping names (StoryParty says so once).
+func set_told_names() -> void:
+	told_names = true
+	_save()
+
+
+## Climbing the World Tree with everyone online, or not (off: out of the room you're in, if it's that).
+func set_with_everyone(on: bool) -> void:
+	with_everyone = on
+	_save()
+	if not on and everyone:
+		leave()
 	players_changed.emit()
 
 
@@ -478,7 +558,7 @@ func _hello(info: Dictionary) -> void:
 	players[who] = _clean(info)
 	_roster.rpc(players)
 	if new and in_run:
-		_start.rpc_id(who, run_seed, Time.get_ticks_msec() - run_started_ms)
+		_start.rpc_id(who, run_seed, Time.get_ticks_msec() - run_started_ms, mode)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -495,18 +575,27 @@ func _roster(all: Dictionary) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _start(the_seed: int, ago_ms: int) -> void:
-	_begin(the_seed, ago_ms)
+func _start(the_seed: int, ago_ms: int, what := "endless") -> void:
+	_begin(the_seed, ago_ms, "story" if what == "story" else "endless")
 
 
-## The climb starts (or a latecomer catches up with it): everyone on the same tower and clock.
-func _begin(the_seed: int, ago_ms: int) -> void:
+## The climb starts (or a latecomer catches up with it): everyone on the same tower and clock, or up
+## the World Tree, each in their own world, those who joined appearing beside the host (beside) unless
+## they came for someone else.
+func _begin(the_seed: int, ago_ms: int, what := "endless") -> void:
 	run_seed = the_seed
 	run_started_ms = Time.get_ticks_msec() - ago_ms
 	in_run = true
+	mode = what
+	if what == "story" and beside == "" and not is_host() and not everyone:
+		beside = name_of(_host_seat if _ws != null else 1)
 	started.emit()
 	if on_start.is_valid():
 		on_start.call()
+	elif what == "story":
+		var here := get_tree().current_scene
+		if here == null or here.scene_file_path != "res://scenes/Main.tscn":
+			get_tree().change_scene_to_file("res://scenes/Main.tscn")  # (StoryParty takes it from there)
 	else:
 		get_tree().change_scene_to_file("res://scenes/EndlessMode.tscn")
 
@@ -536,6 +625,8 @@ func _load() -> void:
 	color = clampi(int(cfg.get_value("party", "color", color)), 0, COLORS.size() - 1)
 	name_tags = bool(cfg.get_value("party", "name_tags", name_tags))
 	tethers = bool(cfg.get_value("party", "tethers", tethers))
+	with_everyone = bool(cfg.get_value("party", "with_everyone", with_everyone))
+	told_names = bool(cfg.get_value("party", "told_names", told_names))
 
 
 func _save() -> void:
@@ -544,4 +635,6 @@ func _save() -> void:
 	cfg.set_value("party", "color", color)
 	cfg.set_value("party", "name_tags", name_tags)
 	cfg.set_value("party", "tethers", tethers)
+	cfg.set_value("party", "with_everyone", with_everyone)
+	cfg.set_value("party", "told_names", told_names)
 	cfg.save(settings_path)

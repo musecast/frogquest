@@ -10,6 +10,8 @@ var score := 0
 var metres := 0
 var standing := false  # (on a platform, by their animation: one who can pull a friend back up)
 var tether_to := 0  # who their band is tied to (a peer id; 0: nobody), for drawing it
+var where := 0  # up the World Tree, where they are in their own world (StoryParty: CLIMBING, IN_FINALE, WON, AWAY)
+var seen := false  # (their phone's said where they are at least once)
 var _sprite: AnimatedSprite2D
 var _hats := {}
 var _skin := ""
@@ -64,7 +66,8 @@ func dress(info: Dictionary) -> void:
 			_sprite.material = _tint(c, 0.45) if c.a > 0.0 else null
 
 
-## Where their phone says their frog is, and how it looks: [x, y, animation, frame, flip, turn, score, metres].
+## Where their phone says their frog is, and how it looks: [x, y, animation, frame, flip, turn, score,
+## metres, band, where] (the band and where only from some: up the World Tree, where they are).
 func show_state(state: Array) -> void:
 	_target = Vector2(float(state[0]), float(state[1]))
 	if not _placed:
@@ -81,7 +84,14 @@ func show_state(state: Array) -> void:
 	standing = str(state[2]) != "airborne"
 	metres = int(state[7])
 	tether_to = int(state[8]) if state.size() > 8 else 0
+	where = int(state[9]) if state.size() > 9 else 0
+	seen = true
 	_place_hats()
+
+
+## Where their phone last said their frog is (it eases there on the screen).
+func spot() -> Vector2:
+	return _target
 
 
 func _process(delta: float) -> void:

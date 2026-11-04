@@ -239,8 +239,8 @@ func _check_story_menus() -> void:
 		_check_inside(title, room, "%s: title screen" % shape)
 		await _expect_title_steady(player, vp, shape)
 		var menu: Control = title.get_node("TitleMenu")
-		for button in ["PlayButton", "EndlessButton", "WardrobeButton", "MuseButton", "SettingsButton"]:
-			if not menu.get_node(button).visible:
+		for button in ["PlayButton", "EndlessButton", "PartyButton", "WardrobeButton", "MuseButton", "SettingsButton"]:
+			if not menu.find_child(button, true, false).visible:
 				_failures.append("%s: the title's %s isn't showing" % [shape, button])
 		var settings: CanvasLayer = player._open_settings()  # (from the title)
 		await _frames(4)
