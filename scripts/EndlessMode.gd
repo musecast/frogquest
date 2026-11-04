@@ -904,11 +904,10 @@ func _start_reel(friend: Node2D) -> bool:
 	_splashed = false
 	var to := spot.global_position + Vector2(0.0, -16.0)
 	var rope = _ropes.get(_rope_key(Party.me(), friend.peer))
-	var path: PackedVector2Array = rope.path_to(to) if rope != null and rope.mine else PackedVector2Array()
-	if path.size() < 2:
-		path = PackedVector2Array([player.global_position, to])
-	path[0] = player.global_position
-	_reel = {"path": path, "to": to, "t": 0.0}  # (along the band: TetherRope)
+	var band: PackedVector2Array = rope.way() if rope != null and rope.mine else PackedVector2Array()
+	# (the way the band goes, round the platforms it's caught on, wide enough for all of him: TetherRope)
+	var path: PackedVector2Array = load("res://scripts/TetherRope.gd").body_path(player, player.global_position, to, band)
+	_reel = {"path": path, "to": to, "t": 0.0}
 	player.set_physics_process(false)
 	player.velocity = Vector2.ZERO
 	var who := str(Party.players.get(friend.peer, {}).get("name", "A friend"))
@@ -918,21 +917,31 @@ func _start_reel(friend: Node2D) -> bool:
 	return true
 
 
-## Up the band, quickly at first and gently at the end, along it, then down onto the platform.
+## Up the band, quickly at first and gently at the end, along his way round the platforms it's caught
+## on, then down onto the platform: moved only as his body can go (up through a platform, as when he
+## jumps, never into one from above); caught on something on the way, he's put there at the end anyway.
 func _reel_in(delta: float) -> void:
 	_reel.t = minf(1.0, float(_reel.t) + delta / TETHER_REEL)
 	var k := 1.0 - pow(1.0 - float(_reel.t), 3.0)
 	var to: Vector2 = _reel.to
-	player.global_position = load("res://scripts/TetherRope.gd").along(_reel.path, k) + Vector2(0.0, -sin(k * PI) * 10.0)
-	player.reset_physics_interpolation()
+	_slide_to(load("res://scripts/TetherRope.gd").along(_reel.path, k) + Vector2(0.0, -sin(k * PI) * 10.0))
 	if _reel.t >= 1.0:
 		_reel = {}
+		_slide_to(to)
 		player.global_position = to
 		player.reset_physics_interpolation()
 		player.set_physics_process(true)
 		if player.global_position.y < highest_player_y:
 			highest_player_y = player.global_position.y
 			_climbed()
+
+
+## Toward a spot as his body can go: up against anything in the way and along it, never into it.
+func _slide_to(spot: Vector2) -> void:
+	var hit := player.move_and_collide(spot - player.global_position)
+	if hit:
+		player.move_and_collide(hit.get_remainder().slide(hit.get_normal()))
+	player.reset_physics_interpolation()
 
 
 ## Falling past the point of no return with nobody to have caught you yet: a friend standing above you
@@ -981,12 +990,12 @@ func _step_ropes(delta: float) -> void:
 		var rope = _ropes.get(key)
 		if rope == null:
 			rope = load("res://scripts/TetherRope.gd").new()
+			rope.exclude = [player.get_rid()]  # (an end of it's inside him: it isn't caught on him)
 			_ropes[key] = rope
 		var owner: int = want[key][2]
 		rope.mine = owner == mine
 		rope.colour = look.band_colour(MusicManager.look if owner == mine else Party.players.get(owner, {}).get("look"))
-		# (his own, while it's reeling him in, slides straight in: it's pulling him along it)
-		rope.step(a, b, TETHER_SLACK, delta, null if (rope.mine and not _reel.is_empty()) else space, player.collision_mask)
+		rope.step(a, b, TETHER_SLACK, delta, space, player.collision_mask)
 
 
 func _rope_key(a: int, b: int) -> String:
@@ -1065,9 +1074,25 @@ func _place_tags() -> void:
 			ui.style_label(tag, 16, want[peer][2])
 			_party_tags.add_child(tag)
 		tag.text = want[peer][1]
+		tag.size = tag.get_combined_minimum_size()
 		var frog: Node2D = want[peer][0]
 		var head: Vector2 = xf * (frog.global_position + Vector2(0.0, -18.0 * frog.scale.y))
 		tag.position = (head - Vector2(tag.size.x * 0.5, tag.size.y)).round()
+	# (frogs side by side: a name that would run into another's goes up over it, as up the tree)
+	var placed: Array[Rect2] = []
+	for peer in want:
+		var tag := _party_tags.get_node_or_null("Tag%d" % peer) as Control
+		if tag == null:
+			continue
+		for _try in 4:
+			var bumped := false
+			for r in placed:
+				if r.grow(1.0).intersects(Rect2(tag.position, tag.size)):
+					tag.position.y = r.position.y - tag.size.y - 1.0
+					bumped = true
+			if not bumped:
+				break
+		placed.append(Rect2(tag.position, tag.size))
 
 
 # ── pause ───────────────────────────────────────────────────────────────────────────────────────

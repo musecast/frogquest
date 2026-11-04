@@ -368,17 +368,16 @@ func _reaches(friend: Node2D) -> bool:
 	return friend.where == CLIMBING or (friend.where == IN_FINALE and _finale_open())
 
 
-## Pulled up by the band, to where the friend's standing (or the nearest spot there he fits), along
-## the band itself: over the ledge it lies across, not through it.
+## Pulled up by the band, to where the friend's standing (or the nearest spot there he fits), the way
+## the band goes: up over the edge of the ledge it's caught on, wide enough round it for all of him
+## (TetherRope.body_path), never through the tree.
 func _start_reel(friend: Node2D) -> bool:
 	var to := _free_spot_near(friend.spot() + Vector2(0.0, -2.0))
 	if to == Vector2.INF:
 		return false
 	var rope = _ropes.get(_rope_key(Party.me(), friend.peer))
-	var path: PackedVector2Array = rope.path_to(to) if rope != null and rope.mine else PackedVector2Array()
-	if path.size() < 2:
-		path = PackedVector2Array([player.global_position, to])
-	path[0] = player.global_position
+	var band: PackedVector2Array = rope.way() if rope != null and rope.mine else PackedVector2Array()
+	var path: PackedVector2Array = load("res://scripts/TetherRope.gd").body_path(player, player.global_position, to, band)
 	_reel = {"path": path, "to": to, "t": 0.0}
 	player.set_physics_process(false)
 	player.velocity = Vector2.ZERO
@@ -394,20 +393,31 @@ func _start_reel(friend: Node2D) -> bool:
 	return true
 
 
-## Up the band, quickly at first and gently at the end, along it, then down onto the ledge.
+## Up the band, quickly at first and gently at the end, along his way round the ledge, then onto it
+## beside them: moved only as his body can go (up against anything in the way and along it, never into
+## it). Caught on something on the way, he's put beside them at the end all the same.
 func _reel_in(delta: float) -> void:
 	_reel.t = minf(1.0, float(_reel.t) + delta / TETHER_REEL)
 	var k := 1.0 - pow(1.0 - float(_reel.t), 3.0)
 	var to: Vector2 = _reel.to
-	player.global_position = load("res://scripts/TetherRope.gd").along(_reel.path, k) + Vector2(0.0, -sin(k * PI) * 6.0)
-	player.reset_physics_interpolation()
+	_slide_to(load("res://scripts/TetherRope.gd").along(_reel.path, k) + Vector2(0.0, -sin(k * PI) * 6.0))
 	if _reel.t >= 1.0:
 		_reel = {}
-		player.global_position = to
-		player.reset_physics_interpolation()
+		_slide_to(to)
+		if player.global_position.distance_to(to) > 1.0 and _free_at(to):
+			player.global_position = to
+			player.reset_physics_interpolation()
 		player.velocity = Vector2.ZERO
 		player.set_physics_process(true)
-		_last_floor_y = to.y
+		_last_floor_y = player.global_position.y
+
+
+## Toward a spot as his body can go: up against anything in the way and along it, never into it.
+func _slide_to(spot: Vector2) -> void:
+	var hit := player.move_and_collide(spot - player.global_position)
+	if hit:
+		player.move_and_collide(hit.get_remainder().slide(hit.get_normal()))
+	player.reset_physics_interpolation()
 
 
 ## Every band up the tree you can see, as a rope hanging against the world (TetherRope): yours to your
@@ -442,12 +452,12 @@ func _step_ropes(delta: float) -> void:
 		var rope = _ropes.get(key)
 		if rope == null:
 			rope = load("res://scripts/TetherRope.gd").new()
+			rope.exclude = [player.get_rid()]  # (an end of it's inside him: it isn't caught on him)
 			_ropes[key] = rope
 		var owner: int = want[key][2]
 		rope.mine = owner == mine
 		rope.colour = look.band_colour(MusicManager.look if owner == mine else Party.players.get(owner, {}).get("look"))
-		# (his own, while it's reeling him in, slides straight in: it's pulling him along it)
-		rope.step(a, b, TETHER_SLACK, delta, null if (rope.mine and not _reel.is_empty()) else space, player.collision_mask)
+		rope.step(a, b, TETHER_SLACK, delta, space, player.collision_mask)
 
 
 func _rope_key(a: int, b: int) -> String:

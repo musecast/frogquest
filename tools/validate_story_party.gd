@@ -2,9 +2,11 @@ extends SceneTree
 ## Climbing the World Tree together (scripts/StoryParty.gd), in the real level: a party hosted on this
 ## computer with a pretend friend in it (their frog's state handed in as their phone would send it).
 ## Checks that their frog shows where they are, named; that the band catches a fall well below a friend
-## who's standing and reels him up to them, but never past the finale's door his own world hasn't
-## opened, never to someone whose ending is playing (they're not shown), never into anything solid of
-## his own world (the gate he hasn't opened), and, up the tree with everyone online, only to friends;
+## who's standing and reels him up to them (caught over a ledge, it bends over the edge, never through
+## the tree, and he's pulled up round it, never into it), but never past the finale's door his own
+## world hasn't opened, never to someone whose ending is playing (they're not shown), never into
+## anything solid of his own world (the gate he hasn't opened), and, up the tree with everyone online,
+## only to friends;
 ## that whoever joins appears beside whoever they joined, or at the finale's door (and lands there);
 ## that a still frog is only sent now and then; that a tap on a name blocks or reports them through
 ## Muse; that a party starting up the tree from the title starts the climb; and that the title leaves
@@ -100,6 +102,49 @@ func _run() -> void:
 	_friend(2, air, "airborne", 0)
 	await _fall_below(air)
 	_expect(sp._reel.is_empty(), "a friend in the air can't pull anyone up")
+
+	# The band caught over a ledge (never through the tree), and him pulled up round it (never into it).
+	var spot := _tree_ledge()
+	_expect(not spot.is_empty(), "there's a ledge up the tree with open air off its edge")
+	if not spot.is_empty():
+		_friend(2, spot.ledge, "default", 0)
+		sp._reel = {}
+		player.set_physics_process(false)
+		player.global_position = spot.ledge  # (by them on the ledge first: the band lies there)
+		player.velocity = Vector2.ZERO
+		sp._tether_peer = 2
+		await _frames(10)
+		player.global_position = spot.fall + Vector2(0, -60)  # (then held off its edge, below it: moved past the step at once)
+		var through := ""
+		for _f in 20:
+			await process_frame
+			if through == "":
+				through = _band_through()
+		var rope = sp._ropes.get(sp._rope_key(party.me(), 2))
+		_expect(rope != null and rope.way().size() > 2,
+			"hanging off a friend's ledge, the band bends over its edge (%s)" % (rope.way() if rope != null else "no band"))
+		_expect(through == "", "and doesn't go through the tree (%s)" % through)
+		player.set_physics_process(true)
+		player.velocity = Vector2(0, 420)
+		sp._last_floor_y = spot.ledge.y - 300.0
+		var inside := ""
+		var reeled := false
+		for _f in 150:
+			await process_frame
+			if through == "":
+				through = _band_through()
+			if not sp._reel.is_empty():
+				reeled = true
+				if inside == "" and not sp._free_at(player.global_position):
+					inside = str(player.global_position)
+			elif reeled:
+				break
+		_expect(reeled, "falling from there, the band catches him")
+		_expect(inside == "" and through == "",
+			"pulled up round the ledge, he's never in the tree, nor the band through it (%s%s)" % [inside, through])
+		await _frames(20)
+		_expect(sp._reel.is_empty() and player.global_position.distance_to(spot.ledge) < 50.0 and sp._free_at(player.global_position),
+			"and he ends up beside them on it (%s, they're at %s)" % [player.global_position, spot.ledge])
 
 	main.npc6 = 0
 	_friend(2, air, "default", sp.IN_FINALE)
@@ -262,6 +307,49 @@ func _fall_below(above: Vector2) -> void:
 	player.velocity = Vector2(0, 420)
 	sp._last_floor_y = above.y - 200.0
 	await _frames(3)
+
+
+## A ledge up the tree (a spot he fits, on ground) with open air off its edge: where a friend stands, and
+## where he falls past it (220 below, beside it).
+func _tree_ledge() -> Dictionary:
+	for y in range(-700, -3000, -40):
+		for x in range(2500, 3300, 30):
+			var top := Vector2(x, y)
+			if not sp._free_at(top) or not sp._floor_under(top):
+				continue
+			for dx in [-60, 60, -80, 80]:
+				var clear := true
+				for d in range(0, 240, 20):
+					if not sp._free_at(top + Vector2(dx, d)):
+						clear = false
+						break
+				if clear:
+					return {"ledge": top, "fall": top + Vector2(dx, 220)}
+	return {}
+
+
+## Where a band that's showing goes through anything solid (its way, every pixel of it; its hanging
+## points), or "".
+func _band_through() -> String:
+	var space := player.get_world_2d().direct_space_state
+	var q := PhysicsPointQueryParameters2D.new()
+	q.collision_mask = player.collision_mask
+	q.exclude = [player.get_rid()]
+	for rope in sp._ropes.values():
+		if not rope.shown():
+			continue
+		var way: PackedVector2Array = rope.way()
+		for i in range(way.size() - 1):
+			var n := int(way[i].distance_to(way[i + 1]))
+			for s in range(1, n):
+				q.position = way[i].lerp(way[i + 1], float(s) / float(n))
+				if not space.intersect_point(q, 1).is_empty():
+					return "its way at %s" % q.position
+		for p in rope._pts:
+			q.position = p
+			if not space.intersect_point(q, 1).is_empty():
+				return "a point of it at %s" % p
+	return ""
 
 
 ## Somewhere in the open (he fits there and 400 under it): to fall through.
