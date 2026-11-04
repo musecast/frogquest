@@ -480,7 +480,7 @@ func _on_blockedpath_body_shape_entered(body_rid, body, body_shape_index, local_
 
 func _on_button_pressed():
 	if not MusicManager.look_made:
-		_meet_the_frog_god()  # (his first climb: what does he look like? then he wakes, and climbs)
+		_meet_the_frog_god(_on_button_pressed)  # (his first climb: what does he look like? then he wakes, and climbs)
 		return
 	$Trajectory.endGame = 0
 	$".".visible = true
@@ -496,9 +496,10 @@ func _on_button_pressed():
 	
 
 
-## Before his first climb, the frog god asks what he looks like (CreatorIntro): he wakes as that froggy
-## and the climb starts (the title's already gone).
-func _meet_the_frog_god() -> void:
+## The first time he plays anything (a climb, Endless, or Play Together), the frog god asks what he
+## looks like first (CreatorIntro): it's how the game starts. He wakes as that froggy, and on he goes
+## (`then`, at the intro's flash: the climb, Endless, or Play Together's menu).
+func _meet_the_frog_god(then: Callable) -> void:
 	if get_node_or_null("CreatorIntro"):
 		return
 	$titlescreen.visible = false
@@ -507,7 +508,7 @@ func _meet_the_frog_god() -> void:
 	intro.done.connect(func() -> void:
 		_apply_equipped_cosmetics()
 		_refresh_title_menu()
-		_on_button_pressed())
+		then.call())
 
 
 func _on_thanksforplaying_timer_timeout():
@@ -1016,7 +1017,13 @@ func _on_muse_button_pressed() -> void:
 
 
 ## PLAY TOGETHER: host or join a party on the same Wi-Fi (PartyScreen); starting it climbs Endless.
+## The first time, he makes his froggy first (the frog god), so friends see him as he is.
 func _on_party_button_pressed() -> void:
+	if not MusicManager.look_made:
+		_meet_the_frog_god(func() -> void:
+			$titlescreen.visible = true  # (back to the title when Play Together's closed)
+			_on_party_button_pressed())
+		return
 	$frogaim.play()
 	var title_was_visible: bool = $titlescreen.visible
 	$titlescreen.visible = false
@@ -1049,7 +1056,15 @@ func _show_logo(pop := false) -> void:
 		title.spring_velocity += 0.5
 
 
+## ENDLESS. The first time, he makes his froggy first (the frog god), and its flash fades over Endless.
 func _on_endlessmodebutton_pressed() -> void:
+	if not MusicManager.look_made:
+		_meet_the_frog_god(func() -> void:
+			var intro := get_node_or_null("CreatorIntro")
+			if intro:
+				intro.reparent(get_tree().root)  # (kept through the change, to fade out over Endless)
+			_on_endlessmodebutton_pressed())
+		return
 	get_tree().change_scene_to_file("res://scenes/EndlessMode.tscn")
 
 

@@ -4,7 +4,8 @@ extends SceneTree
 ## choice dresses him at once (colour, belly, pattern and its colour, eyes, hat, band), round and round;
 ## his colours fill in; "Is this you?" No goes back, Yes keeps it (in the wardrobe's save); the last
 ## words, the flash, and he wakes in his bedroom as that froggy, the TV talking. His look goes to his
-## party; next time Play's straight to the climb; the wardrobe's CHANGE YOUR LOOK is just the choosing,
+## party; next time Play's straight to the climb; not made yet, ENDLESS and PLAY TOGETHER bring the frog
+## god first too (then Play Together's menu); the wardrobe's CHANGE YOUR LOOK is just the choosing,
 ## and the climb goes on. Then the unlocks (once each, with the mushrooms' count and a big fall), a
 ## friend's frog in their look, and the wardrobe's starters and STILL TO FIND. Scratch saves only.
 ##   Godot --headless --path . --script res://tools/validate_creator.gd
@@ -113,6 +114,54 @@ func _run() -> void:
 	await _frames(3)
 	_expect(player.get_node_or_null("CreatorIntro") == null and player.get_node("Trajectory").endGame == 0, "next time, Play's straight to the climb")
 
+	# Not made yet, ENDLESS and PLAY TOGETHER bring the frog god first too: it's how the game starts.
+	var made: Dictionary = mm.look.duplicate()
+	var made_hat: String = mm.equipped_hat
+	mm.look_made = false
+	main.queue_free()
+	await _frames(3)
+	main = await _game()
+	player = main.get_node("Player")
+	player._on_endlessmodebutton_pressed()
+	await _frames(3)
+	var first = player.get_node_or_null("CreatorIntro")
+	_expect(first != null and root.get_node_or_null("EndlessMode") == null and is_instance_valid(main) and main.is_inside_tree(),
+		"a new player's ENDLESS brings the frog god first, not Endless")
+	if first:
+		first.queue_free()
+	await _frames(2)
+	player.get_node("titlescreen").visible = true
+	player._on_party_button_pressed()
+	await _frames(3)
+	first = player.get_node_or_null("CreatorIntro")
+	_expect(first != null and _party_screen(player) == null, "and PLAY TOGETHER does too, before its menu")
+	if first:
+		first._advance()
+		for _i in 12:
+			if first._step != "talk":
+				break
+			first._advance()
+			await _frames(1)
+		first._ask_sure()
+		first._yes()
+		await _until(func() -> bool: return _party_screen(player) != null, 10.0)
+		var screen = _party_screen(player)
+		_expect(mm.look_made and screen != null, "made, Play Together's menu opens")
+		if screen:
+			screen.closed.emit()
+			await _frames(2)
+			_expect(player.get_node("titlescreen").visible, "and closing it, the title's there")
+	await _until(func() -> bool: return player.get_node_or_null("CreatorIntro") == null, 3.0)
+	mm.look = made
+	mm.equipped_hat = made_hat
+	mm.look_made = true
+	main.queue_free()
+	await _frames(3)
+	main = await _game()
+	player = main.get_node("Player")
+	player._on_button_pressed()  # (climbing again, as before)
+	await _frames(3)
+
 	# The wardrobe's CHANGE YOUR LOOK: just the choosing; the climb goes on.
 	var ws: CanvasLayer = load("res://scenes/WardrobeScreen.gd").new()
 	player.add_child(ws)
@@ -175,6 +224,15 @@ func _run() -> void:
 		and words.contains("Climb all the way to space in Endless"), "the wardrobe: starters yours, and what's still to find, and how")
 	ws2.queue_free()
 	await _finish(real, main)
+
+
+## Play Together's menu (PartyScreen), open over the title, or null.
+func _party_screen(player: Node) -> Node:
+	for child in player.get_children():
+		var s: Script = child.get_script()
+		if s != null and s.resource_path == "res://scenes/PartyScreen.gd" and not child.is_queued_for_deletion():
+			return child
+	return null
 
 
 func _game() -> Node:
