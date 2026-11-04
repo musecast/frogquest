@@ -23,6 +23,17 @@ const STATUSES := ["online", "away", "dnd", "invisible"]
 const STATE_ORDER := ["online", "away", "dnd", "offline"]  # (how friends are listed: who's on first)
 const REPORT_REASONS := ["spam", "harassment", "hate", "sexual", "impersonation", "other"]
 const COMMUNITY_RULES := "https://musemedia.app/community"
+## Handles no one may take, passing for Muse's team (handle_problem; Muse's admins can, but not from
+## here): exactly these (Muse's own list);
+const RESERVED_HANDLES := ["muse", "admin", "administrator", "support", "help", "mod", "moderator", "staff",
+	"official", "team", "root", "system", "null", "undefined", "everyone", "anonymous", "me", "settings", "api",
+	"www", "apple", "security"]
+## any with these in it, its numbers read as letters (4dm1n) and its underscores dropped;
+const STAFF_INSIDE := ["admin", "moderator", "official", "staff", "support", "verified", "developer"]
+## any with these as one of its words (mod_bob, bob_mod, mod123, m0d: model and devin are fine);
+const STAFF_WORDS := ["mod", "mods", "dev", "devs", "team", "owner", "founder", "ceo", "gm", "muse"]
+## and any starting or ending with muse (jasonmuse), or reading frogquest.
+const READ_AS := {"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t"}
 
 var available := false  # Muse Social answers (it isn't live everywhere yet)
 var me := {}  # you as Muse Social has you (handle, displayName, avatar...), empty with no @handle yet
@@ -339,6 +350,33 @@ static func _cards(value) -> Array:
 		for each in value:
 			if each is Dictionary and str(each.get("handle", "")) != "":
 				out.append(each.duplicate())
+	return out
+
+
+## What's wrong with a new @handle, in Muse's words, or "" if Muse could take it (whether someone has,
+## only Muse knows): 3 to 20 letters, numbers or underscores with a letter, and nothing passing for
+## Muse's team or the game (RESERVED_HANDLES...). Muse checks the same when it's saved; this says so
+## at once.
+static func handle_problem(new_handle: String) -> String:
+	var h := _bare(new_handle)
+	if not RegEx.create_from_string("^[a-z0-9_]{3,20}$").search(h) or not RegEx.create_from_string("[a-z]").search(h):
+		return "Use 3 to 20 letters, numbers or underscores, with at least one letter."
+	var letters := RegEx.create_from_string("[^a-z]").sub(_read_as_letters(h), "", true).replace("badminton", "")
+	var reserved := h in RESERVED_HANDLES or letters == "frogquest" or letters.begins_with("muse") \
+		or (letters.ends_with("muse") and not letters.ends_with("amuse") and not letters.ends_with("bemuse"))
+	for word in STAFF_INSIDE:
+		reserved = reserved or word in letters
+	for piece in h.split("_", false):
+		var word := RegEx.create_from_string("^[0-9]+|[0-9]+$").sub(piece, "", true)
+		reserved = reserved or word in STAFF_WORDS or _read_as_letters(word) in STAFF_WORDS
+	return "That handle is reserved." if reserved else ""
+
+
+## A handle as it reads, its numbers that stand for letters as those letters (4dm1n: admin).
+static func _read_as_letters(h: String) -> String:
+	var out := ""
+	for c in h:
+		out += READ_AS.get(c, c)
 	return out
 
 

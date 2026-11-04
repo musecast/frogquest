@@ -167,11 +167,13 @@ func _handle_step() -> void:
 	_add_note()
 
 
-## Agree and Save: a handle Muse could take (its rules: muse_social_handle_problem) gets the last look.
+## Agree and Save: a handle Muse could take (MuseSocial.handle_problem: none passing for its team)
+## gets the last look.
 func _check_handle() -> void:
 	var wanted := (_input.text if _input else _typed).strip_edges().trim_prefix("@").to_lower()
-	if not RegEx.create_from_string("^[a-z0-9_]{3,20}$").search(wanted) or not RegEx.create_from_string("[a-z]").search(wanted):
-		_say("Use 3 to 20 letters, numbers or underscores, with at least one letter.", RED)
+	var problem := MuseSocial.handle_problem(wanted)
+	if problem != "":
+		_say(problem, RED)
 		return
 	_confirming = wanted
 	_note_text = ""

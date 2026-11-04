@@ -103,11 +103,11 @@ func _picking_a_handle() -> void:
 	await _tap(_button(screen, "Change It"))
 	_expect(screen._confirming == "" and _box(screen) != null and _box(screen).text == "froggy",
 		"Change It goes back to the box, the @handle still in it")
-	for bad in ["ab", "1234", "frog-man"]:
-		_box(screen).text = bad
+	for bad in [["ab", "Use 3 to 20"], ["1234", "Use 3 to 20"], ["frog-man", "Use 3 to 20"], ["adm1n", "That handle is reserved"]]:
+		_box(screen).text = bad[0]
 		await _tap(_button(screen, "Agree and Save"))
-		_expect(screen._confirming == "" and str(screen._note_text).begins_with("Use 3 to 20"),
-			"\"%s\", which Muse wouldn't take, is turned down at once" % bad)
+		_expect(screen._confirming == "" and str(screen._note_text).begins_with(bad[1]),
+			"\"%s\", which Muse wouldn't take, is turned down at once (%s)" % [bad[0], screen._note_text])
 	_box(screen).text = "taken_one"
 	await _tap(_button(screen, "Agree and Save"))
 	await _tap(_button(screen, "Yes, Save It"))
