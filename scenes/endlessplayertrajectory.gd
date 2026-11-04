@@ -116,11 +116,9 @@ func _draw():
 	if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0) and can_jump():
 		var launch := flight_velocity(mousePath)
 		var boost: float = get_parent().launch_boost() if get_parent().has_method("launch_boost") else 1.0
-		if boost > 1.0:  # on a spring: longer, in spring gold
-			draw_line(Vector2(0,0), launch / 10.8, Color(1.0, 0.86, 0.3, 1), 3.0)
-		else:
-			var power := clampf(launch.length() / Vector2(800, 450).length(), 0.0, 1.0)
-			draw_line(Vector2(0,0), launch / 10.8, Color(255, 1.2 - power, 1.2 - power, 1), 2.0)
+		var power := clampf(launch.length() / Vector2(800, 450).length(), 0.0, 1.0)
+		# (little dots along the jump, as the story's: AimLine; on a spring, longer, and gold all along)
+		load("res://scripts/AimLine.gd").draw(self, launch / 10.8, power, boost > 1.0)
 
 
 func _on_cursor_lock_button_pressed():

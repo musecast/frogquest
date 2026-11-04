@@ -33,11 +33,12 @@ func _run() -> void:
 	var acct := root.get_node("MuseAccount")
 	var social := root.get_node("MuseSocial")
 	var mm := root.get_node("MusicManager")
-	var real := [party.settings_path, acct.save_path, mm.wardrobe_path]
+	var real := [party.settings_path, acct.save_path, mm.wardrobe_path, mm.look_made]
 	party.settings_path = SCRATCH_PARTY
 	party.on_start = func() -> void: pass  # (the scene stays put)
 	party.with_everyone = false  # (no trying Muse's rooms here: the online test does that)
 	mm.wardrobe_path = SCRATCH_WARDROBE
+	mm.look_made = true  # (he's made his froggy already: Play starts the climb, no intro)
 	acct.save_path = SCRATCH_MUSE
 	acct.changed.disconnect(social._on_account_changed)
 	acct.transport = _fake_muse
@@ -224,6 +225,8 @@ func _run() -> void:
 	player.get_node("titlescreen").visible = true
 	await _frames(3)
 	_expect(not party.is_on(), "back at the title, out of everyone's room")
+	await _frames(2)
+	_expect(not sp._any_tags() and sp._ropes.is_empty(), "and nobody's name or band is left on the screen")
 
 	# Everyone's room dropping (the relay's daily allowance gone, say) says nothing: he climbs on alone.
 	player.get_node("titlescreen").visible = false
@@ -336,6 +339,7 @@ func _finish(real: Array) -> void:
 	party.settings_path = real[0]
 	party.on_start = Callable()
 	root.get_node("MusicManager").wardrobe_path = real[2]
+	root.get_node("MusicManager").look_made = real[3]
 	for p in [SCRATCH_SAVE, SCRATCH_PARTY, SCRATCH_MUSE, SCRATCH_WARDROBE]:
 		if FileAccess.file_exists(p):
 			DirAccess.remove_absolute(p)

@@ -78,6 +78,8 @@ static func caught(fly: Node) -> void:
 	sfx.play()
 	sfx.finished.connect(sfx.queue_free)
 	var all_done := record(MusicManager.flies_caught, str(fly.fly_id))
+	if MusicManager.flies_caught.size() >= 5:
+		MusicManager.unlock("lilypad")  # (5 caught: the Lily Pad hat)
 	var unlocked := all_done and not (REWARD in MusicManager.unlocked_skins)
 	if unlocked:
 		MusicManager.unlocked_skins.append(REWARD)

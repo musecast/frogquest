@@ -37,7 +37,7 @@ func _place_hats() -> void:
 	# (the negative skin shows the screen behind him, hats and all, so its hat sits a bit higher)
 	var hat_y := -10.66667 if MusicManager.equipped_skin == "negative_skin" else -9.1667
 	hat_y += _froggy_head.drop(frame) * sprite.scale.y
-	for hat_name in ["Froggycrown", "FroggyWizHat", "FroggyCakeHat"]:
+	for hat_name in ["Froggycrown", "FroggyWizHat", "FroggyCakeHat", "LookHat"]:
 		var hat := get_node_or_null(hat_name) as Sprite2D
 		if hat and hat.visible:
 			hat.rotation = sprite.rotation
@@ -61,24 +61,27 @@ func _apply_equipped_cosmetics() -> void:
 	if has_node("FroggyCakeHat"):
 		$FroggyCakeHat.visible = (hat == "cakehat")
 
-	match MusicManager.equipped_skin:
-		"golden_skin":
-			var mat := ShaderMaterial.new()
-			mat.shader = load("res://assets/skin_tint.gdshader")
-			mat.set_shader_parameter("tint_color", Color(1.0, 0.75, 0.0))
-			mat.set_shader_parameter("tint_strength", 0.55)
-			sprite.material = mat
-		"grayscale_skin":
-			var mat := ShaderMaterial.new()
-			mat.shader = load("res://assets/grayscale.gdshader")
-			sprite.material = mat
-		"negative_skin":
-			var mat := ShaderMaterial.new()
-			mat.shader = load("res://assets/negative.gdshader")
-			sprite.material = mat
-		_:
-			sprite.material = null
+	# (the hats drawn in code, on his own grid, and your froggy with your skin over him: FroggyLook)
+	var look: GDScript = load("res://scripts/FroggyLook.gd")
+	var look_hat := _look_hat()
+	look_hat.texture = look.hat_texture(hat)
+	look_hat.offset = look.hat_offset(hat)
+	look_hat.visible = look_hat.texture != null
+	sprite.material = look.material(MusicManager.look, MusicManager.equipped_skin)
 	shadow.visible = MusicManager.equipped_skin != "negative_skin"
+
+
+## The hat that's drawn in code (FroggyLook.HATS), sized and placed as his others are.
+func _look_hat() -> Sprite2D:
+	var h := get_node_or_null("LookHat") as Sprite2D
+	if h == null:
+		h = Sprite2D.new()
+		h.name = "LookHat"
+		var like := get_node_or_null("FroggyWizHat") as Sprite2D
+		h.scale = like.scale if like else sprite.scale
+		h.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(h)  # (after his body: worn in front of his head; his other hats are behind it)
+	return h
 
 func _physics_process(delta):
 	var was_on_floor := is_on_floor()

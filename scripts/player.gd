@@ -68,6 +68,8 @@ var _title_laid_out_for := Vector2.ZERO  # (the screen size the title was last l
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
 var highScore
 var currentHeight
+var _fall_top := 0.0  # (the highest he's been since he last stood: a fall's how far below that he lands)
+const GHOST_FALL := 150.0  # (a fall this big, in currentHeight: the Ghost skin)
 
 func _trace(label: String) -> void:
 	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
@@ -235,6 +237,9 @@ func _physics_process(delta):
 				# THIS HAPPENS ONCE WHEN GAME ENDS
 				finalTime = str(int(minutes))+ ":"+str("%02d" % seconds)
 				finalTimeBool =1
+				MusicManager.unlock("shadow")  # (he's beaten it: the frog god's own shadow is his to wear)
+				if int(hours) == 0:
+					MusicManager.unlock("halo")  # (and in under an hour: the Halo)
 
 				$"../frogNPC1".position = Vector2(3038, -1236)
 				$"../frogNPC1/Jonathan-dodd-hut-wo-details".visible = false
@@ -259,6 +264,9 @@ func _physics_process(delta):
 		
 	# Add the gravity.
 	if not is_on_floor():
+		if not was_airborne:
+			_fall_top = currentHeight
+		_fall_top = maxf(_fall_top, currentHeight)  # (the highest he's been this time in the air)
 		was_airborne = true
 		velocity.y += gravity * delta
 		$Sprite2D.play("airborne")
@@ -273,6 +281,8 @@ func _physics_process(delta):
 	if is_on_floor():
 		if was_airborne:
 			was_airborne = false
+			if _fall_top - currentHeight >= GHOST_FALL:
+				MusicManager.unlock("ghost")  # (a really big fall: the Ghost skin)
 			save_game()
 		$Sprite2D.rotation = lerp_angle($Sprite2D.rotation, get_floor_normal().angle() + PI / 2, 25.0 * delta)
 		$Shadow.rotation = $Sprite2D.rotation
@@ -469,6 +479,9 @@ func _on_blockedpath_body_shape_entered(body_rid, body, body_shape_index, local_
 
 
 func _on_button_pressed():
+	if not MusicManager.look_made:
+		_meet_the_frog_god()  # (his first climb: what does he look like? then he wakes, and climbs)
+		return
 	$Trajectory.endGame = 0
 	$".".visible = true
 	$titlescreen. visible = false
@@ -481,6 +494,20 @@ func _on_button_pressed():
 		$"../World Sprites/tutorial3".visible = true
 		$"../World Sprites/tutorial4".visible = true
 	
+
+
+## Before his first climb, the frog god asks what he looks like (CreatorIntro): he wakes as that froggy
+## and the climb starts (the title's already gone).
+func _meet_the_frog_god() -> void:
+	if get_node_or_null("CreatorIntro"):
+		return
+	$titlescreen.visible = false
+	var intro: CanvasLayer = load("res://scenes/CreatorIntro.gd").new()
+	add_child(intro)
+	intro.done.connect(func() -> void:
+		_apply_equipped_cosmetics()
+		_refresh_title_menu()
+		_on_button_pressed())
 
 
 func _on_thanksforplaying_timer_timeout():
@@ -739,6 +766,13 @@ func _place_hats() -> void:
 		if hat.visible:
 			hat.rotation = body.rotation
 			hat.position = Vector2(0, hat_y).rotated(body.rotation)
+	# (a hat drawn in code is worn in front of his head: it sits at his feet, so the y-sort draws it
+	# after him, and its offset puts it up on his head, turning with him)
+	var look_hat := _look_hat()
+	if look_hat.visible:
+		look_hat.rotation = body.rotation
+		look_hat.position = Vector2.ZERO
+		look_hat.offset = _look_hat_offset + Vector2(0, hat_y / look_hat.scale.y)
 
 
 func _apply_equipped_cosmetics() -> void:
@@ -756,25 +790,33 @@ func _apply_equipped_cosmetics() -> void:
 	$FroggyWizHat.visible = (hat == "wizhat")
 	$FroggyCakeHat.visible = (hat == "cakehat")
 
+	# (the hats drawn in code, on his own grid: FroggyLook.HATS)
+	var look_hat := _look_hat()
+	look_hat.texture = load("res://scripts/FroggyLook.gd").hat_texture(hat)
+	_look_hat_offset = load("res://scripts/FroggyLook.gd").hat_offset(hat)
+	look_hat.visible = look_hat.texture != null
+
+	# (your froggy, as you made him, with your skin's effect over him: FroggyLook)
 	var skin := MusicManager.equipped_skin
-	match skin:
-		"golden_skin":
-			var mat := ShaderMaterial.new()
-			mat.shader = load("res://assets/skin_tint.gdshader")
-			mat.set_shader_parameter("tint_color", Color(1.0, 0.75, 0.0))
-			mat.set_shader_parameter("tint_strength", 0.55)
-			$Sprite2D.material = mat
-		"grayscale_skin":
-			var mat := ShaderMaterial.new()
-			mat.shader = load("res://assets/grayscale.gdshader")
-			$Sprite2D.material = mat
-		"negative_skin":
-			var mat := ShaderMaterial.new()
-			mat.shader = load("res://assets/negative.gdshader")
-			$Sprite2D.material = mat
-		_:
-			$Sprite2D.material = null
+	$Sprite2D.material = load("res://scripts/FroggyLook.gd").material(MusicManager.look, skin)
 	$Shadow.visible = (skin != "negative_skin")
+	_place_hats()
+
+
+var _look_hat_offset := Vector2.ZERO  # (where his drawn hat goes on his head: FroggyLook.hat_offset)
+
+
+## The hat that's drawn in code (FroggyLook.HATS), sized and placed as his others are.
+func _look_hat() -> Sprite2D:
+	var h := get_node_or_null("LookHat") as Sprite2D
+	if h == null:
+		h = Sprite2D.new()
+		h.name = "LookHat"
+		h.scale = $FroggyWizHat.scale  # (his own pixel's size)
+		h.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		h.position = $FroggyWizHat.position
+		add_child(h)
+	return h
 
 
 func _on_wardrobe_button_pressed() -> void:

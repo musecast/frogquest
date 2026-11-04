@@ -160,7 +160,8 @@ func _starts() -> void:
 	_box.add_child(_button("Climb Endless", func() -> void: Party.start("endless")))
 
 
-## You, as your friends see you: your name over your frog, your colour, name tags and tethers.
+## You, as your friends see you: your name over your frog (your froggy's your look: FroggyLook), name
+## tags and tethers.
 func _look() -> void:
 	_header("You")
 	if MuseSocial.is_member():
@@ -170,29 +171,7 @@ func _look() -> void:
 		_input.text = Party.my_name if _typed == "" else _typed
 		_input.text_changed.connect(func(text: String) -> void: Party.set_my_name(text))
 		_box.add_child(_input)
-	var swatches := GridContainer.new()
-	swatches.columns = 4
-	swatches.add_theme_constant_override("h_separation", 6)
-	swatches.add_theme_constant_override("v_separation", 6)
-	swatches.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	for i in Party.COLORS.size():
-		var swatch := Button.new()
-		swatch.custom_minimum_size = Vector2(BTN_HEIGHT * 1.5, BTN_HEIGHT)
-		swatch.focus_mode = Control.FOCUS_NONE
-		swatch.tooltip_text = "His own green" if i == 0 else ""
-		var fill: Color = Party.COLORS[i] if Party.COLORS[i].a > 0.0 else Color(0.55, 0.85, 0.45)
-		for state in ["normal", "hover", "pressed", "focus"]:
-			var box := StyleBoxFlat.new()
-			box.bg_color = fill
-			box.set_corner_radius_all(3)
-			box.set_border_width_all(3 if i == Party.color else 1)
-			box.border_color = Color.WHITE if i == Party.color else Color(0.2, 0.17, 0.19)
-			swatch.add_theme_stylebox_override(state, box)
-		swatch.pressed.connect(func() -> void:
-			Party.set_color(i)
-			_show())
-		swatches.add_child(swatch)
-	_box.add_child(swatches)
+	_box.add_child(_label("You climb as your froggy. Change your look in the Wardrobe.", BODY_FONT_SZ, DIM))
 	_box.add_child(_button("Name Tags: %s" % ("On" if Party.name_tags else "Off"), func() -> void:
 		Party.set_name_tags(not Party.name_tags)
 		_show(), "go" if Party.name_tags else "quiet"))

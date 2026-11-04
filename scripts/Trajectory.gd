@@ -157,12 +157,12 @@ func _process(delta):
 			queue_redraw()
 
 
-## The aim line: along the jump he'll make, longer and whiter the stronger it is.
+## The aim line: little dots along the jump he'll make, further and golder the stronger it is (AimLine).
 func _draw():
 	if Input.is_action_pressed("ui_mouse") and mouseOrigin != Vector2(0, 0) and can_jump():
 		var launch := shown_velocity(mousePath)
 		var power := clampf(launch.length() / Vector2(800, 450).length(), 0.0, 1.0)
-		draw_line(Vector2(0,0), launch / 10.8, Color(255, 1.2 - power, 1.2 - power, 1), 2.0)
+		load("res://scripts/AimLine.gd").draw(self, launch / 10.8, power)
 
 
 func _on_cursor_lock_button_pressed():

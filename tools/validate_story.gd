@@ -27,8 +27,10 @@ func _run() -> void:
 	var mm := root.get_node("MusicManager")
 	var real_wardrobe: String = mm.wardrobe_path
 	var real_beaten: bool = mm.game_beaten
+	var real_made: bool = mm.look_made
 	mm.wardrobe_path = WARDROBE
 	mm.game_beaten = false
+	mm.look_made = true  # (he's made his froggy already: Play starts the climb, no intro)
 	_view = SubViewport.new()
 	_view.size = Vector2i(PORTRAIT)
 	root.add_child(_view)
@@ -171,6 +173,7 @@ func _run() -> void:
 	_expect(not main._tv_done and not main._tv_bubble.visible, "the TV keeps quiet once he's won")
 	mm.wardrobe_path = real_wardrobe
 	mm.game_beaten = real_beaten
+	mm.look_made = real_made
 	main.queue_free()
 	_finish()
 

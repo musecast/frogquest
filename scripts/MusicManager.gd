@@ -12,6 +12,9 @@ var equipped_skin: String = ""
 var unlocked_skins: Array = []
 var seen_cosmetics: Array = []
 var flies_caught: Array = []  # the hidden flies you've caught (FlyHunt.gd): ids like "fly_3"
+var look: Dictionary = {}  # your froggy, as you made him (FroggyLook: colours, pattern, eyes, band)
+var look_made := false  # (you've made him: the intro, CreatorIntro, doesn't come again)
+var mushroom_bounces := 0  # (bounces off the World Tree's mushrooms: the Mushroom hat at 25)
 
 const WARDROBE_PATH := "user://wardrobe.save"
 var wardrobe_path := WARDROBE_PATH  # (the tests point this somewhere else, so they never touch your save)
@@ -50,6 +53,9 @@ func save_wardrobe() -> void:
 		"desktop_frog_unlocked": desktop_frog_unlocked,
 		"ads_removed": ads_removed,
 		"has_launched_before": has_launched_before,
+		"look": look,
+		"look_made": look_made,
+		"mushroom_bounces": mushroom_bounces,
 	})
 	f.close()
 	_trace("MusicManager save_wardrobe end")
@@ -63,6 +69,8 @@ func load_wardrobe() -> void:
 		unlocked_skins = []
 		seen_cosmetics = []
 		flies_caught   = []
+		look = {}
+		look_made = false
 		_trace("MusicManager load_wardrobe end missing file")
 		return
 	var f = FileAccess.open(wardrobe_path, FileAccess.READ)
@@ -81,7 +89,22 @@ func load_wardrobe() -> void:
 	desktop_frog_unlocked = d.get("desktop_frog_unlocked", false)
 	ads_removed         = d.get("ads_removed",          false)
 	has_launched_before = d.get("has_launched_before",  false)
+	look                = d.get("look",                 {}) if d.get("look") is Dictionary else {}
+	look_made           = bool(d.get("look_made",       false))
+	mushroom_bounces    = int(d.get("mushroom_bounces", 0))
 	_trace("MusicManager load_wardrobe end")
+
+## Something you've earned (FroggyLook.UNLOCKS): yours from now on, kept, and "New Hat Unlocked!" (or
+## Skin) to say so. Again, it does nothing. True the first time.
+func unlock(id: String) -> bool:
+	if id in unlocked_skins:
+		return false
+	unlocked_skins.append(id)
+	save_wardrobe()
+	var kind: String = load("res://scripts/FroggyLook.gd").UNLOCKS.get(id, ["skin"])[0]
+	show_unlock_notification(kind, id)
+	return true
+
 
 ## "New Hat Unlocked!", with the hat (or the frog wearing the skin) when item_id says which.
 func show_unlock_notification(item_type: String, item_id := "") -> void:

@@ -3,7 +3,7 @@ extends Node2D
 ## said it was (Party.frog_moved), eased between its updates. Only looks: it doesn't stand on anything,
 ## and nothing stands on it. Its name tag is drawn by EndlessMode, on the screen, at the pixel font's size.
 
-const HATS := ["Froggycrown", "FroggyWizHat", "FroggyCakeHat"]
+const HATS := ["Froggycrown", "FroggyWizHat", "FroggyCakeHat", "LookHat"]  # (LookHat: the ones drawn in code)
 
 var peer := 0
 var score := 0
@@ -29,19 +29,22 @@ func setup(template: Node2D, who: int, info: Dictionary) -> void:
 	var source := template.get_node("Sprite2D") as AnimatedSprite2D
 	_sprite = source.duplicate(0) as AnimatedSprite2D
 	_sprite.material = null
-	add_child(_sprite)
-	for hat_name in HATS:
+	for hat_name in HATS:  # (the art hats behind him, as on your own frog; the drawn one, in front)
 		var hat := template.get_node_or_null(hat_name) as Sprite2D
 		if hat:
 			var copy := hat.duplicate(0) as Sprite2D
 			copy.material = null
 			copy.visible = false
+			copy.position = Vector2(0, -9.1667)
 			add_child(copy)
 			_hats[hat_name] = copy
+	add_child(_sprite)
+	if _hats.has("LookHat"):
+		move_child(_hats.LookHat, -1)
 	dress(info)
 
 
-## Their hat, skin and colour (the same way endlessplayer.gd dresses his own frog).
+## Their hat and skin, and their froggy as they made him (FroggyLook: no party colour over him now).
 func dress(info: Dictionary) -> void:
 	var hat := str(info.get("hat", ""))
 	_skin = str(info.get("skin", ""))
@@ -54,16 +57,12 @@ func dress(info: Dictionary) -> void:
 		_hats.FroggyWizHat.visible = hat == "wizhat"
 	if _hats.has("FroggyCakeHat"):
 		_hats.FroggyCakeHat.visible = hat == "cakehat"
-	match _skin:
-		"golden_skin":
-			_sprite.material = _tint(Color(1.0, 0.75, 0.0), 0.55)
-		"grayscale_skin":
-			_sprite.material = _shader("res://assets/grayscale.gdshader")
-		"negative_skin":
-			_sprite.material = _shader("res://assets/negative.gdshader")
-		_:
-			var c: Color = Party.COLORS[clampi(int(info.get("color", 0)), 0, Party.COLORS.size() - 1)]
-			_sprite.material = _tint(c, 0.45) if c.a > 0.0 else null
+	var look: GDScript = load("res://scripts/FroggyLook.gd")
+	if _hats.has("LookHat"):
+		_hats.LookHat.texture = look.hat_texture(hat)
+		_hats.LookHat.offset = look.hat_offset(hat)
+		_hats.LookHat.visible = _hats.LookHat.texture != null
+	_sprite.material = look.material(info.get("look"), _skin)
 
 
 ## Where their phone says their frog is, and how it looks: [x, y, animation, frame, flip, turn, score,

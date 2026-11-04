@@ -12,9 +12,9 @@ const ITEMS: Dictionary = {
 					  "tint": Color(0.0, 0.0, 0.0), "strength": 1.0,
 					  "how": "Score 100 in Endless"},
 	"wizhat":         {"label": "Wiz Hat",       "type": "hat", "icon": "res://assets/froggywizhat.png",
-					  "how": "Find it in the world"},
+					  "how": "Find the wizard frog in the World Tree"},
 	"cakehat":        {"label": "Cake Hat",      "type": "hat", "icon": "res://assets/froggycakehat.png",
-					  "how": "Find it in the world"},
+					  "how": "Find the cake in the World Tree"},
 	"golden_skin":    {"label": "Golden Frog",   "type": "skin", "icon": "res://assets/frog.png",
 					  "tint": Color(1.0, 0.75, 0.0), "strength": 0.55,
 					  "how": "Catch every fly hiding in the World Tree"},
@@ -24,6 +24,25 @@ const ITEMS: Dictionary = {
 	"negative_skin":  {"label": "Negative",      "type": "skin", "icon": "res://assets/frog.png",
 					  "shader": "res://assets/negative.gdshader",
 					  "how": "Score 50 in Endless"},
+	# (the hats drawn in code, FroggyLook.HATS: the starters are yours from the start, the intro's)
+	"bow":            {"label": "Bow",           "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
+	"beanie":         {"label": "Beanie",        "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
+	"leaf":           {"label": "Leaf",          "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
+	"flower":         {"label": "Flower",        "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
+	"cap":            {"label": "Cap",           "type": "hat", "pixel": true, "starter": true, "how": "Yours from the start"},
+	"tophat":         {"label": "Top Hat",       "type": "hat", "pixel": true, "how": "Score 150 in Endless"},
+	"partyhat":       {"label": "Party Hat",     "type": "hat", "pixel": true, "how": "Climb with a friend (Play Together)"},
+	"halo":           {"label": "Halo",          "type": "hat", "pixel": true, "how": "Beat Frog Quest in under an hour"},
+	"lilypad":        {"label": "Lily Pad",      "type": "hat", "pixel": true, "how": "Catch 5 of the flies hiding in the World Tree"},
+	"mushroom":       {"label": "Mushroom",      "type": "hat", "pixel": true, "how": "Bounce off 25 mushrooms in the World Tree"},
+	# (the skins: effects over your froggy, FroggyLook.EFFECTS)
+	"shiny":          {"label": "Shiny",         "type": "skin", "how": "Score 75 in Endless"},
+	"rainbow":        {"label": "Rainbow",       "type": "skin", "how": "Score 200 in Endless"},
+	"glow":           {"label": "Glow",          "type": "skin", "how": "Get pulled up by a friend's band"},
+	"ghost":          {"label": "Ghost",         "type": "skin", "how": "Take a really big fall in the World Tree"},
+	"starry":         {"label": "Starry",        "type": "skin", "how": "Climb all the way to space in Endless"},
+	"holo":           {"label": "Holo",          "type": "skin", "how": "Climb with 3 friends at once"},
+	"shadow":         {"label": "God's Shadow", "type": "skin", "how": "Beat Frog Quest"},
 	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop", "icon": "res://assets/frog.png",
 					  "how": "He lives on your desktop. Right-click him or his tray icon for more."},
 }
@@ -152,6 +171,14 @@ func _build_ui() -> void:
 	ui.style_label(title, font_size_title, ui.GOLD)
 	title_row.add_child(title)
 	outer.add_child(title_row)
+	var look_btn := Button.new()  # (back to the frog god, to choose again: CreatorIntro)
+	look_btn.name = "ChangeLookButton"
+	look_btn.text = "CHANGE YOUR LOOK"
+	look_btn.focus_mode = Control.FOCUS_NONE
+	look_btn.custom_minimum_size = Vector2(0, btn_min.y)
+	ui.style_button(look_btn, font_size_body, "wood")
+	look_btn.pressed.connect(_change_look)
+	outer.add_child(look_btn)
 
 	# ScrollContainer holds all the items and expands to fill available space
 	# (what a row gets across: the panel less its padding, the scroll bar and a row's own lit box)
@@ -192,6 +219,14 @@ func _build_ui() -> void:
 			none_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			ui.style_label(none_lbl, font_size_body, ui.CREAM.darkened(0.3))
 			vbox.add_child(none_lbl)
+	var locked := []
+	for id in ITEMS:
+		if ITEMS[id]["type"] != "desktop" and not _is_unlocked(id):
+			locked.append(id)
+	if not locked.is_empty():
+		vbox.add_child(_section_header("STILL TO FIND", font_size_body))
+		for id in locked:
+			vbox.add_child(_locked_row(id, font_size_body, icon_size))
 	ui.finger_scroll(scroll)  # (the rows and their buttons kept every touch: only the bar scrolled it)
 
 	# ── HINT (shown when an info button is pressed) ──────────────────────
@@ -326,13 +361,19 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 static func item_icon(id: String, size: float) -> TextureRect:
 	var def: Dictionary = ITEMS.get(id, {})
 	var icon := TextureRect.new()
-	icon.texture = _trimmed(load(def.get("icon", "res://assets/frog.png")))
+	var look: GDScript = load("res://scripts/FroggyLook.gd")
+	if def.get("pixel", false):
+		icon.texture = look.hat_texture(id)  # (drawn in code, on his grid)
+	else:
+		icon.texture = _trimmed(load(def.get("icon", "res://assets/frog.png")))
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icon.custom_minimum_size = Vector2(size, size)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if def.has("shader"):
+	if def.get("type") == "skin":
+		icon.material = look.material(MusicManager.look, id)  # (your froggy, wearing it)
+	elif def.has("shader"):
 		var mat := ShaderMaterial.new()
 		mat.shader = load(def["shader"])
 		icon.material = mat
@@ -390,7 +431,56 @@ func _on_info_pressed(id: String) -> void:
 		_hint_box.visible = true
 
 
+## Something still to find: its picture in shadow, its name, and how to find it.
+func _locked_row(id: String, font_size: int, icon_size: float) -> Control:
+	var ui: GDScript = load("res://scripts/UIStyle.gd")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var icon := item_icon(id, icon_size)
+	icon.modulate = Color(0.0, 0.0, 0.0, 0.55)
+	row.add_child(icon)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 0)
+	var name_label := Label.new()
+	name_label.text = ITEMS[id]["label"]
+	ui.style_label(name_label, font_size, ui.CREAM.darkened(0.25))
+	words.add_child(name_label)
+	var how := Label.new()
+	how.text = ITEMS[id].get("how", "")
+	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ui.style_label(how, 16, ui.CREAM.darkened(0.45))
+	words.add_child(how)
+	row.add_child(words)
+	return row
+
+
+## Back to the frog god, to choose your look again (CreatorIntro, just the choosing); then this again,
+## with it.
+func _change_look() -> void:
+	var intro: CanvasLayer = load("res://scenes/CreatorIntro.gd").new()
+	intro.from_wardrobe = true
+	get_tree().root.add_child(intro)
+	intro.done.connect(func() -> void:
+		cosmetic_changed.emit()
+		_rebuild())
+
+
+func _rebuild() -> void:
+	if not is_inside_tree():
+		return
+	for child in get_children():
+		child.queue_free()
+	_item_buttons.clear()
+	_item_rows.clear()
+	_hint_label = null
+	_hint_box = null
+	_build_ui()
+
+
 func _is_unlocked(id: String) -> bool:
+	if ITEMS.get(id, {}).get("starter", false):
+		return true  # (the hats you start with)
 	if id == "froggycrown":
 		return MusicManager.froggyCrown != 0
 	if id == "lil_froggy":

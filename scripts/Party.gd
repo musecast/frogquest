@@ -130,7 +130,8 @@ func display_name() -> String:
 
 
 func my_info() -> Dictionary:
-	return {"name": display_name(), "hat": str(MusicManager.equipped_hat), "skin": str(MusicManager.equipped_skin), "color": color}
+	return {"name": display_name(), "hat": str(MusicManager.equipped_hat), "skin": str(MusicManager.equipped_skin), "color": color,
+		"look": load("res://scripts/FroggyLook.gd").clean(MusicManager.look)}  # (your froggy as you made him, band and all)
 
 
 ## Starts a party here. "" when it's up (code() is what the others type), else what went wrong.
@@ -640,7 +641,8 @@ func _end(why: String) -> void:
 static func _clean(info) -> Dictionary:
 	var d: Dictionary = info if info is Dictionary else {}
 	return {"name": str(d.get("name", "Froggy")).substr(0, 21), "hat": str(d.get("hat", "")),
-		"skin": str(d.get("skin", "")), "color": clampi(int(d.get("color", 0)), 0, COLORS.size() - 1)}
+		"skin": str(d.get("skin", "")), "color": clampi(int(d.get("color", 0)), 0, COLORS.size() - 1),
+		"look": load("res://scripts/FroggyLook.gd").clean(d.get("look"))}
 
 
 func _load() -> void:

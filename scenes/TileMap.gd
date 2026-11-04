@@ -11,6 +11,7 @@ const PAD_SOURCE := 3
 
 @onready var player = $"../Player"
 var jump_velocity = -800
+var _last_bounce_ms := 0
 
 
 func _process(_delta):
@@ -18,6 +19,18 @@ func _process(_delta):
 	if pad != 0.0 and player.velocity.x != 0:  # (moving sideways: landing on it, or jumping off it)
 		$"../Environmental Audio/jumpPad".play()
 		player.velocity.y = pad
+		if pad == float(jump_velocity) and Time.get_ticks_msec() - _last_bounce_ms > 400:  # (a mushroom, not the bed: one bounce)
+			_counted_bounce()
+		_last_bounce_ms = Time.get_ticks_msec()
+
+
+## Another bounce off a mushroom: 25 and the Mushroom hat's yours.
+func _counted_bounce() -> void:
+	MusicManager.mushroom_bounces += 1
+	if MusicManager.mushroom_bounces >= 25:
+		MusicManager.unlock("mushroom")
+	if MusicManager.mushroom_bounces <= 25:
+		MusicManager.save_wardrobe()
 
 
 ## The throw a mushroom gives him standing at at (his position): jump_velocity on a mushroom, half on the

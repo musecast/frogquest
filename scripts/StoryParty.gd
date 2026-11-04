@@ -44,6 +44,7 @@ var _layer: CanvasLayer  # names over the frogs (a tap opens a card, online), th
 var _bands: Node2D
 var _tether_peer := 0
 var _reel := {}
+var _ropes := {}  # "a-b" -> TetherRope: each band showing, hanging against the world
 var _last_floor_y := 0.0
 var _tried := false  # (asked to climb with everyone, this climb)
 var _asking := false  # (and waiting to hear back)
@@ -105,15 +106,23 @@ func _process(delta: float) -> void:
 		MuseSocial.set_activity("story")
 		_climb_with_everyone()
 	if not _in_party():
-		if not _frogs.is_empty():
-			_clear()
+		if not _frogs.is_empty() or not _ropes.is_empty() or _any_tags():
+			_clear()  # (out of the party: their frogs, names and bands go, his own name too)
 		return
 	_with_everyone = Party.everyone
 	_send(delta)
 	_join_beside()
 	_tether(delta)
+	_step_ropes(delta)
 	_place_tags()
 	_bands.queue_redraw()
+
+
+func _any_tags() -> bool:
+	for tag in _layer.get_children():
+		if tag.has_meta("peer") and not tag.is_queued_for_deletion():
+			return true
+	return false
 
 
 func _in_party() -> bool:
@@ -202,6 +211,9 @@ func _on_frog_moved(peer: int, state: Array) -> void:
 		frog.z_index = player.z_index
 		_frogs[peer] = frog
 		_tell_about_names()
+		MusicManager.unlock("partyhat")  # (climbing with someone: the Party Hat)
+		if Party.players.size() >= 4:
+			MusicManager.unlock("holo")  # (with 3 others at once: the Holo skin)
 	frog.show_state(state)
 	frog.visible = frog.where != WON and frog.where != AWAY
 
@@ -237,6 +249,7 @@ func _clear() -> void:
 	for tag in _layer.get_children():
 		if tag.has_meta("peer"):
 			tag.queue_free()
+	_ropes.clear()
 	_bands.queue_redraw()
 
 
@@ -355,15 +368,22 @@ func _reaches(friend: Node2D) -> bool:
 	return friend.where == CLIMBING or (friend.where == IN_FINALE and _finale_open())
 
 
-## Pulled up by the band, to where the friend's standing (or the nearest spot there he fits).
+## Pulled up by the band, to where the friend's standing (or the nearest spot there he fits), along
+## the band itself: over the ledge it lies across, not through it.
 func _start_reel(friend: Node2D) -> bool:
 	var to := _free_spot_near(friend.spot() + Vector2(0.0, -2.0))
 	if to == Vector2.INF:
 		return false
-	_reel = {"from": player.global_position, "to": to, "t": 0.0}
+	var rope = _ropes.get(_rope_key(Party.me(), friend.peer))
+	var path: PackedVector2Array = rope.path_to(to) if rope != null and rope.mine else PackedVector2Array()
+	if path.size() < 2:
+		path = PackedVector2Array([player.global_position, to])
+	path[0] = player.global_position
+	_reel = {"path": path, "to": to, "t": 0.0}
 	player.set_physics_process(false)
 	player.velocity = Vector2.ZERO
 	_float_words(to + Vector2(0, -40), "%s pulled you up!" % Party.name_of(friend.peer), GOLD)
+	MusicManager.unlock("glow")  # (pulled up by a friend's band: the Glow skin)
 	var s := AudioStreamPlayer.new()
 	s.stream = load("res://assets/coolfind.mp3")
 	s.pitch_scale = 1.2
@@ -374,58 +394,71 @@ func _start_reel(friend: Node2D) -> bool:
 	return true
 
 
-## Up the band, quickly at first and gently at the end, in a little arc, then down onto the ledge.
+## Up the band, quickly at first and gently at the end, along it, then down onto the ledge.
 func _reel_in(delta: float) -> void:
 	_reel.t = minf(1.0, float(_reel.t) + delta / TETHER_REEL)
 	var k := 1.0 - pow(1.0 - float(_reel.t), 3.0)
-	var from: Vector2 = _reel.from
 	var to: Vector2 = _reel.to
-	player.global_position = from.lerp(to, k) + Vector2(0.0, -sin(k * PI) * 24.0)
+	player.global_position = load("res://scripts/TetherRope.gd").along(_reel.path, k) + Vector2(0.0, -sin(k * PI) * 6.0)
 	player.reset_physics_interpolation()
 	if _reel.t >= 1.0:
 		_reel = {}
+		player.global_position = to
+		player.reset_physics_interpolation()
 		player.velocity = Vector2.ZERO
 		player.set_physics_process(true)
 		_last_floor_y = to.y
 
 
-## Every band up the tree you can see: yours to your friend, and each friend's to theirs. Slack, it
-## sags, thick and pink; stretched, it pulls straight and thin (as Endless's).
+## Every band up the tree you can see, as a rope hanging against the world (TetherRope): yours to your
+## friend, in your band's colour, and each friend's to theirs, in theirs. A frame of each, then drawn.
+func _step_ropes(delta: float) -> void:
+	var want := {}  # key -> [from node, to node, owner peer]
+	var mine := Party.me()
+	if Party.tethers and _climbing():
+		if _ties_to(_tether_peer):
+			want[_rope_key(mine, _tether_peer)] = [player, _frogs[_tether_peer], mine]
+		for peer in _frogs:
+			var frog = _frogs[peer]
+			var to := int(frog.tether_to)
+			if to == 0 or not frog.visible:
+				continue
+			var other = player if to == mine else _frogs.get(to)
+			var key := _rope_key(to, peer)
+			if other == null or not other.visible or want.has(key):
+				continue
+			want[key] = [frog, other, peer]
+	for key in _ropes.keys():
+		if not want.has(key):
+			_ropes.erase(key)
+	var space := player.get_world_2d().direct_space_state
+	var look: GDScript = load("res://scripts/FroggyLook.gd")
+	for key in want:
+		var a: Vector2 = want[key][0].global_position + Vector2(0.0, -8.0)
+		var b: Vector2 = want[key][1].global_position + Vector2(0.0, -8.0)
+		if a.distance_to(b) > TETHER_DRAWN:
+			_ropes.erase(key)
+			continue
+		var rope = _ropes.get(key)
+		if rope == null:
+			rope = load("res://scripts/TetherRope.gd").new()
+			_ropes[key] = rope
+		var owner: int = want[key][2]
+		rope.mine = owner == mine
+		rope.colour = look.band_colour(MusicManager.look if owner == mine else Party.players.get(owner, {}).get("look"))
+		# (his own, while it's reeling him in, slides straight in: it's pulling him along it)
+		rope.step(a, b, TETHER_SLACK, delta, null if (rope.mine and not _reel.is_empty()) else space, player.collision_mask)
+
+
+func _rope_key(a: int, b: int) -> String:
+	return "%d-%d" % [mini(a, b), maxi(a, b)]
+
+
 func _draw_bands() -> void:
 	if not _in_party() or not Party.tethers or not _climbing():
 		return
-	var seen := {}
-	var mine := Party.me()
-	if _ties_to(_tether_peer):
-		_band(player.global_position, _frogs[_tether_peer].position)
-		seen["%d-%d" % [mini(mine, _tether_peer), maxi(mine, _tether_peer)]] = true
-	for peer in _frogs:
-		var frog = _frogs[peer]
-		var to := int(frog.tether_to)
-		if to == 0 or not frog.visible:
-			continue
-		var other = player if to == mine else _frogs.get(to)
-		var key := "%d-%d" % [mini(to, peer), maxi(to, peer)]
-		if other == null or not other.visible or seen.has(key):
-			continue
-		seen[key] = true
-		_band(frog.position, other.global_position)
-
-
-func _band(a: Vector2, b: Vector2) -> void:
-	a += Vector2(0.0, -8.0)
-	b += Vector2(0.0, -8.0)
-	var d := a.distance_to(b)
-	if d > TETHER_DRAWN or d < 4.0:
-		return
-	var taut := clampf((d - TETHER_SLACK * 0.5) / (TETHER_SLACK * 0.5), 0.0, 1.0)
-	# (it sags no lower than their feet: on the tree's solid ground, lower is behind the ground)
-	var mid := (a + b) * 0.5 + Vector2(0.0, minf(maxf(0.0, TETHER_SLACK - d) * 0.5, 16.0))
-	var points := PackedVector2Array()
-	for i in 13:
-		var t := i / 12.0
-		points.append(a.lerp(mid, t).lerp(mid.lerp(b, t), t))
-	_bands.draw_polyline(points, Color(1.0, 0.5, 0.7).lerp(Color(1.0, 0.82, 0.9), taut), lerpf(3.0, 1.5, taut))
+	for rope in _ropes.values():
+		rope.draw(_bands)
 
 
 # ── names ───────────────────────────────────────────────────────────────────────────────────────
