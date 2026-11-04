@@ -1,17 +1,18 @@
 extends SceneTree
 ## Your froggy (FroggyLook) and the frog god's intro (CreatorIntro), in the real level: a new player's
 ## game starts with it, no title, out of the dark with a low hum (the TV's static quiet), the frog god's
-## shadow speaking; tapping goes through its words to "what do you look like?" (in even lines), his skin,
-## then his eyes, then his belly, each from a palette of 40 (a tap or a slide, gliding onto him; NEXT and
-## BACK); "Is this you?" No goes back, Yes keeps it (in the wardrobe's save: no hat, no pattern, they're
-## earned by playing); it cuts to black, the hum cut off, the climb begins behind it, and he
-## fades in in his bedroom as that froggy, the TV's static up and the TV talking; he's lil froggy, and
-## his look goes to his party. A hat he's found is worn in front of his head. Next time START's straight
-## to the climb; not made yet, ENDLESS and PLAY TOGETHER bring the frog god first too (then Play
-## Together's menu); the wardrobe's CHANGE YOUR LOOK is just the choosing (his pattern's colour too, and
-## his band's), and the climb goes on. Then the unlocks (once each; the Mushroom hat at 25 bounces; a
-## big fall; nothing for just climbing; the key's Spots, the first frog's Leaf), a friend's frog in their
-## look, and the wardrobe's PATTERNS and STILL TO FIND. Scratch saves only.
+## shadow speaking, slowly, in a low voice; tapping goes through its words to "what do you look like?"
+## (in even lines), his skin, then his eyes, then his belly, each from a palette of 40 (a tap or a slide,
+## gliding onto him; NEXT and BACK); "Is this you?" No goes back, Yes keeps it (in the wardrobe's save:
+## no hat, no pattern, they're earned by playing; his band a random colour of its own); it cuts to black,
+## the hum cut off, the climb begins behind it, and he fades in in his bedroom as that froggy, the TV's
+## static up and the TV talking; he's lil froggy, and his look goes to his party. A hat he's found is worn
+## in front of his head. Next time START's straight to the climb; not made yet, ENDLESS and PLAY TOGETHER
+## bring the frog god first too (then Play Together's menu, where his band's colour is changed); the
+## wardrobe's CHANGE YOUR LOOK is just the choosing (his pattern's colour too, not his band's), and the
+## climb goes on. Then the unlocks (once each; the Mushroom hat at 25 bounces; a big fall; nothing for
+## just climbing; the key's Spots, the first frog's Leaf), a friend's frog in their look, and the
+## wardrobe's PATTERNS and STILL TO FIND. Scratch saves only.
 ##   Godot --headless --path . --script res://tools/validate_creator.gd
 
 const SCRATCH_SAVE := "user://test_creator_save.save"
@@ -57,6 +58,8 @@ func _run() -> void:
 	_expect(tv.volume_db < -70.0, "the TV's static quiet while it's there")
 	await _until(func() -> bool: return intro._words.text != "", 4.0)
 	_expect(intro._words.text == "...LITTLE ONE..." and intro._shadow > 0.9 and intro._black.color.a < 0.5, "he's the frog god's shadow, and it speaks")
+	_expect(intro.TYPE_SPEED <= 15.0 and intro.VOICE_PITCH.y < 0.5 and intro.VOICE_PITCH.x < intro.VOICE_PITCH.y,
+		"slowly, in a low voice (%.0f letters a second, pitch %.2f to %.2f)" % [intro.TYPE_SPEED, intro.VOICE_PITCH.x, intro.VOICE_PITCH.y])
 	await _wait(1.0)
 	_expect(not main._tv_done, "and the TV keeps its words till he's woken in his bedroom")
 	for _i in 12:
@@ -108,6 +111,13 @@ func _run() -> void:
 	await _frames(1)
 	_expect(mm.look_made and str(mm.look.body) == made.body and str(mm.look.eyes) == made.eyes and str(mm.look.belly) == made.belly
 		and mm.equipped_hat == "" and int(mm.look.pattern) == 0, "Yes keeps him as he is (hats and patterns are earned by playing)")
+	var bright: Array = look.palette("band").slice(look.ACROSS, look.ACROSS * 3)
+	var rolled: Color = look.band_colour(mm.look)
+	var bands := {}
+	for _i in 60:
+		bands[look.random_band()] = true
+	_expect(bright.any(func(c: Color) -> bool: return _near(c, rolled)) and bands.size() >= 8,
+		"and gives him a band of a colour all his own, at random (%s; %d different in 60 froggies)" % [rolled.to_html(false), bands.size()])
 	_expect(intro._black.color.a > 0.99 and not intro._root.visible and not intro._hum.playing and player.get_node("Trajectory").endGame == 0,
 		"it cuts to black, the hum cut off, and the climb's begun behind it")
 	var kept: Dictionary = mm.look.duplicate()
@@ -186,6 +196,34 @@ func _run() -> void:
 		var screen = _party_screen(player)
 		_expect(mm.look_made and screen != null, "made, Play Together's menu opens")
 		if screen:
+			# His band's colour is changed here (the frog god doesn't ask it): its palette, a tap, kept and sent.
+			var band_button: Button = screen.find_child("BandButton", true, false)
+			var band_line: Control = screen.find_child("BandLine", true, false)
+			_expect(band_button != null and band_line != null and screen.find_child("BandGrid", true, false) == null,
+				"Play Together has his band's colour (its palette shut till he opens it)")
+			if band_button:
+				band_button.pressed.emit()
+				await _frames(4)
+				var band_grid = screen.find_child("BandGrid", true, false)
+				var squares: bool = band_grid != null and band_grid.colours.size() == 40
+				if band_grid:
+					for i in band_grid.colours.size():
+						var r: Rect2 = band_grid.cell(i)
+						squares = squares and Rect2(Vector2.ZERO, band_grid.size).encloses(r) and r.size.x >= 16.0
+				_expect(squares and _near(band_grid.colours[band_grid.at], look.band_colour(mm.look)),
+					"BAND COLOUR: its palette, his band's colour framed, every square there")
+				if band_grid:
+					var pick: int = 3 if band_grid.at != 3 else 4
+					band_grid._choose_at(band_grid.cell(pick).get_center())
+					var picked: Color = band_grid.colours[pick]
+					var sent: Dictionary = root.get_node("Party").my_info()
+					_expect(_near(look.band_colour(mm.look), picked) and _near(look.band_colour(sent.look), picked),
+						"a tap: his band's that colour, and what his friends see")
+					var picked_look: Dictionary = mm.look.duplicate()
+					mm.look = {}
+					mm.load_wardrobe()
+					_expect(_near(look.band_colour(mm.look), picked), "kept in the wardrobe's save")
+					mm.look = picked_look
 			screen.closed.emit()
 			await _frames(2)
 			_expect(player.get_node("titlescreen").visible, "and closing it, the title's there")
@@ -200,8 +238,8 @@ func _run() -> void:
 	player._on_button_pressed()  # (climbing again, as before)
 	await _frames(3)
 
-	# The wardrobe's CHANGE YOUR LOOK: just the choosing (with his pattern's colour, when he's wearing one,
-	# and his band's); the climb goes on.
+	# The wardrobe's CHANGE YOUR LOOK: just the choosing (with his pattern's colour, when he's wearing one;
+	# not his band's, that's Play Together's); the climb goes on.
 	mm.unlocked_skins.append("pattern_spots")
 	var spotted: Dictionary = look.clean(mm.look)
 	spotted.pattern = 1
@@ -218,19 +256,19 @@ func _run() -> void:
 		_expect(again != null and again.from_wardrobe and again._said == "WHAT DO YOU LOOK LIKE?" and again._part.text == "SKIN"
 			and again._shadow < 0.05, "which goes straight to the choosing, no shadow")
 		if again:
-			_expect(again._steps == ["body", "eyes", "belly", "pattern_colour", "band"], "his skin, eyes and belly, his pattern's colour, his band's")
+			_expect(again._steps == ["body", "eyes", "belly", "pattern_colour"], "his skin, eyes and belly, his pattern's colour (not his band's)")
 			again._grid._choose_at(again._grid.cell(4).get_center())
 			var new_skin: Color = look.colour(again._look, "body")
-			for _i in 4:
+			var band: Color = look.band_colour(mm.look)
+			for _i in 3:
 				again._next_pressed()
 			await _frames(1)
-			_expect(again._part.text == "BAND" and again._next.text == "DONE" and again._band.visible, "his band's colour last, shown under him")
+			_expect(again._part.text == "PATTERN" and again._next.text == "DONE", "his pattern's colour last")
 			again._grid._choose_at(again._grid.cell(13).get_center())
-			var band: Color = look.colour(again._look, "band")
 			again._next_pressed()
 			await _until(func() -> bool: return not is_instance_valid(again), 3.0)
 			_expect(_near(look.colour(mm.look, "body"), new_skin) and _near(look.band_colour(mm.look), band) and int(mm.look.pattern) == 1
-				and is_instance_valid(main) and player.get_node("Trajectory").endGame == 0, "and back, his new look kept, the climb as it was")
+				and is_instance_valid(main) and player.get_node("Trajectory").endGame == 0, "and back, his new look kept (his band as it was), the climb as it was")
 	ws.queue_free()
 	mm.unlocked_skins.erase("pattern_spots")
 	spotted = look.clean(mm.look)

@@ -2,10 +2,11 @@ extends RefCounted
 ## Your froggy (MusicManager.look): his skin's colour, his eyes' and his belly's (chosen one by one in
 ## the intro, CreatorIntro, from a palette of each, and again in the wardrobe), a pattern over him and its
 ## colour (the patterns are earned by playing, UNLOCKS), and his stretchy band's colour (the tether, when
-## you climb with friends). Froggy's own frames are never redrawn: a shader recolours his mint body, cream
-## belly and black eyes, keeping their shading and soft edges (FroggyLook.material). Friends online see
-## your froggy as you made him (Party sends the look). Colours are kept as "rrggbb"; a look from before
-## (a number into these lists) still reads as that list's colour.
+## you climb with friends: a random one of its own to start with, changed in Play Together). Froggy's own
+## frames are never redrawn: a shader recolours his mint body, cream belly and black eyes, keeping their
+## shading and soft edges (FroggyLook.material). Friends online see your froggy as you made him (Party
+## sends the look). Colours are kept as "rrggbb"; a look from before (a number into these lists) still
+## reads as that list's colour.
 
 ## [name, colour]: the colours looks were chosen from before (a number into these), and what a colour's
 ## called (the nearest). The light tone of his body (his own mint is the first); its shade follows.
@@ -124,6 +125,13 @@ static func palette(kind: String) -> Array:
 	if not SHADES.has(kind) or kind == "skin":
 		out[ACROSS] = BODY[0][1]  # (his own mint, where it'd be: light, green)
 	return out
+
+
+## A new froggy's band: one of the band palette's bright colours, at random (everyone's is their own,
+## and it's changed in Play Together).
+static func random_band() -> String:
+	var bright := palette("band").slice(ACROSS, ACROSS * 3)  # (its two middle rows: bright, and seen against the tree)
+	return (bright[randi() % bright.size()] as Color).to_html(false)
 
 
 ## Which of a palette's colours is nearest to `c` (the one shown chosen).

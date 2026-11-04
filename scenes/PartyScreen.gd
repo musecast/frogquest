@@ -1,8 +1,8 @@
 extends CanvasLayer
 ## PLAY TOGETHER: a party of up to 16 frogs (Party.MAX_PLAYERS), each on their own phone, up the World Tree
 ## (each in their own world: StoryParty) or the same Endless tower; the host picks which as they start.
-## Host one (and read out its code) or join one by its code, on the same Wi-Fi; pick your party colour
-## and the name over your frog (your Muse @handle when you have one), and turn name tags on or off.
+## Host one (and read out its code) or join one by its code, on the same Wi-Fi, or online; turn name tags
+## and tethers on or off, and choose your band's colour (everyone's starts as a random one of its own).
 ## Opened from the title's PLAY TOGETHER. Party.gd does the networking; built in code and dressed like
 ## MuseAccountScreen.
 
@@ -27,6 +27,9 @@ var _note := ""
 var _note_colour := GOLD
 var _typed := ""
 var _keyboard: Node  # (KeyboardHelp: a tap off the box puts the keyboard away; how far to lift for it)
+var _band_open := false  # (your band's palette, open)
+var _band_line: Control  # (your band, drawn in its colour)
+var _band_grid: Control  # (its palette: ColourGrid)
 
 
 func _ready() -> void:
@@ -83,6 +86,8 @@ func _show() -> void:
 		_box.remove_child(child)
 		child.queue_free()
 	_input = null
+	_band_line = null
+	_band_grid = null
 	match _mode:
 		"join":
 			_box.add_child(_label("Type the party code from the host's screen. You both need to be on the same Wi-Fi.", BODY_FONT_SZ, GOLD))
@@ -161,7 +166,7 @@ func _starts() -> void:
 
 
 ## You, as your friends see you: your froggy (your look: FroggyLook) and, signed in to Muse, your
-## @handle over him (there's no name to give: everyone's lil froggy), name tags and tethers.
+## @handle over him (there's no name to give: everyone's lil froggy); name tags, tethers and your band.
 func _look() -> void:
 	_header("You")
 	if MuseSocial.is_member():
@@ -176,11 +181,83 @@ func _look() -> void:
 		Party.set_tethers(not Party.tethers)
 		_show(), "go" if Party.tethers else "quiet"))
 	_box.add_child(_label("With tethers, a friend pulls you up when you fall.", BODY_FONT_SZ, DIM))
+	_band()
 	if MuseSocial.rooms_live and MuseSocial.is_member():
 		_box.add_child(_button("Climb with Everyone: %s" % ("On" if Party.with_everyone else "Off"), func() -> void:
 			Party.set_with_everyone(not Party.with_everyone)
 			_show(), "go" if Party.with_everyone else "quiet"))
 		_box.add_child(_label("On the World Tree, see everyone online climbing too. Friends can join you from their Friends list.", BODY_FONT_SZ, DIM))
+
+
+## Your band's colour (the tether between you and a friend, as they see it): its button, your band drawn
+## in it, and its palette while that's open. A colour tapped is yours at once, kept, and sent to the party.
+func _band() -> void:
+	var button := _button("Band Colour", _toggle_band)
+	button.name = "BandButton"
+	_box.add_child(button)
+	_band_line = Control.new()
+	_band_line.name = "BandLine"
+	_band_line.custom_minimum_size = Vector2(0, 18)
+	_band_line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_band_line.draw.connect(_draw_band)
+	_box.add_child(_band_line)
+	if not _band_open:
+		return
+	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	var colours: Array = looks.palette("band")
+	_band_grid = load("res://scripts/ColourGrid.gd").new()
+	_band_grid.name = "BandGrid"
+	_band_grid.show_colours(colours, looks.nearest(colours, looks.band_colour(MusicManager.look)))
+	_band_grid.picked.connect(_pick_band)
+	_box.add_child(_band_grid)
+
+
+## Its palette open (or shut); opened, scrolled to as little as it takes to show its button down to the
+## palette's end (or, when that's more than fits, down to the colour that's yours, framed).
+func _toggle_band() -> void:
+	_band_open = not _band_open
+	_show()
+	if not _band_open:
+		return
+	for _i in 3:  # (laid out, at its height)
+		await get_tree().process_frame
+	if not is_instance_valid(_band_grid) or not _band_grid.is_inside_tree():
+		return
+	var view := _scroll.size.y
+	var top: float = _box.find_child("BandButton", false, false).position.y
+	var bottom: float = _band_grid.position.y + _band_grid.size.y
+	var chosen: float = _band_grid.position.y + _band_grid.cell(_band_grid.at).end.y + 8.0
+	var at := float(_scroll.scroll_vertical)
+	if bottom - top <= view:
+		at = clampf(at, bottom - view, top)
+	else:
+		at = maxf(top, chosen - view)
+	_scroll.scroll_vertical = int(at)
+
+
+func _pick_band() -> void:
+	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	var look: Dictionary = looks.clean(MusicManager.look)
+	look.band = (_band_grid.colours[_band_grid.at] as Color).to_html(false)
+	MusicManager.look = look
+	MusicManager.save_wardrobe()
+	Party.share_look()
+	if is_instance_valid(_band_line):
+		_band_line.queue_redraw()
+
+
+## Your band, slung across, in its colour.
+func _draw_band() -> void:
+	var colour: Color = load("res://scripts/FroggyLook.gd").band_colour(MusicManager.look)
+	var w := minf(_band_line.size.x * 0.7, 240.0)
+	var x0 := roundf((_band_line.size.x - w) * 0.5)
+	var line := PackedVector2Array()
+	for i in 17:
+		var t := float(i) / 16.0
+		line.append(Vector2(x0 + w * t, 3.0 + sin(t * PI) * (_band_line.size.y - 8.0)))
+	_band_line.draw_polyline(line, Color(0.10, 0.07, 0.06), 6.0)
+	_band_line.draw_polyline(line, colour, 4.0)
+	_band_line.draw_polyline(line, colour.lerp(Color.WHITE, 0.55), 1.5)
 
 
 ## A section's name, in gold, over a thin line.
@@ -307,6 +384,8 @@ func _fit() -> void:
 	var portrait := vp.y > vp.x * 1.3
 	var s: float = ui.panel_zoom(vp, room)
 	ui.fit_panel(_panel, _scroll, room, s, 0.9 if portrait else 0.62)
+	if is_instance_valid(_band_grid) and _band_grid.size.x > 0.0:  # (as tall as its squares need, little ones: 260 across at most)
+		_band_grid.custom_minimum_size.y = _band_grid.height_for(minf(_band_grid.size.x, 260.0))
 	var keyboard: float = _keyboard.height_for(_input)
 	var lift := 0.0
 	if keyboard > 0.0 and _input:
