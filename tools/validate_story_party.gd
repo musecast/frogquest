@@ -102,6 +102,8 @@ func _run() -> void:
 
 	main.npc6 = 0
 	_friend(2, air, "default", sp.IN_FINALE)
+	await _frames(2)
+	_expect(not sp._ties_to(2), "no band to a friend past the finale's door his own world hasn't opened")
 	await _fall_below(air)
 	_expect(sp._reel.is_empty(), "a friend past the finale's door doesn't pull him there while his own world hasn't opened it")
 	main.npc6 = 1
@@ -199,6 +201,15 @@ func _run() -> void:
 	await _wait(1.5)
 	_expect(player.is_on_floor() and player.global_position.distance_to(sp.FINALE_DOOR) < 90.0,
 		"and stands there, on the castle hall's floor (%s)" % player.global_position)
+	_expect(int(main.npc6) != 0, "and the frog at the door starts talking to him (he opens the way in his world)")
+
+	# A few words over a few words: the newest stay up (the last ones' fading took them away).
+	sp._say("First words", sp.CREAM, 0.2)
+	await _wait(0.3)
+	sp._say("Newest words", sp.CREAM, 3.0)
+	await _wait(0.9)
+	_expect(sp._toast.text == "Newest words" and sp._toast.modulate.a > 0.9,
+		"the newest words stay up while the last ones would have faded (%.2f)" % sp._toast.modulate.a)
 
 	# A party starting up the tree with the title up: the climb starts.
 	player.get_node("titlescreen").visible = true

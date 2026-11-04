@@ -22,6 +22,8 @@ const INVITES_EVERY := 15.0  # and between looks for invites into friends' parti
 const STATUSES := ["online", "away", "dnd", "invisible"]
 const STATE_ORDER := ["online", "away", "dnd", "offline"]  # (how friends are listed: who's on first)
 const REPORT_REASONS := ["spam", "harassment", "hate", "sexual", "impersonation", "other"]
+## How each reason reads on its button, kid-friendly (what goes to Muse stays the reason itself).
+const REPORT_WORDS := {"sexual": "Inappropriate"}
 const COMMUNITY_RULES := "https://musemedia.app/community"
 ## Handles no one may take, passing for Muse's team (handle_problem; Muse's admins can, but not from
 ## here): exactly these (Muse's own list);
@@ -202,6 +204,11 @@ func unfriend(who: String) -> String:
 ## Blocks someone: neither of you sees the other anywhere in Muse after, and any friendship ends.
 func block(who: String) -> String:
 	return await _act("muse_social_block", {"p_handle": _bare(who)})
+
+
+## A report reason as its button says it: "Spam", "Inappropriate"...
+static func reason_words(reason: String) -> String:
+	return REPORT_WORDS.get(reason, reason.capitalize())
 
 
 ## Reports someone's profile to the Muse team, for one of REPORT_REASONS.

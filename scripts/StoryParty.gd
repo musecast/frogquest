@@ -21,7 +21,7 @@ extends Node2D
 enum { CLIMBING, IN_FINALE, WON, AWAY }
 
 const FINALE_HEIGHT := 525.0  # (player.currentHeight past the wall the door's frog takes away: y -5721)
-const FINALE_DOOR := Vector2(2562.0, -5680.0)  # (beside the frog at the finale's door, in the castle hall)
+const FINALE_DOOR := Vector2(2520.0, -5680.0)  # (just beside the frog at the finale's door, in the castle hall: he talks)
 const WON_HEIGHT := 787.0  # (past the glass: the ending)
 const TETHER_SLACK := 140.0  # the band's give before it catches a fall (as Endless's)
 const TETHER_REEL := 0.8  # seconds a friend takes to pull you back up
@@ -53,6 +53,7 @@ var _climb_on_title := false  # (a party started up the tree with the title up: 
 var _blocked := {}  # "@handle": true, blocked from here (their frog goes at once)
 var _card: Control
 var _toast: Label
+var _toast_tween: Tween
 
 
 func _ready() -> void:
@@ -263,10 +264,9 @@ func _join_beside() -> void:
 		return
 	var who := Party.beside
 	Party.beside = ""
-	var to: Vector2 = frog.spot()
+	var spot := _free_spot_near(frog.spot())
 	if frog.where == WON or (frog.where == IN_FINALE and not _finale_open()):
-		to = FINALE_DOOR
-	var spot := _free_spot_near(to)
+		spot = FINALE_DOOR if _free_at(FINALE_DOOR) else _free_spot_near(FINALE_DOOR)
 	if spot == Vector2.INF:
 		return
 	if not _reel.is_empty():  # (a band reeling him in lets go: he's somewhere else now)
@@ -343,9 +343,11 @@ func _tether(delta: float) -> void:
 			_start_reel(friend)
 
 
+## Whether his band can tie to them: a friend he can see, somewhere his own world could pull him to (a
+## band to someone past a door he hasn't been let through couldn't pull: it isn't there).
 func _ties_to(peer: int) -> bool:
 	var frog = _frogs.get(peer)
-	return frog != null and frog.visible and frog.seen and _is_friend(peer)
+	return frog != null and frog.visible and frog.seen and _is_friend(peer) and _reaches(frog)
 
 
 ## Somewhere his own world has open: not past the finale's door unless his has opened it.
@@ -506,10 +508,12 @@ func _say(words: String, colour: Color, seconds := 3.5) -> void:
 	_toast.add_theme_color_override("font_color", colour)
 	_toast.size = Vector2(minf(vp.x - 40.0, 420.0), 0.0)
 	_toast.position = Vector2(roundf((vp.x - _toast.size.x) * 0.5), roundf(vp.y * 0.16))
-	var tw := _toast.create_tween()
-	tw.tween_property(_toast, "modulate:a", 1.0, 0.3)
-	tw.tween_interval(seconds)
-	tw.tween_property(_toast, "modulate:a", 0.0, 0.6)
+	if _toast_tween:
+		_toast_tween.kill()  # (the last words' fade would take these with them)
+	_toast_tween = _toast.create_tween()
+	_toast_tween.tween_property(_toast, "modulate:a", 1.0, 0.3)
+	_toast_tween.tween_interval(seconds)
+	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.6)
 
 
 ## A few words floating up off a spot in the world (a friend pulling you up).
@@ -600,7 +604,7 @@ func _open_card(peer: int, reporting := false, note := "", note_colour := CREAM)
 		ui.style_label(why, 16, CREAM)
 		box.add_child(why)
 		for reason in MuseSocial.REPORT_REASONS:
-			buttons.append([reason.capitalize(), _report.bind(peer, who, reason), "quiet"])
+			buttons.append([MuseSocial.reason_words(reason), _report.bind(peer, who, reason), "quiet"])
 		buttons.append(["Back", _open_card.bind(peer), "quiet"])
 	else:
 		if _is_friend(peer):

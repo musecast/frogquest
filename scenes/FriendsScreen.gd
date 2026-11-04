@@ -236,7 +236,7 @@ func _friend_row(card: Dictionary) -> void:
 		if _reporting == who:
 			_box.add_child(_label("Report @%s for:" % who, BODY_FONT_SZ, GOLD))
 			for reason in MuseSocial.REPORT_REASONS:
-				_box.add_child(_button(reason.capitalize(), _report.bind(who, reason), "quiet"))
+				_box.add_child(_button(MuseSocial.reason_words(reason), _report.bind(who, reason), "quiet"))
 		else:
 			_box.add_child(_button("Remove Friend", _act.bind("unfriend", who, "@%s isn't your friend any more." % who), "quiet"))
 			_box.add_child(_button("Block", _act.bind("block", who, "Blocked @%s: you won't see each other in Muse." % who), "quiet"))

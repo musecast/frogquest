@@ -154,7 +154,7 @@ func _row(row: Dictionary) -> void:
 	if _open == who and who != "":
 		if _reporting == who:
 			for reason in MuseSocial.REPORT_REASONS:
-				_box.add_child(_button(reason.capitalize(), _report.bind(who, reason), "quiet"))
+				_box.add_child(_button(MuseSocial.reason_words(reason), _report.bind(who, reason), "quiet"))
 		else:
 			_box.add_child(_button("Block @%s" % who, _block.bind(who), "quiet"))
 			_box.add_child(_button("Report @%s" % who, func() -> void:
