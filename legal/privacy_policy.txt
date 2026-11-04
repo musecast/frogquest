@@ -62,6 +62,6 @@ We may retain aggregated or de‑identified data that cannot reasonably identify
 We may revise this document. Updates appear in‑app alongside a new effective date. Continued play after revision constitutes acceptance unless law requires renewed consent steps.
 
 10. CONTACT
-Privacy questions about Frog Quest can be sent through our support page, https://jasonmuse.github.io/frog-quest-support/support.html, where you can open a support request. Please mention “Frog Quest privacy enquiry” and your locale. Support requests are public, so please do not include personal details, passwords or sign-in codes in them.
+Privacy questions about Frog Quest can be sent through our contact form, https://musemedia.app/contact?app=frog-quest. What you send comes straight to us and is not public. Please mention “Frog Quest privacy enquiry” and your locale, and do not include passwords or sign-in codes.
 
 END OF DOCUMENT
