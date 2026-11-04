@@ -2,7 +2,8 @@ extends SceneTree
 ## Who may be called what (MuseSocial.handle_problem): nobody passes for Muse's team or the game, in any
 ## disguise (adm1n, the_admin, mod_bob, 0fficial, jasonmuse, frog_quest), while names that only have
 ## those letters in them stay free (badminton_pro, model_frog, devin, amused_frog, frogquestfan). Muse's
-## own check (muse_social_handle_problem, in Muse Shelf's repo) should turn down the same.
+## own check (muse_social_handle_problem, in Muse Shelf's repo) should turn down the same. Your own
+## handle always passes, as on Muse (someone who already has a handle it now reserves keeps it).
 ##   Godot --headless --path . --script res://tools/validate_handles.gd
 
 const RESERVED := [
@@ -19,6 +20,13 @@ const FREE := [
 	"downer", "frogquestfan", "frog_quest_fan", "gamer", "leapking", "jump_jump", "x_x_x", "a1b",
 ]
 const SHAPE := ["ab", "1234", "____", "frog-man", "frog man", "a_very_long_handle_123", ""]
+## Whoever already has a handle Muse now reserves keeps it (@muse, an admin's): saving a profile checks
+## the handle again every time. [handle, their current handle, what's said]
+const OWN := [
+	["muse", "muse", ""], ["@Muse", "muse", ""], ["admin", "@admin", ""], ["froggy", "froggy", ""],
+	["admin", "muse", "That handle is reserved."], ["muse", "", "That handle is reserved."],
+	["ab", "froggy", "Use 3 to 20"], ["", "", "Use 3 to 20"],
+]
 
 
 func _initialize() -> void:
@@ -36,8 +44,12 @@ func _initialize() -> void:
 		var said: String = social.handle_problem(h)
 		if not said.begins_with("Use 3 to 20"):
 			failures.append("\"%s\" should be turned down for its shape, got \"%s\"" % [h, said])
+	for each in OWN:
+		var said: String = social.handle_problem(each[0], each[1])
+		if not (said == each[2] if each[2] == "" else said.begins_with(each[2])):
+			failures.append("\"%s\" for @%s should get \"%s\", got \"%s\"" % [each[0], each[1], each[2], said])
 	if failures.is_empty():
-		print("Handles test passed (%d reserved, %d free, %d misshapen)." % [RESERVED.size(), FREE.size(), SHAPE.size()])
+		print("Handles test passed (%d reserved, %d free, %d misshapen, %d against your own)." % [RESERVED.size(), FREE.size(), SHAPE.size(), OWN.size()])
 	else:
 		for f in failures:
 			push_warning("FAIL: " + f)

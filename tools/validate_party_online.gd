@@ -82,13 +82,19 @@ var _relay := FakeRelay.new()
 var _tickets: Array[String] = []  # whose ticket each ticket call is (the next phone to connect)
 var _room_mode := "endless"  # (what Muse's stand-in says the room climbs)
 var _quick_open := false  # (whether Muse's stand-in has quick join yet)
+var _ticket_code := 200  # (what the relay's stand-in says to a ticket: 503 once its daily allowance is gone)
+var _left_rooms: Array = []  # (rooms let go of: muse_game_room_leave)
 
 
 func _initialize() -> void:
 	_run.call_deferred()
 
 
-func _fake_muse(path: String, _body: Dictionary, _bearer: String) -> Dictionary:
+func _fake_muse(path: String, body: Dictionary, _bearer: String) -> Dictionary:
+	if path == "/api/rooms/ticket" and _ticket_code != 200:
+		return {"code": _ticket_code, "data": {"error": "Playing online isn't set up yet"}}
+	if path.ends_with("muse_game_room_leave"):
+		_left_rooms.append(str(body.get("p_room", "")))
 	if path == "/api/rooms/ticket":
 		var who: String = _tickets.pop_front() if not _tickets.is_empty() else "someone"
 		return {"code": 200, "data": {"ticket": who, "url": "ws://127.0.0.1:%d/api/rooms/R1/ws?ticket=%s" % [RELAY_PORT, who], "expires_in": 60, "max_players": 16}}
@@ -197,6 +203,12 @@ func _run() -> void:
 	climber.leave()
 	buddy.leave()
 	_expect(climber.mode == "endless" and not climber.everyone and climber.beside == "" and buddy.beside == "", "leaving clears all that")
+	_ticket_code = 503  # (the relay's daily allowance used up)
+	_left_rooms.clear()
+	_expect(await climber.climb_with_everyone() != "" and climber.online_room == "" and not climber.is_on(),
+		"the relay refusing a ticket leaves him climbing alone")
+	_expect(_left_rooms.has("R1"), "and lets Muse have the seat back at once (left: %s)" % [_left_rooms])
+	_ticket_code = 200
 
 	process_frame.disconnect(_process_relay)
 	_relay.server.stop()

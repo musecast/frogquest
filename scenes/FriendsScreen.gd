@@ -171,7 +171,7 @@ func _handle_step() -> void:
 ## gets the last look.
 func _check_handle() -> void:
 	var wanted := (_input.text if _input else _typed).strip_edges().trim_prefix("@").to_lower()
-	var problem := MuseSocial.handle_problem(wanted)
+	var problem := MuseSocial.handle_problem(wanted, MuseSocial.handle())
 	if problem != "":
 		_say(problem, RED)
 		return

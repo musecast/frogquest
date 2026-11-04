@@ -28,8 +28,9 @@ signal frog_moved(peer: int, state: Array)  # a friend's frog: [x, y, animation,
 const PORT := 47850
 const MAX_PLAYERS := 16
 const SEND_EVERY := 1.0 / 15.0  # seconds between your frog's updates to the others
-const STILL_EVERY := 1.0  # (on the World Tree, a frog that hasn't moved is only sent this often: it's
-                          # online with everyone, through Muse's relay, so the quiet ones cost little)
+const STILL_EVERY := 1.0  # (on the World Tree, a frog that hasn't moved is only sent this often, and a
+                          # moving one every SEND_EVERY_BIG: it's online with everyone, through Muse's relay,
+                          # which counts what it's sent against a daily allowance)
 const SEND_EVERY_BIG := 1.0 / 10.0  # (in a big party, a bit less often: the host passes every frog on to
                                      # everyone, so its load grows with the square of the party)
 const BIG_PARTY := 9
@@ -266,17 +267,25 @@ func _connect_room(room: String) -> String:
 	online_room = room
 	var t: Dictionary = await MuseAccount.call_api(ws_ticket_path, {"room": room})
 	if t.code != 200 or not (t.data is Dictionary) or str(t.data.get("url", "")) == "":
-		online_room = ""
+		_let_go(room)
 		return "Couldn't reach the party (%s)." % ("you're not in it" if t.code == 403 else "the relay said %d" % t.code)
 	_ws = WebSocketPeer.new()
 	if _ws.connect_to_url(str(t.data.url)) != OK:
 		_ws = null
-		online_room = ""
+		_let_go(room)
 		return "Couldn't reach the party."
 	_ping_left = 25.0
 	players = {}
 	players_changed.emit()
 	return ""
+
+
+## Out of a room we couldn't get into the relay for (its ticket refused: the relay's daily allowance
+## used up, say): Muse lets the seat go at once, rather than holding it for nobody till it tidies up.
+func _let_go(room: String) -> void:
+	if online_room == room:
+		online_room = ""
+	MuseAccount.call_rpc("muse_game_room_leave", {"p_room": room})
 
 
 func _process(delta: float) -> void:
@@ -393,7 +402,7 @@ func send_frog(state: Array, delta: float) -> void:
 		return
 	if mode == "story" and state == _last_state and _since_sent < STILL_EVERY:
 		return  # (on the World Tree, still: now and then is enough)
-	_send_left = SEND_EVERY if players.size() < BIG_PARTY else SEND_EVERY_BIG
+	_send_left = SEND_EVERY if players.size() < BIG_PARTY and mode != "story" else SEND_EVERY_BIG
 	_since_sent = 0.0
 	_last_state = state
 	if _ws != null:

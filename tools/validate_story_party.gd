@@ -137,12 +137,13 @@ func _run() -> void:
 	_expect(sp._ties_to(2), "a Muse friend is")
 	party.everyone = false
 
-	# Quiet when still: up the tree, a frog that hasn't moved goes out about once a second.
+	# Thrifty up the tree (Muse's relay counts it against a daily allowance): about 10 a second moving,
+	# about once a second still.
 	var still := [1.0, 2.0, "default", 0, false, 0.0, 0, 3, 0, 0]
 	var sends := _count_sends(func(_i: int) -> Array: return still, 120)
 	_expect(sends >= 2 and sends <= 3, "a still frog is sent about once a second (%d in two seconds)" % sends)
 	var moving := _count_sends(func(i: int) -> Array: return [1.0 + i, 2.0, "airborne", 0, false, 0.0, 0, 3, 0, 0], 60)
-	_expect(moving >= 11 and moving <= 16, "a moving one 12 to 15 times a second (%d in one)" % moving)
+	_expect(moving >= 8 and moving <= 11, "a moving one about 10 times a second (%d in one)" % moving)
 
 	# Beside whoever you joined.
 	await _until(func() -> bool: return sp._reel.is_empty(), 2.0)
@@ -212,6 +213,24 @@ func _run() -> void:
 	player.get_node("titlescreen").visible = true
 	await _frames(3)
 	_expect(not party.is_on(), "back at the title, out of everyone's room")
+
+	# Everyone's room dropping (the relay's daily allowance gone, say) says nothing: he climbs on alone.
+	player.get_node("titlescreen").visible = false
+	player.get_node("Trajectory").endGame = 0
+	_expect(party.host() == "", "a party here again")
+	party.players[2] = {"name": "@pal", "hat": "", "skin": "", "color": 0}
+	party.start("story")
+	party.everyone = true
+	await _frames(3)
+	sp._toast.modulate.a = 0.0
+	party._end("Lost the online party.")  # (as Party does: out of it, then says so)
+	await _frames(3)
+	_expect(sp._toast.modulate.a == 0.0, "everyone's room dropping says nothing (it was never asked for)")
+	sp._tried = true  # (he was in everyone's room, and now isn't: it's asked for again, in a while)
+	sp._asking = false
+	sp._climb_with_everyone()
+	_expect(not sp._tried and sp._next_try >= Time.get_ticks_msec() / 1000.0 + 59.0,
+		"in and then out again, everyone's room is tried again in a while")
 	await _finish(real)
 
 

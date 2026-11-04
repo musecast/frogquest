@@ -1,6 +1,6 @@
 FROG QUEST — PRIVACY POLICY
 
-Effective date: 2 November 2026
+Effective date: 4 November 2026
 
 This Privacy Policy describes how MUSE (“we”, “us”, “our”) handles information when you use the application Frog Quest (the “App”), including Frog Quest+, which is what the App becomes for Muse Pro members. By using the App, you agree to this policy alongside our Terms of Use.
 
@@ -8,19 +8,26 @@ This Privacy Policy describes how MUSE (“we”, “us”, “our”) handles i
 The App is published for phones, tablets and computers. If you use the App, this policy applies to you. If you do not agree, please discontinue use.
 
 2. INFORMATION THE APP PROCESSES
-You can play without any account. Data is processed mainly on your device and by service providers integrated into the App.
+You can play without any account. Data is processed mainly on your device and by service providers integrated into the App. Playing with others is optional; what it shares is set out below.
 
 • Gameplay and preferences: progression, high scores where applicable, settings (sound, cosmetics, unlocked items where relevant), and similar data may be saved locally on your device (for example via Godot/OS user storage).
-• Optional Muse account: if you choose to sign in with a Muse account you already have (the account Muse apps such as Muse Shelf use), you can do it through Muse Shelf or by email. Through Muse Shelf: the App asks the Muse API for a short code, telling it the kind of device it's on (for example “iPhone or iPad”) so Muse Shelf can show what's asking; you type the code into Muse Shelf, where you're already signed in, and the App then receives a one-time sign-in for your account. By email: the App sends your email address, and then the one-time code emailed to you, to the Muse account service, which runs on Supabase. Either way, the App keeps the resulting sign-in session on your device, encrypted to that device, and asks the service whether your account has Muse Pro so it can turn on Frog Quest+. The App does not create Muse accounts and does not upload your game progress.
+• Optional Muse account: if you choose to sign in with a Muse account you already have (the account Muse apps such as Muse Shelf use), you can do it through Muse Shelf or by email. Through Muse Shelf: the App asks the Muse API for a short code, telling it the kind of device it's on (for example “iPhone or iPad”) so Muse Shelf can show what's asking; you type the code into Muse Shelf, where you're already signed in, and the App then receives a one-time sign-in for your account. By email: the App sends your email address, and then the one-time code emailed to you, to the Muse account service, which runs on Supabase. Either way, the App keeps the resulting sign-in session on your device, encrypted to that device, and asks the service whether your account has Muse Pro so it can turn on Frog Quest+. The App does not create Muse accounts, and your progress up the World Tree stays on your device.
+• Muse Social (optional, signed in): if you pick an @handle (agreeing to Muse's community rules, musemedia.app/community), it becomes your name in every Muse app, and other players can find you by it. Friend requests, your friends, the players you block, and the reports you make (the @handle you report and the reason you pick) are kept by the Muse account service. Muse's moderators review reports, and can hide anyone who breaks the community rules.
+• Your status: while the App is open and you're signed in with an @handle, it tells Muse about once a minute that you're in Frog Quest, what you're doing (on the title, climbing the World Tree, or playing Endless) and whether friends can join you, so your friends can see it. In Friends you can show as away, do not disturb or invisible instead.
+• Leaderboards: when an Endless climb ends while you're signed in with an @handle, the App sends Muse a record of it, from which Muse works out and checks the score: when you landed on each platform and how high, any flies you caught, and how long the climb took. Your friends see your best scores; the global leaderboard shows yours only if you choose to be on it.
+• Playing online: signed in with an @handle, climbing the World Tree puts you in an online room with other players climbing too, unless you turn off Climb with Everyone (in Play Together); you can also host or join online parties with friends. While you're in a room, the App sends your frog's position and pose, its look (hat, skin and party colour) and which friend your band is tied to, through Muse's relay, to the others in the room, several times a second while you move. The relay passes it on and doesn't keep it. Others in the room see your @handle over your frog, and you see theirs. There is no chat. Muse keeps a record of the rooms you're in and of invites, to run them, and lets them go when you leave or the room closes. A tap on a player's name lets you block or report them.
+• Playing on the same Wi-Fi: in a Wi-Fi party, phones talk directly to each other over your local network; nothing goes through our servers. The name you type (or your @handle), your frog's look and where it is are shared only with the phones in your party.
 • Advertising: we use Google AdMob to show advertisements. AdMob may use identifiers permitted by your device and platform settings (such as privacy‑friendly signals on newer OS versions where available, advertising identifiers subject to consent, IP address, coarse location, diagnostics, fraud prevention signals, interaction with ads). Muse Pro members and players who bought Remove Ads see no ads.
 • Payments: purchases (such as “Remove Ads”) are processed by Apple. We do not receive your full payment card number. Apple may provide minimal purchase‑related identifiers and status so we can deliver your entitlement.
 • Consent tools: in regions where Google’s consent framework applies, Google’s User Messaging Platform (UMP) may present choices about ads and cookies or similar mechanisms as required locally.
 
-We do not request contacts, microphone, camera, precise GPS, SMS, calendar, photo library browsing, Bluetooth, nor health sensors for Frog Quest. If OS permission prompts unrelated to ads or payments appeared, those would originate from dependent libraries—in that rare case discontinue use until we ship an update.
+We do not request contacts, microphone, camera, precise GPS, SMS, calendar, photo library browsing, Bluetooth, nor health sensors for Frog Quest. The App may ask to find devices on your local network: that's only for parties on the same Wi-Fi, and you can say no. If OS permission prompts unrelated to ads, payments or local-network parties appeared, those would originate from dependent libraries—in that rare case discontinue use until we ship an update.
 
 3. HOW WE USE INFORMATION
 • Operate gameplay, cosmetics, backups on device where applicable.
 • Sign you in to your Muse account and check for Muse Pro, only if you choose to sign in.
+• Show your @handle, friends, status and leaderboard scores, and let you play with friends and other players, only if you choose to.
+• Keep playing together safe: review reports, hide players who break the community rules, and keep players who've blocked each other apart.
 • Display and personalize advertising where allowed after consent and regional rules.
 • Process and validate in‑app purchases, prevent fraud, obey law.
 • Measure ad performance subject to SDK and consent settings.
@@ -29,23 +36,25 @@ We do not request contacts, microphone, camera, precise GPS, SMS, calendar, phot
 The App itself is not centred on invasive analytics. Measurement related to advertisements may still occur via the ad SDK consistent with consent and vendor policies.
 
 5. CHILDREN AND TEENS
-Frog Quest is aimed at general audiences. It is not designed as primarily child‑directed. Guardians supervise minors’ device use.
+Frog Quest is aimed at general audiences. It is not designed as primarily child‑directed. Guardians supervise minors’ device use. Playing online needs a Muse account; it shows other players only @handles (which Muse filters) and frogs, and has no chat. Anyone can be blocked or reported with a tap on their name. To keep play offline, don't sign in to a Muse account, or turn off Climb with Everyone.
 
 6. STORAGE AND SECURITY
-Industry‑standard safeguards at the SDK and platform level reduce risk but no method is 100% secure. Local save corruption or device loss affects only that device unless you rely on backups. Signing out (Muse Account › Sign Out) removes the Muse sign-in session from your device.
+Industry‑standard safeguards at the SDK and platform level reduce risk but no method is 100% secure. Local save corruption or device loss affects only that device unless you rely on backups. Signing out (Muse Account › Sign Out) removes the Muse sign-in session from your device. What Muse Social keeps (your @handle, friends, blocks, reports and scores) stays with the Muse account service until you delete your Muse account; your status lapses a few minutes after you close the App.
 
 7. SHARING WITH THIRD PARTIES
 We integrate third‑party processors. Key categories:
-• Muse accounts (only if you sign in): Supabase, Inc., which hosts the Muse account service — supabase.com/privacy; and Cloudflare, Inc., which runs the Muse API used to sign in through Muse Shelf — cloudflare.com/privacypolicy
+• Muse accounts and Muse Social (only if you sign in): Supabase, Inc., which hosts the Muse account service and Muse Social (handles, friends, status, leaderboards and online rooms) — supabase.com/privacy; and Cloudflare, Inc., which runs the Muse API used to sign in through Muse Shelf and the relay that passes frogs between players online — cloudflare.com/privacypolicy
 • Advertising: Google LLC (Google AdMob) — google.com/privacy
 • Store & payments / platform services: Apple Inc. — apple.com/legal/privacy/en‑ww/
 
 Those parties process data pursuant to their own policies and contractual terms with publishers.
 
+When you play with others, they see what's described above: your @handle (or the name you typed), your frog's look and where it is, and your scores on the leaderboards.
+
 8. INTERNATIONAL USERS AND RIGHTS
 European Economic Area / UK users may have GDPR rights (legal basis often legitimate interests for ads where permitted plus consent flows; contract for IAP and for the optional Muse account sign-in). Californian users may exercise CCPA/CPRA rights where applicable via platform tools and our contact below. Responses may require verifying you are affected.
 
-You can reset or adjust ad choices inside the consent surface when offered, revisit iOS Tracking settings if prompted, reduce ad personalization platform‑wide via device settings where available, purchase Remove Ads where offered, or delete the App to stop future collection initiated by our code paths. To delete your Muse account and what is stored with it, use Muse Shelf (Settings › Muse account › Delete account) or contact us below.
+You can reset or adjust ad choices inside the consent surface when offered, revisit iOS Tracking settings if prompted, reduce ad personalization platform‑wide via device settings where available, purchase Remove Ads where offered, or delete the App to stop future collection initiated by our code paths. To delete your Muse account and what is stored with it (your @handle, friends and scores included), use Muse Shelf (Settings › Muse account › Delete account) or contact us below.
 
 We may retain aggregated or de‑identified data that cannot reasonably identify you.
 

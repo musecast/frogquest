@@ -46,7 +46,9 @@ var _tether_peer := 0
 var _reel := {}
 var _last_floor_y := 0.0
 var _tried := false  # (asked to climb with everyone, this climb)
+var _asking := false  # (and waiting to hear back)
 var _next_try := 0.0  # (seconds since the game started: not before then, after it didn't work)
+var _with_everyone := false  # (the party he's in is everyone's room: its ending's said nothing about)
 var _climb_on_title := false  # (a party started up the tree with the title up: Play, once it's there)
 var _blocked := {}  # "@handle": true, blocked from here (their frog goes at once)
 var _card: Control
@@ -105,6 +107,7 @@ func _process(delta: float) -> void:
 		if not _frogs.is_empty():
 			_clear()
 		return
+	_with_everyone = Party.everyone
 	_send(delta)
 	_join_beside()
 	_tether(delta)
@@ -146,16 +149,22 @@ func _where() -> int:
 # ── with everyone ───────────────────────────────────────────────────────────────────────────────
 
 ## Up the tree with everyone online, once a climb's going: quietly, signed in with an @handle, and
-## not in a party already. Not open yet (or not now): tried again a while later.
+## not in a party already. Not open (or not now: the relay's daily allowance used up, say), or in and
+## then out again: the climb goes on alone, and it's tried again a while later.
 func _climb_with_everyone() -> void:
+	var now := Time.get_ticks_msec() / 1000.0
+	if _tried and not _asking and not Party.is_on() and Party.online_room == "":
+		_tried = false
+		_next_try = maxf(_next_try, now + 60.0)
 	if _tried or Party.is_on() or Party.online_room != "" or not Party.with_everyone:
 		return
-	if not MuseSocial.is_member() or not MuseSocial.rooms_live or Time.get_ticks_msec() / 1000.0 < _next_try:
+	if not MuseSocial.is_member() or not MuseSocial.rooms_live or now < _next_try:
 		return
 	_tried = true
+	_asking = true
 	var problem: String = await Party.climb_with_everyone()
+	_asking = false
 	if problem != "" and is_inside_tree():
-		_tried = false
 		_next_try = Time.get_ticks_msec() / 1000.0 + RETRY_EVERY
 
 
@@ -205,12 +214,15 @@ func _on_party_changed() -> void:
 			_frogs[peer].dress(Party.players[peer])
 
 
+## The party's over (the host left, the Wi-Fi or the relay dropped): he climbs on alone. Everyone's
+## room going says nothing (it was never asked for): he's back in one in a little while.
 func _on_party_ended(why: String) -> void:
 	_clear()
 	_tried = false
-	_next_try = Time.get_ticks_msec() / 1000.0 + 30.0  # (lost everyone's room: back in a little while)
-	if why != "" and not Party.everyone and is_inside_tree():
+	_next_try = Time.get_ticks_msec() / 1000.0 + 30.0
+	if why != "" and not _with_everyone and is_inside_tree():
 		_say(why, RED)
+	_with_everyone = false
 
 
 func _clear() -> void:

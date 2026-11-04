@@ -356,9 +356,12 @@ static func _cards(value) -> Array:
 ## What's wrong with a new @handle, in Muse's words, or "" if Muse could take it (whether someone has,
 ## only Muse knows): 3 to 20 letters, numbers or underscores with a letter, and nothing passing for
 ## Muse's team or the game (RESERVED_HANDLES...). Muse checks the same when it's saved; this says so
-## at once.
-static func handle_problem(new_handle: String) -> String:
+## at once. Your own handle (current) is always fine: Muse lets whoever already has a handle it now
+## reserves keep it (@muse, an admin's), as saving a profile checks the handle again every time.
+static func handle_problem(new_handle: String, current := "") -> String:
 	var h := _bare(new_handle)
+	if h != "" and h == _bare(current):
+		return ""
 	if not RegEx.create_from_string("^[a-z0-9_]{3,20}$").search(h) or not RegEx.create_from_string("[a-z]").search(h):
 		return "Use 3 to 20 letters, numbers or underscores, with at least one letter."
 	var letters := RegEx.create_from_string("[^a-z]").sub(_read_as_letters(h), "", true).replace("badminton", "")
