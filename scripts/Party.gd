@@ -24,6 +24,7 @@ signal players_changed  # someone joined or left, or changed their look
 signal started  # the climb starts (EndlessMode reads run_seed and the clock)
 signal ended(why: String)  # the party's over for you: why, in words ("" when you left yourself)
 signal frog_moved(peer: int, state: Array)  # a friend's frog: [x, y, animation, frame, flip, turn, score, metres]
+signal relay_full  # Muse's relay turned a ticket away: its daily allowance is used up (back at 00:00 UTC)
 
 const PORT := 47850
 const MAX_PLAYERS := 16
@@ -49,6 +50,7 @@ var name_tags := true
 var tethers := true  # a stretchy band to your nearest friend, that catches you falling
 var with_everyone := true  # signed in, climbing the World Tree online with everyone (climb_with_everyone)
 var told_names := false  # (been told a tap on a name adds, blocks or reports them: StoryParty, once)
+var full_told_on := ""  # (the UTC day he was last told online's full: RoomFullPopup, once a day)
 var settings_path := SETTINGS_PATH  # (the tests point it elsewhere)
 var on_start := Callable()  # (what starting does; the tests swap it so the scene stays put)
 
@@ -268,6 +270,9 @@ func _connect_room(room: String) -> String:
 	var t: Dictionary = await MuseAccount.call_api(ws_ticket_path, {"room": room})
 	if t.code != 200 or not (t.data is Dictionary) or str(t.data.get("url", "")) == "":
 		_let_go(room)
+		if t.code == 429 or t.code >= 500:
+			_tell_full()  # (its daily allowance used up, or Cloudflare's own: 429 or 5xx)
+			return "Playing online is full for today: it's back at %s." % load("res://scenes/RoomFullPopup.gd").reset_words()
 		return "Couldn't reach the party (%s)." % ("you're not in it" if t.code == 403 else "the relay said %d" % t.code)
 	_ws = WebSocketPeer.new()
 	if _ws.connect_to_url(str(t.data.url)) != OK:
@@ -278,6 +283,18 @@ func _connect_room(room: String) -> String:
 	players = {}
 	players_changed.emit()
 	return ""
+
+
+## Online's full for today (Muse's relay turned a ticket away): RoomFullPopup says so, and when it's
+## back, at most once a UTC day.
+func _tell_full() -> void:
+	relay_full.emit()
+	var today := Time.get_date_string_from_system(true)
+	if full_told_on == today or not is_inside_tree():
+		return
+	full_told_on = today
+	_save()
+	get_tree().root.add_child(load("res://scenes/RoomFullPopup.gd").new())
 
 
 ## Out of a room we couldn't get into the relay for (its ticket refused: the relay's daily allowance
@@ -636,6 +653,7 @@ func _load() -> void:
 	tethers = bool(cfg.get_value("party", "tethers", tethers))
 	with_everyone = bool(cfg.get_value("party", "with_everyone", with_everyone))
 	told_names = bool(cfg.get_value("party", "told_names", told_names))
+	full_told_on = str(cfg.get_value("party", "full_told_on", full_told_on))
 
 
 func _save() -> void:
@@ -646,4 +664,5 @@ func _save() -> void:
 	cfg.set_value("party", "tethers", tethers)
 	cfg.set_value("party", "with_everyone", with_everyone)
 	cfg.set_value("party", "told_names", told_names)
+	cfg.set_value("party", "full_told_on", full_told_on)
 	cfg.save(settings_path)

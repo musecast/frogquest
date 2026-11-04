@@ -60,7 +60,7 @@ func _run() -> void:
 			var where := "%s, %s" % [shape, "story" if base == STORY_BASE else "Endless"]
 			for each in [["Remove Ads", "res://scenes/RemoveAdsScreen.gd"], ["Muse account", "res://scenes/MuseAccountScreen.gd"],
 					["settings", "res://scenes/SettingsScreen.gd"], ["wardrobe", "res://scenes/WardrobeScreen.gd"],
-					["privacy policy", "res://scripts/PrivacyTermsPopup.gd"]]:
+					["privacy policy", "res://scripts/PrivacyTermsPopup.gd"], ["online's full today", "res://scenes/RoomFullPopup.gd"]]:
 				var view := _view(vp)
 				view.add_child(load(each[1]).new())
 				await _frames(5)

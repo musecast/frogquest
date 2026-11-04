@@ -131,6 +131,9 @@ func _run() -> void:
 		var popup: GDScript = load("res://scripts/PrivacyTermsPopup.gd")
 		await _check_panel("%s, story: privacy policy" % shape, popup, story_vp, up)
 		await _check_panel("%s, Endless: privacy policy" % shape, popup, endless_vp, up)
+		var full: GDScript = load("res://scenes/RoomFullPopup.gd")
+		await _check_panel("%s, story: online's full today" % shape, full, story_vp, up)
+		await _check_panel("%s, Endless: online's full today" % shape, full, endless_vp, up)
 		acct.email = real_session[0]
 		acct._refresh_token = real_session[1]
 		acct._pro = real_session[2]

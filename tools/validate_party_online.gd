@@ -84,6 +84,8 @@ var _room_mode := "endless"  # (what Muse's stand-in says the room climbs)
 var _quick_open := false  # (whether Muse's stand-in has quick join yet)
 var _ticket_code := 200  # (what the relay's stand-in says to a ticket: 503 once its daily allowance is gone)
 var _left_rooms: Array = []  # (rooms let go of: muse_game_room_leave)
+var _ask_live := false  # (whether Muse's stand-in has muse_play_ask_for_room yet)
+var _asked_room: Array = []  # (asks for more room: the app each was for)
 
 
 func _initialize() -> void:
@@ -107,6 +109,10 @@ func _fake_muse(path: String, body: Dictionary, _bearer: String) -> Dictionary:
 				return {"code": 200, "data": {"room": "R1", "app": "frog-quest", "mode": _room_mode, "maxPlayers": 16, "public": true}}
 		"muse_game_room_leave":
 			return {"code": 204, "data": null}
+		"muse_play_ask_for_room":
+			if _ask_live:
+				_asked_room.append(str(body.get("p_app", "")))
+				return {"code": 200, "data": {"asked": true, "today": 12}}
 		"muse_presence_ping":
 			return {"code": 200, "data": "online"}
 	return {"code": 404, "data": {"message": "no such function"}}
@@ -208,6 +214,30 @@ func _run() -> void:
 	_expect(await climber.climb_with_everyone() != "" and climber.online_room == "" and not climber.is_on(),
 		"the relay refusing a ticket leaves him climbing alone")
 	_expect(_left_rooms.has("R1"), "and lets Muse have the seat back at once (left: %s)" % [_left_rooms])
+	var full := root.find_child("RoomFullPopup", true, false)
+	var back: String = load("res://scenes/RoomFullPopup.gd").reset_words()
+	_expect(full != null and _words_in(full).contains("Online's Full Today") and _words_in(full).contains(back),
+		"a popup says online's full for today, and when it's back (%s)" % back)
+	if full:
+		_ask_live = true
+		_press(full, "Ask for More Room")
+		await _until(func() -> bool: return _words_in(full).contains("froggies want more room"), 3.0)
+		_expect(_asked_room == ["frog-quest"] and _words_in(full).contains("Asked! 12 froggies want more room today."),
+			"Ask for More Room asks Muse (once), and says how many asked today (%s)" % [_asked_room])
+		_press(full, "OK")
+		await process_frame
+	await climber.climb_with_everyone()
+	await process_frame
+	_expect(root.find_child("RoomFullPopup", true, false) == null, "and it's only said once a day")
+	_ask_live = false
+	await buddy.climb_with_everyone()
+	var again := root.find_child("RoomFullPopup", true, false)
+	if again:
+		_press(again, "Ask for More Room")
+		await _until(func() -> bool: return _words_in(again).contains("isn't open yet"), 3.0)
+	_expect(again != null and _words_in(again).contains("Asking isn't open yet"), "before Muse counts asks, Ask for More Room says so")
+	if again:
+		_press(again, "OK")
 	_ticket_code = 200
 
 	process_frame.disconnect(_process_relay)
@@ -232,6 +262,25 @@ func _run() -> void:
 			push_warning("FAIL: " + f)
 		print("Online party test failed (%d)." % _failures.size())
 	quit(1 if not _failures.is_empty() else 0)
+
+
+## Every word on a screen, one after another.
+func _words_in(screen: Node) -> String:
+	if not is_instance_valid(screen):
+		return ""
+	var out := ""
+	for l in screen.find_children("*", "Label", true, false):
+		if l.visible:
+			out += l.text + " "
+	return out
+
+
+func _press(screen: Node, words: String) -> void:
+	for b in screen.find_children("*", "Button", true, false):
+		if b.text == words and b.visible and not b.disabled:
+			b.pressed.emit()
+			return
+	_failures.append("no \"%s\" button to press" % words)
 
 
 func _phone(branch_name: String) -> Node:
