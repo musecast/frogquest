@@ -1,6 +1,8 @@
 extends SceneTree
 ## Headless check of Frog Frenzy (Frenzy.gd, Muse Pro's microgames).
-## - Each microgame can be won by doing it, and lost (or timed out) by not.
+## - The microgames are played as the real Froggy (his own jump), but EAT!, tapped: each won by doing it (him
+##   put where a good jump takes him), and lost (or timed out) by not; SCARE! in his bedroom.
+## - His jump's held while a microgame's word is up and after its time, let go only while it's on.
 ## - The rounds are planned the same from the same seed: never the same twice running, FASTER every four.
 ## - On your own: 3, 2, 1, a cleared round counts, a missed one costs a life, paused it stops; out of
 ##   lives it's over, and your best is kept.
@@ -83,13 +85,24 @@ func _run() -> void:
 
 # ── the microgames ──────────────────────────────────────────────────────────────────────────────
 
+var _froggy: CharacterBody2D  # (the real Froggy, as Frenzy has him, for the microgames played as him)
+
+
 func _micro(kind: String, seed_n := 7) -> Node2D:
 	var frenzy: GDScript = load("res://scripts/Frenzy.gd")
 	var m: Node2D = (load(frenzy.MICROS[kind][0]) as GDScript).new()
 	m.rng.seed = seed_n
+	m.froggy = _froggy
 	root.add_child(m)
 	m.begin()
+	if m.uses_froggy:
+		_froggy.global_position = m.froggy_at
+		_froggy.velocity = Vector2.ZERO
+		_froggy.visible = true
+		_froggy.set_physics_process(true)
+		m.froggy_placed()
 	m.playing = true
+	m.accepting = true
 	return m
 
 
@@ -101,84 +114,128 @@ func _steps(m: Node2D, seconds: float, until := Callable()) -> void:
 		m.step(DT)
 
 
-func _microgames() -> void:
-	# SCARE!: tap while she's leaning right up to the screen and he bursts out: she's scared. Too soon, no.
-	var m := _micro("scare")
-	_steps(m, 6.0, func() -> bool: return m._lean > 0.8)
-	m.press(Vector2(120, 120))
-	_steps(m, 0.4)
-	_expect(m.word == "SCARE!" and m.won, "SCARE!: out of the TV as she leans in, and she's scared")
+func _done(m: Node2D) -> void:
+	if m.uses_froggy:
+		m.froggy_left()
 	m.queue_free()
+	await _frames(2)
+
+
+func _microgames() -> void:
+	_froggy = (load("res://scenes/endlessplayer.tscn") as PackedScene).instantiate()
+	root.add_child(_froggy)
+	for layer_name in ["CanvasLayer", "CRT Shader", "SCANLINES", "PauseScreen", "winscreen"]:
+		var layer_node := _froggy.get_node_or_null(layer_name)
+		if layer_node:
+			layer_node.visible = false
+	_froggy.get_node("Trajectory").endGame = 1  # (no stray jumps in here)
+	await _frames(2)
+	var kinds := {}
+	for kind in ["scare", "fly", "hat", "wish", "key", "play"]:
+		var m := _micro(kind)
+		kinds[kind] = m.uses_froggy
+		m.queue_free()
+	_expect(not kinds.values().has(false), "the microgames are played as Froggy, his own jump and all (%s)" % [kinds])
+	# He stands where he's put (a pixel over what's under him: one-way platforms let through what starts in them).
+	var m := _micro("hat")
+	for _i in 30:
+		await physics_frame
+	_expect(_froggy.is_on_floor() and _froggy.global_position.distance_to(m.froggy_at) < 3.0, "he's put on his feet, and stays there (%s, %s)"
+		% [_froggy.global_position, m.froggy_at])
+	await _done(m)
+	# SCARE!: in his bedroom (the story's own), in the TV; out at her while she leans in: she's scared. Too soon, no.
+	m = _micro("scare")
+	_expect(m._room.get_node_or_null("Bae") != null and m._room.get_node_or_null("Beanbag") != null and m._screen.has_point(_froggy.global_position),
+		"SCARE!: in his bedroom, him in the Muse TV")
+	_steps(m, 6.0, func() -> bool: return m._lean > 0.8)
+	_froggy.global_position = m._screen.position + Vector2(-14.0, m._screen.size.y * 0.5)
+	m.step(DT)
+	_expect(m.word == "SCARE!" and m.won and _froggy.z_index > 5, "SCARE!: out of the TV as she leans in, in front of it, and she's scared")
+	await _done(m)
 	m = _micro("scare")
 	_steps(m, 0.1)
-	m.press(Vector2(120, 120))
-	_steps(m, 0.4)
-	_expect(m.lost and not m.won, "SCARE!: out too soon, while she's sat back: no")
-	m.queue_free()
-	# EAT!: every tap a bite; finish first. Or the farmer frog does.
+	_froggy.global_position = m._screen.position + Vector2(-14.0, m._screen.size.y * 0.5)
+	m.step(DT)
+	_expect(m.lost and not m.won, "SCARE!: out too soon, while she's sat back: she watches him come")
+	await _done(m)
+	# CATCH!: into the fly. Or not.
+	m = _micro("fly")
+	_froggy.global_position = m._fly.position + Vector2(6.0, 4.0)
+	m.step(DT)
+	_expect(m.word == "CATCH!" and m.won, "CATCH!: jumped into the fly")
+	await _done(m)
+	m = _micro("fly")
+	_steps(m, 4.4)
+	_expect(not m.timeout(), "CATCH!: no jump, no fly")
+	await _done(m)
+	# HAT!: into the hat, and he's wearing it (his own hidden meanwhile, and back after).
+	m = _micro("hat")
+	var his := 0
+	for child in _froggy.get_children():
+		if child is Sprite2D and child.visible:
+			his += 1
+	_froggy.global_position = m._hat.position
+	m.step(DT)
+	m.step(DT)
+	_expect(m.word == "HAT!" and m.won and m._hat.position.distance_to(_froggy.global_position + Vector2(0.0, -m.FEET - m._tall * 0.5 + 2.0)) < 1.0,
+		"HAT!: jumped into it, and he's wearing it")
+	await _done(m)
+	var back := 0
+	for child in _froggy.get_children():
+		if child is Sprite2D and child.visible:
+			back += 1
+	_expect(back == his, "and his own hat's back after (%d, %d)" % [his, back])
+	# WISH!: into the shooting star; too slow and it's gone.
+	m = _micro("wish")
+	_steps(m, 2.0, func() -> bool: return m.t > m._comes + 0.2)
+	_froggy.global_position = m._star
+	m.step(DT)
+	_expect(m.word == "WISH!" and m.won, "WISH!: the shooting star, caught")
+	await _done(m)
+	m = _micro("wish")
+	_steps(m, 4.4)
+	_expect(m.lost and m._mark != null and m._mark.text == "...", "WISH!: too slow, it's away over the edge")
+	await _done(m)
+	# UNLOCK!: up into the keyhole with the key.
+	m = _micro("key")
+	_froggy.global_position = m._hole
+	m.step(DT)
+	_expect(m.word == "UNLOCK!" and m.won, "UNLOCK!: the key in, turned")
+	await _done(m)
+	# PLAY!: down onto the jukebox and it plays; onto the floor, no song.
+	m = _micro("play")
+	m.step(DT)
+	_froggy.global_position = m._top.position + Vector2(0.0, -m.FEET - 2.0)
+	_froggy.velocity = Vector2.ZERO
+	for _i in 30:
+		m.step(DT)
+		await physics_frame
+		if m.won:
+			break
+	_expect(m.word == "PLAY!" and m.won, "PLAY!: down on the jukebox, and it plays")
+	await _done(m)
+	m = _micro("play")
+	_froggy.global_position = Vector2(m._top.position.x + (130.0 if m._top.position.x < 0.0 else -130.0), m.FLOOR_Y - m.FEET - 2.0)
+	_froggy.velocity = Vector2.ZERO
+	for _i in 30:
+		m.step(DT)
+		await physics_frame
+		if m.lost:
+			break
+	_expect(m.lost, "PLAY!: down on the floor instead: no song")
+	await _done(m)
+	# EAT!: tapped (every tap a bite); or the farmer frog's finished first.
 	m = _micro("cake")
+	_expect(not m.uses_froggy, "EAT!'s tapped")
 	for _i in m._need:
 		m.press(Vector2(66, 190))
 	_expect(m.word == "EAT!" and m.won, "EAT!: the whole cake, bite by bite (%d)" % m._need)
-	m.queue_free()
+	await _done(m)
 	m = _micro("cake")
 	_steps(m, 4.0)
 	_expect(m.lost, "EAT!: too slow, the farmer frog's finished theirs")
-	m.queue_free()
-	# DROP!: dropped over the slot it plays (and the stars come out); off to one side it bounces off.
-	m = _micro("record")
-	_steps(m, 2.0, func() -> bool: return absf(m._record.position.x - m.FOOT.x) < 6.0)
-	m.press(Vector2.ZERO)
-	_steps(m, 1.2)
-	_expect(m.word == "DROP!" and m.won and m._night() > 0.9, "DROP!: into the jukebox, playing, its starry sky in (%.2f)" % m._night())
-	m.queue_free()
-	m = _micro("record")
-	_steps(m, 2.0, func() -> bool: return absf(m._record.position.x - m.FOOT.x) > 40.0)
-	m.press(Vector2.ZERO)
-	_steps(m, 1.2)
-	_expect(m.lost and m._night() == 0.0, "DROP!: off to one side, it misses")
-	m.queue_free()
-	# WISH!: tap the shooting star; too slow and it's gone.
-	m = _micro("wish")
-	_steps(m, 2.0, func() -> bool: return m.t > m._comes + 0.2)
-	m.press(m._star + Vector2(4, 3))
-	_steps(m, 0.3)
-	_expect(m.word == "WISH!" and m.won, "WISH!: the shooting star, caught")
-	m.queue_free()
-	m = _micro("wish")
-	_steps(m, 3.6)
-	_expect(m.lost and m._mark.text == "...", "WISH!: too slow, it's away over the edge")
-	m.queue_free()
-	# CATCH!: tap the fly.
-	m = _micro("fly")
-	m.press(m._fly.position)
-	_expect(m.word == "CATCH!" and m.won, "CATCH!: the fly, tapped")
-	m.queue_free()
-	m = _micro("fly")
-	_steps(m, 3.6)
-	_expect(not m.timeout(), "CATCH!: no tap, no fly")
-	m.queue_free()
-	# HAT!: dragged onto his head.
-	m = _micro("hat")
-	m.press(m._hat.position)
-	m.move(m._on_head())
-	m.release(m._on_head())
-	_expect(m.word == "HAT!" and m.won, "HAT!: on his head")
-	m.queue_free()
-	m = _micro("hat")
-	m.press(m._hat.position)
-	m.move(m._hat.position + Vector2(0, 30))
-	m.release(Vector2.ZERO)
-	_expect(not m.won and not m.timeout(), "HAT!: dropped short, it's not on")
-	m.queue_free()
-	# UNLOCK!: the key into its hole.
-	m = _micro("key")
-	var hole: Vector2 = m._lock.position + Vector2(-14.0, 0.0)
-	m.press(m._key.position)
-	m.move(hole)
-	m.release(hole)
-	_expect(m.word == "UNLOCK!" and m.won, "UNLOCK!: the key in, turned")
-	m.queue_free()
+	await _done(m)
+	_froggy.queue_free()
 	await _frames(2)
 
 
@@ -221,6 +278,11 @@ func _solo() -> void:
 	f._solo_t = 3.02
 	await _frames(2)
 	_expect(f._round == 0 and f._micro != null and f.plan.size() >= 1, "then the first microgame")
+	var aim: Node = f.froggy.get_node("Trajectory")
+	_expect(aim.endGame == 1, "his jump held while its word's up")
+	f._solo_t = float(f.plan[0].play_at) + 0.01
+	await _frames(2)
+	_expect(aim.endGame == (0 if f._micro.uses_froggy else 1) and f._micro.accepting, "and let go once it's on (if it's played as him)")
 	f._solo_t = float(f.plan[0].word_at) + 0.01
 	await _frames(2)
 	_expect(f._word.text == f._micro.word, "its word, big (%s)" % f._word.text)
@@ -228,6 +290,7 @@ func _solo() -> void:
 	f._solo_t = float(f.plan[0].end_at) + 0.01
 	await _frames(2)
 	_expect(f.cleared == 1 and f.lives == 4, "cleared: one, no life lost")
+	_expect(aim.endGame == 1 and not f._micro.accepting, "his jump held again once its time's up")
 	f._solo_t = float(f.plan[0].next_at) + 0.01
 	await _frames(2)
 	_expect(f._round == 1 and f.plan.size() >= 2, "on to the next")
@@ -415,21 +478,21 @@ func _party_screen() -> void:
 	root.add_child(screen)
 	await _frames(2)
 	var buttons := _buttons(screen)
-	_expect(buttons.get("Frog Frenzy") == false and _words(screen).contains("Frog Frenzy needs Muse Pro."),
+	_expect(buttons.get("Frog Frenzy (Beta)") == false and _words(screen).contains("Frog Frenzy needs Muse Pro."),
 		"without Muse Pro: Frog Frenzy greyed, and why (%s)" % [buttons])
 	_restart(screen)
 	buttons = _buttons(screen)
-	_expect(buttons.get("Frog Frenzy: Versus") == false and buttons.get("Frog Frenzy: Team") == false,
+	_expect(buttons.get("Frog Frenzy Beta: Versus") == false and buttons.get("Frog Frenzy Beta: Team") == false,
 		"a party's Frog Frenzy greyed for a host without it (%s)" % [buttons])
 	acct._refresh_token = "test"
 	acct._pro = true
 	acct._pro_checked_at = acct._now()
 	screen._show()
 	await _frames(1)
-	_expect(_buttons(screen).get("Frog Frenzy") == true, "with Muse Pro: Frog Frenzy, on your own")
+	_expect(_buttons(screen).get("Frog Frenzy (Beta)") == true, "with Muse Pro: Frog Frenzy (in beta), on your own")
 	_restart(screen)
 	buttons = _buttons(screen)
-	_expect(buttons.get("Frog Frenzy: Versus") == true and buttons.get("Frog Frenzy: Team") == true,
+	_expect(buttons.get("Frog Frenzy Beta: Versus") == true and buttons.get("Frog Frenzy Beta: Team") == true,
 		"and for the party, versus or as a team (%s)" % [buttons])
 	screen.queue_free()
 	acct.save_path = real[0]

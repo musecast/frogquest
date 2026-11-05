@@ -1,5 +1,7 @@
 extends Node2D
-## FROG FRENZY (Muse Pro's): Froggy's microgames one after another, a few seconds each. A word says what to
+## FROG FRENZY (Muse Pro's, in beta): Froggy's microgames one after another, a few seconds each, most of them
+## played as Froggy himself, with his own jump (the slingshot, the aim line: the real Froggy, kept from one to
+## the next, in each one's little world on the stage: Micro.gd). A word says what to
 ## do (SCARE! EAT! DROP! WISH! CATCH! HAT! UNLOCK!), then do it before the bar runs out; faster every few
 ## (FASTER!), the Muse TV's song speeding up with it. Four lives. On your own it's how many you can clear
 ## (your best kept). With a party: VERSUS, everyone given the same microgames at the same moments on the
@@ -10,14 +12,14 @@ extends Node2D
 
 signal said(what: Dictionary)  # (your news, as it goes to the others: the tests listen)
 
-const MICROS := {  # (each: its script, its seconds at the first speed, its stage's colour)
-	"scare": ["res://scripts/frenzy/MicroScare.gd", 4.0, Color(0.20, 0.16, 0.30)],
+const MICROS := {  # (each: its script, its seconds at the first speed (as it says itself), its stage's colour)
+	"scare": ["res://scripts/frenzy/MicroScare.gd", 5.0, Color(0.80, 0.50, 0.33)],
 	"cake": ["res://scripts/frenzy/MicroCake.gd", 4.0, Color(0.98, 0.88, 0.70)],
-	"record": ["res://scripts/frenzy/MicroRecord.gd", 3.6, Color(0.18, 0.137, 0.447)],
-	"wish": ["res://scripts/frenzy/MicroWish.gd", 3.6, Color(0.004, 0.02, 0.06)],
-	"fly": ["res://scripts/frenzy/MicroFly.gd", 3.6, Color(0.55, 0.78, 0.96)],
-	"hat": ["res://scripts/frenzy/MicroHat.gd", 4.0, Color(0.62, 0.84, 0.58)],
-	"key": ["res://scripts/frenzy/MicroKey.gd", 4.0, Color(0.52, 0.50, 0.58)],
+	"play": ["res://scripts/frenzy/MicroPlay.gd", 4.6, Color(0.18, 0.137, 0.447)],
+	"wish": ["res://scripts/frenzy/MicroWish.gd", 4.4, Color(0.004, 0.02, 0.06)],
+	"fly": ["res://scripts/frenzy/MicroFly.gd", 4.4, Color(0.55, 0.78, 0.96)],
+	"hat": ["res://scripts/frenzy/MicroHat.gd", 4.4, Color(0.62, 0.84, 0.58)],
+	"key": ["res://scripts/frenzy/MicroKey.gd", 4.4, Color(0.52, 0.50, 0.58)],
 }
 const LIVES := 4
 const COUNTDOWN := 3.0
@@ -65,7 +67,12 @@ var _down := false
 var _portrait := true
 var _layer: CanvasLayer
 var _stage_bg: ColorRect
-var _stage: Node2D
+var _box: SubViewportContainer  # (the stage: each microgame's little world, and Froggy in it)
+var _view: SubViewport
+var _world: Node2D
+var froggy: CharacterBody2D  # (the real Froggy: endlessplayer.tscn, his jump and all, kept from one to the next)
+var _cam: Camera2D
+var _aim: Node  # (his slingshot: endGame 1 holds it)
 var _hud: Control
 var _hearts_at := Vector2.ZERO
 var _word: Label
@@ -116,9 +123,37 @@ func _build() -> void:
 	_stage_bg.color = Color(0.16, 0.12, 0.10)
 	_stage_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer.add_child(_stage_bg)
-	_stage = Node2D.new()
-	_stage.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_layer.add_child(_stage)
+	_box = SubViewportContainer.new()
+	_box.stretch = true
+	_box.mouse_filter = Control.MOUSE_FILTER_STOP
+	_layer.add_child(_box)
+	_view = SubViewport.new()
+	_view.transparent_bg = true
+	_view.handle_input_locally = true
+	_view.audio_listener_enable_2d = true
+	_view.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	_box.add_child(_view)
+	_world = Node2D.new()
+	_view.add_child(_world)
+	froggy = (load("res://scenes/endlessplayer.tscn") as PackedScene).instantiate()
+	_view.add_child(froggy)
+	for layer_name in ["CanvasLayer", "CRT Shader", "SCANLINES", "PauseScreen", "winscreen"]:  # (Frenzy has its own)
+		var layer_node := froggy.get_node_or_null(layer_name)
+		if layer_node:
+			layer_node.visible = false
+	_cam = froggy.get_node("Camera2D")
+	_cam.top_level = true
+	_cam.offset = Vector2.ZERO
+	_cam.position_smoothing_enabled = false
+	_cam.drag_horizontal_enabled = false
+	_cam.limit_left = -10000000
+	_cam.limit_top = -10000000
+	_cam.limit_right = 10000000
+	_cam.limit_bottom = 10000000
+	_aim = froggy.get_node("Trajectory")
+	_hold_froggy(true)
+	froggy.visible = false
+	froggy.set_physics_process(false)
 	_hud = Control.new()
 	_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -253,8 +288,15 @@ func _process(delta: float) -> void:
 		if _micro:
 			_pop(_micro.word)
 	if _micro and t >= float(r.play_at):
-		_micro.playing = true
+		if not _micro.playing:
+			_micro.playing = true
+			_micro.accepting = true
+			if _micro.uses_froggy and not out:
+				_hold_froggy(false)
 		_micro.step(minf(delta, 0.1))
+	if t >= float(r.end_at) and _micro and _micro.accepting:
+		_micro.accepting = false
+		_hold_froggy(true)
 	if t >= float(r.end_at) and _settled < k:
 		_settle(k)
 	var left := 1.0
@@ -284,9 +326,14 @@ func _plan_round(k: int) -> Dictionary:
 func _begin_round(k: int) -> void:
 	_round = k
 	_down = false
+	_hold_froggy(true)
 	if _micro:
+		if _micro.uses_froggy:
+			_micro.froggy_left()
 		_micro.queue_free()
 		_micro = null
+	froggy.visible = false
+	froggy.set_physics_process(false)
 	var r: Dictionary = plan[k]
 	if r.faster:
 		_pop("FASTER!")
@@ -299,8 +346,28 @@ func _begin_round(k: int) -> void:
 	_micro = (load(MICROS[r.kind][0]) as GDScript).new()
 	_micro.speed = float(r.speed)
 	_micro.rng.seed = hash([_seed, k])
-	_stage.add_child(_micro)
+	_micro.froggy = froggy
+	_world.add_child(_micro)
 	_micro.begin()
+	_cam.global_position = _micro.view.get_center()
+	_cam.reset_physics_interpolation()
+	if _micro.uses_froggy:  # (him, put in its world, standing, ready)
+		froggy.global_position = _micro.froggy_at
+		froggy.velocity = Vector2.ZERO
+		froggy.z_index = 0
+		froggy.reset_physics_interpolation()
+		froggy.visible = true
+		froggy.set_physics_process(true)
+		_micro.froggy_placed()
+
+
+## Froggy's jump held (no aiming, no jumping) or let go: only while a microgame of his is on.
+func _hold_froggy(hold: bool) -> void:
+	if _aim == null:
+		return
+	_aim.endGame = 1 if hold else 0
+	if hold:
+		_aim.mousePath = Vector2.ZERO
 
 
 ## How round k went: cleared, or a life gone (in a team, the team's).
@@ -421,25 +488,6 @@ func _say(what: Dictionary) -> void:
 		said.emit(what)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if over or out or paused or _micro == null or _round < 0 or _settled >= _round:
-		return
-	var r: Dictionary = plan[_round]
-	var t := now()
-	if t < float(r.play_at) or t >= float(r.end_at):
-		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var at := _stage.to_local(event.position)
-		if event.pressed:
-			_down = true
-			_micro.press(at)
-		elif _down:
-			_down = false
-			_micro.release(at)
-	elif event is InputEventMouseMotion and _down:
-		_micro.move(_stage.to_local(event.position))
-
-
 ## Everyone in it, best first: in versus, those still in, then whoever lasted longest, then the most
 ## cleared; in a team, the most cleared.
 func rows() -> Array:
@@ -548,8 +596,10 @@ func _fit() -> void:
 	var span: Vector2 = ui.across(vp, room, room.size.x - 24.0)  # (in the screen's middle, clear of a camera strip)
 	var side := maxf(60.0, minf(span.y, bottom - top))
 	var at := Vector2(span.x + (span.y - side) * 0.5, top + (bottom - top - side) * 0.5).round()
-	_stage.position = at
-	_stage.scale = Vector2.ONE * side / STAGE
+	_box.position = at
+	_box.size = Vector2(side, side)
+	if _micro:
+		_cam.zoom = Vector2.ONE * side / maxf(1.0, _micro.view.size.x)
 	_stage_bg.position = at
 	_stage_bg.size = Vector2(side, side)
 	_bar_back.position = Vector2(at.x, at.y + side + 12.0)
@@ -605,8 +655,10 @@ func pause() -> void:
 		return
 	paused = true
 	_down = false
+	_hold_froggy(true)
 	if style == "solo":
 		_song.stream_paused = true
+		_view.process_mode = Node.PROCESS_MODE_DISABLED  # (the microgame and Froggy, stopped where they are)
 	_pause_menu = _panel("Paused", 75)
 	var box: VBoxContainer = _pause_menu.get_meta("box")
 	if style != "solo":
@@ -619,6 +671,9 @@ func pause() -> void:
 func _unpause() -> void:
 	paused = false
 	_song.stream_paused = false
+	_view.process_mode = Node.PROCESS_MODE_INHERIT
+	if _micro and _micro.accepting and _micro.uses_froggy:
+		_hold_froggy(false)
 	if _pause_menu:
 		_pause_menu.queue_free()
 		_pause_menu = null
@@ -635,8 +690,10 @@ func finish() -> void:
 		return
 	over = true
 	_down = false
+	_hold_froggy(true)
 	if _micro:
 		_micro.playing = false
+		_micro.accepting = false
 	if style == "solo" and cleared > MusicManager.frenzy_best:
 		MusicManager.frenzy_best = cleared
 		MusicManager.save_wardrobe()
@@ -653,7 +710,7 @@ func _show_results() -> void:
 		return
 	if _pause_menu:
 		_unpause()
-	results = _panel("FROG FRENZY", 70)
+	results = _panel("FROG FRENZY BETA", 70)
 	var box: VBoxContainer = results.get_meta("box")
 	match style:
 		"solo":

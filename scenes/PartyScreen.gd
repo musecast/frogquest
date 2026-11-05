@@ -190,7 +190,7 @@ func _starts() -> void:
 		start.disabled = not pro or lonely
 		_box.add_child(start)
 	for style in ["vs", "team"]:  # (Frog Frenzy: Frenzy.gd)
-		var start := _button("Frog Frenzy: %s" % ("Versus" if style == "vs" else "Team"),
+		var start := _button("Frog Frenzy Beta: %s" % ("Versus" if style == "vs" else "Team"),
 			func() -> void: Party.start("frenzy", style), "gold" if pro else "quiet")
 		start.disabled = not pro
 		_box.add_child(start)
@@ -205,13 +205,13 @@ func _starts() -> void:
 func _frenzy() -> void:
 	_header("Muse Pro")
 	var pro: bool = MuseAccount.has_pro()
-	var play := _button("Frog Frenzy", func() -> void: get_tree().change_scene_to_file("res://scenes/Frenzy.tscn"),
+	var play := _button("Frog Frenzy (Beta)", func() -> void: get_tree().change_scene_to_file("res://scenes/Frenzy.tscn"),
 		"gold" if pro else "quiet")
 	play.disabled = not pro
 	_box.add_child(play)
 	if MusicManager.frenzy_best > 0:
 		_box.add_child(_label("Your best: %d cleared" % MusicManager.frenzy_best, BODY_FONT_SZ, GOLD))
-	_box.add_child(_label("Quick little games, faster and faster. Host a party to play it with friends." if pro
+	_box.add_child(_label("Quick little games as Froggy, faster and faster. It's in beta: more to come. Host a party to play it with friends." if pro
 		else "Frog Frenzy needs Muse Pro. Friends without it can join a Pro friend's party and play.", BODY_FONT_SZ, DIM))
 
 
