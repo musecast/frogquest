@@ -1161,7 +1161,9 @@ func _build_title_menu() -> void:
 	var modes := BoxContainer.new()  # (side by side upright, one over the other sideways: _layout_title)
 	modes.name = "Modes"
 	menu.add_child(modes)
-	_title_button(modes, "EndlessButton", _on_endlessmodebutton_pressed).set_meta("words", "ENDLESS")
+	var endless := _title_button(modes, "EndlessButton", _on_endlessmodebutton_pressed)
+	endless.set_meta("words", "ENDLESS")
+	endless.button_down.connect(_hold_for_og_endless.bind(endless))  # (a secret: OG Endless)
 	_title_button(modes, "PartyButton", _on_party_button_pressed).set_meta("words", "PLAY TOGETHER")
 	var extras := HBoxContainer.new()  # (little square buttons, a picture on each and no words)
 	extras.name = "Extras"
@@ -1364,8 +1366,26 @@ func _show_logo(pop := false) -> void:
 		title.spring_velocity += 0.5
 
 
+## A secret: hold ENDLESS down (OG_HOLD seconds) and it's the original Endless, just as it was (OG Endless:
+## the checkerboard, the pink platforms; scenes/og), with its own best score.
+const OG_HOLD := 2.0
+var _og_endless := false
+
+
+func _hold_for_og_endless(button: Button) -> void:
+	await get_tree().create_timer(OG_HOLD).timeout
+	if not is_instance_valid(button) or not button.is_pressed() or not button.is_hovered() or not $titlescreen.visible:
+		return
+	_og_endless = true
+	MusicManager.show_toast("OG Endless", null, "The original Endless, just as it was.")
+	$frogaim.play()
+	get_tree().change_scene_to_file("res://scenes/og/OGEndlessMode.tscn")
+
+
 ## ENDLESS. The first time, he makes his froggy first (the frog god), and its flash fades over Endless.
 func _on_endlessmodebutton_pressed() -> void:
+	if _og_endless:  # (held: it's the OG one, already on its way)
+		return
 	if not MusicManager.look_made:
 		_meet_the_frog_god(func() -> void:
 			var intro := get_node_or_null("CreatorIntro")

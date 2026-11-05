@@ -681,7 +681,7 @@ func _unpause() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
-		pause()
+		pause.call_deferred()  # (just after: a notification can come while the tree's busy, and the menu can't be added then)
 
 
 ## Over: GAME OVER (or YOU WIN!), your best kept on your own, the music away; then the results.

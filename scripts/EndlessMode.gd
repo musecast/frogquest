@@ -1424,7 +1424,7 @@ func _unpause() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
-		pause()  # (back to it paused, not mid-air)
+		pause.call_deferred()  # (back to it paused, not mid-air; just after: a notification can come while the tree's busy, and the menu can't be added then)
 
 
 # ── the pond ────────────────────────────────────────────────────────────────────────────────────
