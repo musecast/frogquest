@@ -36,9 +36,52 @@ const STALK := [Color("7e644e"), Color("d6c4a6"), Color("d6c4a6"), Color("f0e4cc
 	Color("7e644e")]
 const SHINE := Color("fcf4e4")  # (the glint down its light side)
 const ELBOW := 10.0  # (a bough's bend: how far round its middle goes, in its art's pixels)
+## Each kind's other colours, rarest last (EndlessMode deals them, rarer ones higher up its zone): swaps of
+## its art's own colours. Springs and the ones that give way keep theirs, so you can tell what they'll do.
+const VARIANTS := {
+	"mushroom": [
+		{"cd8e54": "a58fd6", "5e3722": "3e2e60", "96603c": "6e5aa0", "ecb678": "c8b8f0", "f8e2ba": "f4eeff"},  # (lilac: never pink, that's a spring's red)
+		{"cd8e54": "5cb8a8", "5e3722": "1f4c46", "96603c": "3f8a7e", "ecb678": "98dccc", "f8e2ba": "eefaf6"},  # (teal)
+		{"cd8e54": "6fa8dc", "5e3722": "233c5e", "96603c": "41689c", "ecb678": "a6d0f2", "f8e2ba": "eef6ff"},  # (blue)
+		{"cd8e54": "f2c14e", "5e3722": "6a4410", "96603c": "b0802a", "ecb678": "ffe08a", "f8e2ba": "fffbe6"},  # (gold)
+	],
+	"canopy": [
+		{"2eb082": "7cc240", "36e377": "b4e85a", "345551": "3c5a2a"},  # (spring green)
+		{"2eb082": "e08a3c", "36e377": "f8b85c", "345551": "6a3a1e"},  # (autumn)
+		{"2eb082": "ec8cb6", "36e377": "ffc4dc", "345551": "7a3d58"},  # (blossom)
+		{"2eb082": "e6be3e", "36e377": "fff08a", "345551": "6e5418"},  # (gold)
+	],
+	"cloud": [
+		{"dceafa": "f8d8e8", "8caad6": "d898b8", "bed4f0": "f0c6da"},  # (candy floss)
+		{"dceafa": "e4dafa", "8caad6": "a898d8", "bed4f0": "d0c4f2"},  # (lavender)
+		{"dceafa": "d2f4e6", "8caad6": "7ec6a8", "bed4f0": "b6e8d4"},  # (mint)
+		{"ffffff": "fffbe8", "dceafa": "fbeab8", "8caad6": "e0b25a", "bed4f0": "f6d690"},  # (golden)
+	],
+	"island": [
+		{"2eb082": "b8a83c", "36e377": "e0d060"},  # (dry grass)
+		{"2eb082": "d873a6", "36e377": "ffa8cc"},  # (blossom)
+		{"2eb082": "a8d8e8", "36e377": "f0fbff", "c47852": "8e9cc0", "cb815e": "a0aed0", "9f5a52": "6e7aa0", "a86246": "7c88ae",
+			"522c28": "3a4466"},  # (frost)
+		{"2eb082": "e6be3e", "36e377": "fff08a", "c47852": "a070c8", "cb815e": "b282d8", "9f5a52": "7a50a0", "a86246": "8a5cb0",
+			"522c28": "40285a"},  # (amethyst, golden grass)
+	],
+	"asteroid": [
+		{"867ca0": "b0644e", "665c80": "86483a", "a89ebe": "cc8a74", "b4aacc": "dca08a", "5c5276": "6e3a30", "3a324c": "3c1e1a"},  # (red)
+		{"867ca0": "7aa8d0", "665c80": "5880a8", "a89ebe": "a6cce8", "b4aacc": "c0e0f4", "5c5276": "4a6a90", "3a324c": "243650"},  # (ice)
+		{"867ca0": "7ca070", "665c80": "5a7c50", "a89ebe": "a2c294", "b4aacc": "b8d6aa", "5c5276": "46603e", "3a324c": "26341f"},  # (mossy)
+		{"867ca0": "d6a43c", "665c80": "a87a24", "a89ebe": "f0c860", "b4aacc": "ffe08a", "5c5276": "7a5414", "3a324c": "3e2a08"},  # (gold)
+	],
+	"satellite": [
+		{"466ec8": "c8464a", "7eaaf0": "f07e7e"},  # (red panels)
+		{"466ec8": "46b06e", "7eaaf0": "7ee8a8"},  # (green)
+		{"466ec8": "8a56c8", "7eaaf0": "c08ef0"},  # (purple)
+		{"466ec8": "c8a046", "7eaaf0": "f0d27e"},  # (gold)
+	],
+}
 const CRUMBLE_DELAY := 0.6  # seconds from landing to falling
 
 var kind := "mushroom"
+var variant := 0  # (its colours: 0 its kind's own, else one of VARIANTS[kind])
 var width := 96.0
 var motion := ""  # "", "sway", "bob" or "drift"
 var motion_speed := 1.0
@@ -56,6 +99,7 @@ var stalk_root := Vector2.INF  # (where it grows from, in the world: a spot on a
 var stalk_branch := false  # (it grows out of the side of another's stem, at stalk_root: down, round a bend, across into it)
 var stalk_lean := 0.0  # (that stem's lean, across for each down, so a bough meets it flush)
 static var _elbows := {}  # (a bough's bend, turning each way: drawn once)
+static var _arts := {}  # (kinds' art in their other colours, recoloured once: "kind:variant" -> texture)
 var _vines := []  # ([x across its middle, how long, which side its first leaf's on], in art px)
 var _under_node: Node2D
 var _spring_up: Texture2D
@@ -74,7 +118,7 @@ var _spring_kick := 0.0  # the spring's boing as you leave it
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
-	_strip = load(ART % kind)
+	_strip = strip_of(kind, variant)
 	if art[3] != "":
 		if art[3] == "stalk":
 			_stalk = load(ART % "stalk") if stalk_root != Vector2.INF else null
@@ -221,9 +265,9 @@ func _draw_under() -> void:
 			return
 		var h := float(_stalk.get_height())
 		var row := 0.0
-		while row < length:  # (leaning: two rows at a time, each a whole pixel further over)
+		while row < length:  # (leaning: down from under its cap, easing over, down onto what it grows from; two rows at a time, each a whole pixel)
 			var band := minf(2.0, length - row)
-			var x := roundf(root.x * (row + band * 0.5) / length) - roundf(w * 0.5)
+			var x := roundf(root.x * smoothstep(0.0, 1.0, (row + band * 0.5) / length)) - roundf(w * 0.5)
 			_under_node.draw_texture_rect_region(_stalk, Rect2(x, top + row, w, band), Rect2(0.0, fmod(row, h), w, band))
 			row += band
 
@@ -235,11 +279,57 @@ func stalk_top() -> Vector2:
 	return position + Vector2(0.0, (-float(art[2]) + float(strip.get_height()) - 3.0) * PX)
 
 
-## Where its stalk's straight part ends: where it grows from, or a bough's bend.
-func stalk_low() -> Vector2:
+## Its stalk, as points in the world every 12 px or so, from under its cap to where it grows from: down,
+## round a bough's bend and across, or curving over as it leans (EndlessMode grows boughs off these, and
+## keeps stalks from crossing). None with no stalk.
+func stem_points() -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	if stalk_root == Vector2.INF:
+		return pts
+	var top := stalk_top()
 	if stalk_branch:
-		return Vector2(position.x, stalk_root.y - ELBOW * PX)
-	return stalk_root
+		var knee := stalk_root.y - ELBOW * PX
+		var n := maxi(2, int((knee - top.y) / 12.0))
+		for k in n + 1:
+			pts.append(Vector2(top.x, lerpf(top.y, knee, float(k) / n)))
+		var side := signf(stalk_root.x - top.x)
+		pts.append(Vector2(top.x + side * ELBOW * PX * 0.3, stalk_root.y - ELBOW * PX * 0.3))
+		var bend := Vector2(top.x + side * ELBOW * PX, stalk_root.y)
+		var m := maxi(1, int(absf(stalk_root.x - bend.x) / 12.0))
+		for k in m + 1:
+			pts.append(bend.lerp(stalk_root, float(k) / m))
+		return pts
+	var root := stalk_root + Vector2(0.0, 4.0)
+	var n := maxi(2, int((root.y - top.y) / 12.0))
+	for k in n + 1:
+		var u := float(k) / n
+		pts.append(Vector2(top.x + (root.x - top.x) * smoothstep(0.0, 1.0, u), lerpf(top.y, root.y, u)))
+	return pts
+
+
+## A kind's art in one of its colours (VARIANTS; 0, its own): its own colours swapped, made once.
+static func strip_of(of_kind: String, shade: int) -> Texture2D:
+	var base: Texture2D = load(ART % of_kind)
+	var shades: Array = VARIANTS.get(of_kind, [])
+	if shade <= 0 or shade > shades.size():
+		return base
+	var key := "%s:%d" % [of_kind, shade]
+	if _arts.has(key):
+		return _arts[key]
+	var img: Image = base.get_image().duplicate()  # (a copy: the texture's own can be handed back, and isn't ours to change)
+	if img.is_compressed():
+		img.decompress()
+	img.convert(Image.FORMAT_RGBA8)
+	var swap: Dictionary = shades[shade - 1]
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			var to = swap.get(c.to_html(false))
+			if c.a > 0.0 and to != null:
+				img.set_pixel(x, y, Color(Color(str(to)), c.a))
+	var tex := ImageTexture.create_from_image(img)
+	_arts[key] = tex
+	return tex
 
 
 ## A bough: its stalk down from under its cap to `j`'s height less ELBOW, round the bend, and across into the

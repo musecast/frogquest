@@ -88,8 +88,8 @@ var _banner_sub: Label
 var _titles: CanvasLayer  # (the zones' names: AreaTitle)
 var _race: Node = null  # (racing your party up it: PartyRace; null climbing)
 const ROOT_REACH := 320.0  # (as far below a mushroom as its stalk goes looking for a cap to grow out of)
-const BOUGH_ACROSS := Vector2(30.0, 120.0)  # (how far across a bough reaches to another's stem)
-const BOUGH_ODDS := 65  # (in a hundred: a bough, when there's a cap below in reach too)
+const BOUGH_ACROSS := Vector2(26.0, 110.0)  # (how far across a bough reaches to another's stem)
+const LEAN := 0.45  # (the most a stalk leans to a cap below, across for each down: about 24 degrees)
 const PARTY_MAX_X := 180.0  # (in a party, the tower's as wide as an upright phone's for everyone: the same tower)
 var _sky  # (EndlessSky.gd)
 var _zones: Script
@@ -731,6 +731,8 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 	for key in overrides:
 		platform.set(key, overrides[key])
 	platform.position = at
+	if not plain and not overrides.has("variant"):
+		platform.variant = _variant_for(platform.kind, at, t)
 	platform.set_meta("platform_id", next_platform_id)
 	next_platform_id += 1
 	if platform.kind.begins_with("mushroom"):
@@ -739,93 +741,142 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 	return platform
 
 
-## Where a mushroom at `at` grows from: a cap below it (_root_under), or now and then (BOUGH_ODDS; always,
-## with no cap in reach) out of the side of another's stem, like a bough (_bough_from). The same for
-## everyone in a party: it's all worked out from where the platforms are, nothing left to chance.
+## Where a mushroom at `at` grows from, the tidiest way there is (EndlessPlatform draws it):
+## - straight down onto a cap right under it;
+## - out of the side of an upright stem beside it, like a bough;
+## - leaning a little (LEAN) onto a cap below: down from its cap, easing over, down onto the other;
+## - or out of the pond right under it, near the bottom.
+## Never behind another cap or across another stem on the way; with none of those to be had, it's just
+## its cap. Worked out from where the platforms are, so the same for everyone in a party.
 func _plant(platform: Node2D, at: Vector2) -> void:
-	var cap := _root_under(at)
-	var bough: Array = _bough_from(at)
-	var k := int(round(at.x)) * 73856093 ^ int(round(at.y)) * 19349663
-	var coin := absi((k ^ (k >> 13)) * 1274126177) % 100
-	if not bough.is_empty() and (cap == Vector2.INF or coin < BOUGH_ODDS):
-		platform.stalk_root = bough[0]
-		platform.stalk_lean = bough[1]
-		platform.stalk_branch = true
-	else:
-		platform.stalk_root = cap
+	var stems := {}  # (every stalk there is, as points: EndlessPlatform.stem_points)
+	for p in platforms.get_children():
+		if not p.is_queued_for_deletion() and str(p.kind).begins_with("mushroom"):
+			stems[p] = p.stem_points()
+	var top := at + Vector2(0.0, platform.stalk_top().y - platform.position.y)
+	var best_score := INF
+	for p in platforms.get_children():  # (onto a cap below)
+		if p.is_queued_for_deletion():
+			continue
+		var drop: float = p.position.y - at.y
+		if drop < 24.0 or drop > ROOT_REACH:
+			continue
+		var half := float(p.width) * 0.5 - 12.0
+		var x := clampf(at.x, p.position.x - half, p.position.x + half)
+		var across := absf(x - at.x)
+		if across > drop * LEAN or across > 90.0:
+			continue
+		var score := drop + across * 2.5
+		if score < best_score and _stalk_clear(platform, top, Vector2(x, p.position.y), p, stems):
+			best_score = score
+			platform.stalk_root = Vector2(x, p.position.y)
+	var bough: Array = _bough_from(at, stems)  # (out of a stem beside it: a touch preferred, they're the prettiest)
+	if not bough.is_empty():
+		var j: Vector2 = bough[0]
+		var score: float = (j.y - at.y) + absf(j.x - at.x) * 1.4 - 20.0
+		if score < best_score:
+			best_score = score
+			platform.stalk_root = j
+			platform.stalk_lean = bough[1]
+			platform.stalk_branch = true
+	var pond := Vector2(at.x, WATER_Y)  # (out of the pond, right under it)
+	if WATER_Y - at.y <= ROOT_REACH and WATER_Y - at.y + 40.0 < best_score and _stalk_clear(platform, top, pond, null, stems):
+		platform.stalk_root = pond
+		platform.stalk_branch = false
 
 
-## A spot on the side of a mushroom's stem below (the straight part of it, clear of both its ends) that a
-## stalk from `at` can reach going down and then bending across to it, BOUGH_ACROSS across, without running
-## into a cap or another stem on the way: the nearest such, [where, that stem's lean]; [] if there's none.
-func _bough_from(at: Vector2) -> Array:
+## A stalk from `top` (under a cap) curving down to `root` (EndlessPlatform's lean): clear of every cap but
+## the one it grows out of (`into`), and of every other stem?
+func _stalk_clear(platform: Node2D, top: Vector2, root: Vector2, into: Node2D, stems: Dictionary) -> bool:
+	for k in range(1, 12):
+		var u := k / 12.0
+		var spot := Vector2(top.x + (root.x - top.x) * smoothstep(0.0, 1.0, u), lerpf(top.y, root.y, u))
+		for q in platforms.get_children():
+			if q == into or q == platform or q.is_queued_for_deletion():
+				continue
+			if Rect2(q.position.x - float(q.width) * 0.5 - 8.0, q.position.y - 10.0, float(q.width) + 16.0, 28.0).has_point(spot):
+				return false
+		for q in stems:
+			for p in stems[q]:
+				if spot.distance_squared_to(p) < 144.0:
+					return false
+	return true
+
+
+## A spot on the side of a mushroom's stem below, on an upright bit of it and clear of both its ends, that a
+## stalk from `at` can reach going down and then bending across to it (BOUGH_ACROSS across), without
+## running into a cap or another stem: the nearest such, [where, that stem's lean there]; [] if none.
+func _bough_from(at: Vector2, stems := {}) -> Array:
+	if stems.is_empty():
+		for p in platforms.get_children():
+			if not p.is_queued_for_deletion() and str(p.kind).begins_with("mushroom"):
+				stems[p] = p.stem_points()
 	var best := []
 	var shortest := INF
-	for p in platforms.get_children():
-		if p.is_queued_for_deletion() or not str(p.kind).begins_with("mushroom") or p.stalk_root == Vector2.INF:
-			continue
-		var a: Vector2 = p.stalk_top()
-		var b: Vector2 = p.stalk_low()
-		for i in 7:
-			var j := a.lerp(b, 0.3 + i * 0.08)
+	for p in stems:
+		var pts: PackedVector2Array = stems[p]
+		for i in range(1, pts.size() - 1):
+			var j := pts[i]
+			var down := pts[i + 1].y - pts[i - 1].y
+			if down < 4.0:
+				continue
+			var lean := (pts[i + 1].x - pts[i - 1].x) / down
+			if absf(lean) > 0.6 or j.y < p.position.y + 28.0 or j.y > p.stalk_root.y - 16.0:
+				continue
 			var across := absf(j.x - at.x)
 			var drop := j.y - at.y
-			if across < BOUGH_ACROSS.x or across > BOUGH_ACROSS.y or drop < 56.0 or drop > ROOT_REACH:
+			if across < BOUGH_ACROSS.x or across > BOUGH_ACROSS.y or drop < 50.0 or drop > 230.0:
 				continue
-			if j.y < p.position.y + 28.0 or across + drop >= shortest or not _bough_clear(at, j, p):
-				continue
-			shortest = across + drop
-			best = [j, (b.x - a.x) / maxf(1.0, b.y - a.y)]
+			var length := drop + across * 1.4
+			if length < shortest and _bough_clear(at, j, p, stems):
+				shortest = length
+				best = [j, lean]
 	return best
 
 
 ## A bough from `at` down and across to `j` on `into`'s stem: clear of every cap, and of every other stem?
-func _bough_clear(at: Vector2, j: Vector2, into: Node2D) -> bool:
+func _bough_clear(at: Vector2, j: Vector2, into: Node2D, stems: Dictionary) -> bool:
 	var down := Rect2(at.x - 10.0, at.y + 8.0, 20.0, j.y - at.y)
 	var across := Rect2(minf(at.x, j.x), j.y - 10.0, absf(j.x - at.x), 20.0)
 	for q in platforms.get_children():
 		if q.is_queued_for_deletion():
 			continue
-		var cap := Rect2(q.position.x - float(q.width) * 0.5, q.position.y - 8.0, float(q.width), 24.0)
+		var cap := Rect2(q.position.x - float(q.width) * 0.5 - 6.0, q.position.y - 10.0, float(q.width) + 12.0, 28.0)
 		if cap.intersects(down) or cap.intersects(across):
 			return false
-		if q == into or not str(q.kind).begins_with("mushroom") or q.stalk_root == Vector2.INF:
+	for q in stems:
+		if q == into:
 			continue
-		var legs: Array = [[q.stalk_top(), q.stalk_low()]]
-		if q.stalk_branch:
-			legs.append([q.stalk_low(), q.stalk_root])
-		for leg in legs:
-			for s in 9:  # (along that stem: anywhere near the way?)
-				var spot: Vector2 = leg[0].lerp(leg[1], s / 8.0)
-				if down.grow(8.0).has_point(spot) or across.grow(8.0).has_point(spot):
-					return false
+		for spot in stems[q]:
+			if down.grow(8.0).has_point(spot) or across.grow(8.0).has_point(spot):
+				return false
 	return true
 
 
-## Where a mushroom at `at` grows from: the nearest spot on top of a cap below it that its stalk can reach
-## leaning no more than about 40 degrees off upright; or the pond, if that's close below; or nowhere
-## (Vector2.INF: just its cap), so no stalk runs on down through the sky.
-func _root_under(at: Vector2) -> Vector2:
-	var best := Vector2.INF
-	var shortest := INF
-	for p in platforms.get_children():
-		if p.is_queued_for_deletion():
-			continue
-		var top: float = p.global_position.y
-		var dy := top - at.y
-		if dy < 20.0 or dy > ROOT_REACH:
-			continue
-		var half := float(p.width) * 0.5 - 10.0
-		var x := clampf(at.x, p.global_position.x - half, p.global_position.x + half)
-		if absf(x - at.x) > dy * 0.84:
-			continue
-		var length := Vector2(x - at.x, dy).length()
-		if length < shortest:
-			shortest = length
-			best = Vector2(x, top)
-	if best == Vector2.INF and WATER_Y - at.y <= ROOT_REACH:
-		best = Vector2(at.x, WATER_Y)
-	return best
+## A platform's colours: now and then one of its kind's others (EndlessPlatform.VARIANTS), more often and
+## rarer ones the higher up its zone it is, the rarest (gold) only near the top. Worked out from where it
+## is, so the same for everyone in a party.
+func _variant_for(kind: String, at: Vector2, t: float) -> int:
+	var shades: Array = _platform_script.VARIANTS.get(kind, [])
+	if shades.is_empty() or _hash01(at, 7) >= 0.06 + 0.34 * t:
+		return 0
+	var weights := [1.0, 0.9 * t, 0.8 * maxf(0.0, t - 0.35), 0.6 * maxf(0.0, t - 0.65)]
+	var total := 0.0
+	for i in shades.size():
+		total += float(weights[i])
+	var pick := _hash01(at, 11) * total
+	for i in shades.size():
+		pick -= float(weights[i])
+		if pick < 0.0:
+			return i + 1
+	return 1
+
+
+## A repeatable "random" 0..1 for a spot (whole numbers only, so every phone gets the same).
+static func _hash01(at: Vector2, salt: int) -> float:
+	var k := int(round(at.x)) * 73856093 ^ int(round(at.y)) * 19349663 ^ salt * 83492791
+	k = (k ^ (k >> 13)) * 1274126177
+	return float(absi(k) % 10000) / 10000.0
 
 
 static func _pick_kind(kinds: Array, rng: RandomNumberGenerator) -> String:

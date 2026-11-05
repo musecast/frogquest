@@ -71,9 +71,10 @@ func _run() -> void:
 	var max_platforms := 0
 	var last_id := 1
 	var boughs := {}
+	var stalks_seen := {}
 	for step in 170:
 		_check_gaps(endless, zones, checked_gaps)
-		_check_boughs(endless, boughs)
+		_check_stalks(endless, stalks_seen, boughs)
 		var next = _next_platform(endless, last_id)
 		if next == null:
 			_failures.append("no platform above #%d to climb to" % last_id)
@@ -108,6 +109,7 @@ func _run() -> void:
 	_expect(max_platforms < 80, "old platforms are cleaned up below him (at most %d)" % max_platforms)
 	_expect(endless._zone_reached == 4, "each zone's banner showed as he reached it")
 	await _bough_cases(endless)
+	_check_shades(endless)
 
 	# Fall, then keep going.
 	player.global_position.y += 1400.0
@@ -162,22 +164,85 @@ func _check_scorer_vectors(endless: Node) -> void:
 
 
 ## The next platform up from the one with this id (by id: they're made in order, bottom to top).
-## Mushrooms growing out of the side of another's stem (boughs), as they're made: each joins a stem that's
-## there, on its straight part, across within reach, its bend under its own cap.
-func _check_boughs(endless: Node, seen: Dictionary) -> void:
+## The swamp's stalks, as they're made: tidy (none behind a cap, none across another stem, a lean no more
+## than LEAN); and the boughs among them (mushrooms growing out of the side of another's stem): each joins a
+## stem that's there, within reach, its bend well under its own cap.
+func _check_stalks(endless: Node, seen: Dictionary, boughs: Dictionary) -> void:
+	var all: Array = []
 	for p in endless.platforms.get_children():
-		if not str(p.kind).begins_with("mushroom") or not p.stalk_branch or seen.has(p.get_instance_id()):
+		if str(p.kind).begins_with("mushroom") and p.stalk_root != Vector2.INF:
+			all.append(p)
+	for p in all:
+		if seen.has(p.get_instance_id()):
 			continue
 		seen[p.get_instance_id()] = true
-		var j: Vector2 = p.stalk_root
-		var on := false
-		for q in endless.platforms.get_children():
-			if q != p and str(q.kind).begins_with("mushroom") and q.stalk_root != Vector2.INF:
-				on = on or Geometry2D.get_closest_point_to_segment(j, q.stalk_top(), q.stalk_low()).distance_to(j) < 1.5
-		var across := absf(j.x - p.position.x)
-		_expect(on, "bough #%d grows out of a stem that's there" % p.get_meta("platform_id"))
-		_expect(across >= endless.BOUGH_ACROSS.x and across <= endless.BOUGH_ACROSS.y and p.stalk_low().y > p.stalk_top().y + 20.0,
-			"bough #%d reaches %.0f across, its bend well under its cap" % [p.get_meta("platform_id"), across])
+		var id: int = p.get_meta("platform_id", -1)
+		var pts: PackedVector2Array = p.stem_points()
+		var into: Node = null  # (the one whose stem a bough grows out of)
+		for q in all:
+			var theirs: PackedVector2Array = q.stem_points()
+			for i in theirs.size() - 1:
+				if q != p and Geometry2D.get_closest_point_to_segment(p.stalk_root, theirs[i], theirs[i + 1]).distance_to(p.stalk_root) < 2.0:
+					into = q
+		if p.stalk_branch:
+			boughs[p.get_instance_id()] = true
+			var across := absf(p.stalk_root.x - p.position.x)
+			_expect(into != null, "bough #%d grows out of a stem that's there" % id)
+			_expect(across >= endless.BOUGH_ACROSS.x and across <= endless.BOUGH_ACROSS.y and p.stalk_root.y - p.stalk_top().y > 30.0,
+				"bough #%d reaches %.0f across, its bend well under its cap" % [id, across])
+		else:
+			var lean := absf(p.stalk_root.x - p.position.x) / maxf(1.0, p.stalk_root.y - p.position.y)
+			_expect(lean <= endless.LEAN + 0.01, "#%d's stalk leans no more than it should (%.2f)" % [id, lean])
+		for k in pts.size() - 2:  # (all of it but where it grows from)
+			for q in endless.platforms.get_children():
+				if q != p and Rect2(q.position.x - float(q.width) * 0.5, q.position.y - 6.0, float(q.width), 20.0).has_point(pts[k]):
+					_expect(false, "#%d's stalk runs behind #%d's cap" % [id, q.get_meta("platform_id", -1)])
+		for q in all:
+			if q == p or _grows_from(p, q) or _grows_from(q, p):
+				continue
+			var theirs: PackedVector2Array = q.stem_points()
+			var crossed := false
+			for k in pts.size() - 2:
+				for m in theirs.size() - 2:
+					crossed = crossed or pts[k].distance_to(theirs[m]) < 6.0
+			_expect(not crossed, "#%d's stalk runs across #%d's" % [id, q.get_meta("platform_id", -1)])
+
+
+## Does `a` grow out of `b` (out of the top of its cap, or the side of its stem)?
+func _grows_from(a: Node, b: Node) -> bool:
+	if absf(a.stalk_root.y - b.position.y) < 1.0 and absf(a.stalk_root.x - b.position.x) <= float(b.width) * 0.5:
+		return true
+	var theirs: PackedVector2Array = b.stem_points()
+	for i in theirs.size() - 1:
+		if Geometry2D.get_closest_point_to_segment(a.stalk_root, theirs[i], theirs[i + 1]).distance_to(a.stalk_root) < 2.0:
+			return true
+	return false
+
+
+## Every biome's platforms come in their other colours now and then, rarer ones higher up: none at the very
+## bottom of a zone but the odd one; more, and rarer, near its top.
+func _check_shades(endless: Node) -> void:
+	var low := 0
+	var high := 0
+	var rarest := 0
+	for i in 400:
+		var at := Vector2(float(i * 37 % 300) - 150.0, -float(i * 53))
+		if endless._variant_for("mushroom", at, 0.0) > 0:
+			low += 1
+		var v: int = endless._variant_for("mushroom", at, 1.0)
+		if v > 0:
+			high += 1
+		if v == 4:
+			rarest += 1
+	_expect(low < 50 and high > low * 3 and rarest > 0 and rarest < high / 3,
+		"mushrooms' other colours: a few low down (%d in 400), more high up (%d), the gold rarest (%d)" % [low, high, rarest])
+	_expect(endless._variant_for("mushroom_red", Vector2(3.0, -7.0), 1.0) == 0 and endless._variant_for("twig", Vector2(3.0, -7.0), 1.0) == 0,
+		"springs and ones that give way keep their colours")
+	var plain: Texture2D = load("res://assets/endless/canopy.png")
+	var blossom: Texture2D = load("res://scenes/EndlessPlatform.gd").strip_of("canopy", 3)
+	_expect(blossom != plain and blossom.get_size() == plain.get_size()
+		and blossom.get_image().get_pixel(20, 8).to_html(false) != plain.get_image().get_pixel(20, 8).to_html(false),
+		"the treetops' leaves in blossom: the same leaves, pink")
 
 
 ## A bough, made to order far up out of the way: a mushroom with a stem, and one above and beside it
