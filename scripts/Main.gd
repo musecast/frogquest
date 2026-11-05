@@ -27,12 +27,24 @@ const FELL_BY := 25.0  # (in currentHeight, a tenth of a pixel: 250 px above the
 ## The TV at home, through the static, before he's ever won: why he's going.
 const TV_LINES := ["...bzzt...", "...a froggy of fate will\nrise from below...",
 	"...and reach the top of\nthe world tree...", "...bzzzzt..."]
+const WAKE_DOZE := 2.0  # (seconds he's seen asleep before the TV comes on by itself)
+const TV_TYPE_SPEED := 12.0  # (the TV's words, letters a second)
+signal _tv_next  # (a tap, once the TV's line is all there)
 const LOST_FROG_TOP := Vector2(2950, -5626)  # (where the lost frog turns up once the gate's open: the castle hall)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
 var _tv_over := 0.0  # (the middle of the TV, across: its words go over it, unless that's off the screen)
 var _tv_done := false
+var _tv_db := 0.0  # (the TV's static, as the level has it)
+var _tv_typed := 0.0
+var _tv_typing := false
+var _tv_listening := false  # (its words wait for a tap: wake_up)
+var _tv_more: Control  # (MoreArrow, under its words once they're all there)
+var _tv_glass: CanvasItem  # (its screen off: dark glass)
+var _tv_flash: CanvasItem  # (coming on: a line of light, opening up)
+var _tv_voice: AudioStreamPlayer
+var _tv_crackle: AudioStreamPlayer
 var _lost_frog_up := false
 var _lost_frog_thanked := false
 var _no_gods: Label
@@ -86,15 +98,16 @@ func _ready():
 
 	_make_tv_bubble()
 	_make_no_gods_line()
+	var titles: CanvasLayer = load("res://scripts/AreaTitle.gd").new()  # (where he is, named as he gets there)
+	titles.player = $Player
+	add_child(titles)
+	_frog_gods()
 
 	$frogNPC1.play("farmer")
 
 	if MusicManager.MusicPosition != 0:
 		$Player/winscreen/goodbyefroggy.play(MusicManager.MusicPosition)
 		MusicManager.MusicPosition = 0
-
-	_loop_cave_audio($"Environmental Audio/caveaudio")
-	_loop_cave_audio($"Environmental Audio/darktreeAudio")
 
 	load("res://scripts/FlyHunt.gd").spawn_into(self)  # the little flies hiding around the tree (catch them all: the Golden Frog)
 	var together: Node2D = load("res://scripts/StoryParty.gd").new()  # (climbing with friends, and everyone online)
@@ -163,31 +176,211 @@ func _make_tv_bubble() -> void:
 	_tv_bubble.pivot_offset.x = 200.0
 	_tv_over = $Musecrtquarterview.position.x
 	_tv_bubble.position = Vector2(_tv_over - _tv_bubble.pivot_offset.x, $Musecrtquarterview.position.y - 100.0)
+	_tv_bubble.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING  # (typed out in place)
+	_tv_more = load("res://scripts/MoreArrow.gd").new()
+	_tv_more.z_index = _tv_bubble.z_index
+	add_child(_tv_more)
+	_tv_voice = _tv_sound_player("res://assets/tv_voice.wav", -20.0)
+	_tv_crackle = _tv_sound_player("res://assets/tv_crackle.wav", -18.0)
+	_tv_db = $Musecrtquarterview/AudioStreamPlayer2D.volume_db
+	# (its screen, off and coming on: over the static, under the TV's frame, as the static is)
+	var screen: ColorRect = $Musecrtquarterview/ColorRect
+	var glass := TextureRect.new()
+	var shine := GradientTexture2D.new()
+	shine.fill = GradientTexture2D.FILL_RADIAL
+	shine.fill_from = Vector2(0.42, 0.38)
+	shine.fill_to = Vector2(1.05, 1.0)
+	shine.gradient = Gradient.new()
+	shine.gradient.set_color(0, Color(0.22, 0.23, 0.28))
+	shine.gradient.set_color(1, Color(0.09, 0.09, 0.12))
+	glass.texture = shine
+	glass.stretch_mode = TextureRect.STRETCH_SCALE
+	glass.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	var flash := ColorRect.new()
+	flash.color = Color(0.92, 0.95, 1.0)
+	for each in [glass, flash]:
+		each.z_index = screen.z_index
+		each.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		each.visible = false
+		$Musecrtquarterview.add_child(each)
+		each.position = screen.position
+		each.size = screen.size
+		each.pivot_offset = screen.size * 0.5
+	_tv_glass = glass
+	_tv_flash = flash
 
 
-## The TV's words over it, but kept on the screen: upright, a phone shows less of the room either side of
-## it, and they'd run off the edge.
+func _tv_sound_player(path: String, db: float) -> AudioStreamPlayer:
+	var p := AudioStreamPlayer.new()
+	p.stream = load(path)
+	p.bus = &"FX"
+	p.volume_db = db
+	add_child(p)
+	return p
+
+
+## The TV's words over it, but kept on the screen, clear of a closed iPhone Duo's camera strip or a notch
+## (UIStyle.room): upright, a phone shows less of the room either side of it, and they'd run off the edge.
 func _keep_tv_words_in_view() -> void:
 	var vp := get_viewport()
 	var to_world := vp.get_canvas_transform().affine_inverse()
-	var seen: Rect2 = to_world * vp.get_visible_rect()
+	var seen: Rect2 = to_world * load("res://scripts/UIStyle.gd").room(vp.get_visible_rect().size)
 	var rim := float(_tv_bubble.get_theme_constant("outline_size") + 4)  # (its outline, and a little room)
 	var half := (_tv_bubble.get_minimum_size().x * 0.5 + rim) * _tv_bubble.scale.x
 	var mid := _tv_over
-	if seen.size.x > half * 2.0:
+	if seen.size.x > half * 2.0 and _tv_over > seen.position.x and _tv_over < seen.end.x:  # (the TV's on the screen)
 		mid = clampf(mid, seen.position.x + half, seen.end.x - half)
 	_tv_bubble.position.x = mid - _tv_bubble.pivot_offset.x
 
 
-## The TV at home, through the static.
-func _tv_talk() -> void:
+## A new climb from his bedroom (player._on_button_pressed): he's asleep in his beanbag, the TV off. It
+## comes on by itself (a thunk, a line of light opening up, its static swelling in), he wakes, and it
+## speaks, crackling in the frog god's voice: each of its lines stays till a tap (the arrow under it says
+## so). Then the tutorial comes up, and off he goes. from_dark: the game's fading in from the frog god's
+## black (CreatorIntro), so he's asleep all through that, and a little while after.
+func wake_up(from_dark: bool) -> void:
+	if _tv_done:
+		return
+	_tv_done = true
+	var player := $Player
+	player.waking = true
+	player.set_asleep(true)
+	_tv_power(false)
+	_tutorials(false)
+	var intro: GDScript = load("res://scenes/CreatorIntro.gd")
+	if not await _wait((intro.HOLD + intro.FADE if from_dark else 0.5) + WAKE_DOZE):
+		return
+	_tv_power(true)
+	if not await _wait(1.1):
+		return
+	player.wake()
+	if not await _wait(0.9):
+		return
+	_tv_listening = true
 	for line in TV_LINES:
-		_tv_bubble.text = line
-		_tv_bubble.visible = true
-		await get_tree().create_timer(2.8).timeout
+		_tv_say(line)
+		await _tv_next
 		if not is_inside_tree():
 			return
+	_tv_listening = false
 	_tv_bubble.visible = false
+	_tutorials(true)
+	player.waking = false
+
+
+## The frog god's glimpses up the climb (FROG KING2 on: a shadow of him come as he passes each): once one's
+## there, a plain shadow, it slowly turns (each in its own time) into the frog god as the intro shows him
+## (CreatorIntro): dark, a violet rim breathing round him, his eyes glowing.
+func _frog_gods() -> void:
+	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	for god in $"finale/Control".get_children():
+		if god is Sprite2D and str(god.name).begins_with("FROG KING"):
+			var mat: ShaderMaterial = looks.material({}, "")
+			mat.set_shader_parameter("shadow_amount", 0.0)  # (a plain shadow to start: as it always was)
+			god.material = mat
+			god.visibility_changed.connect(_godlike.bind(god))
+
+
+func _godlike(god: Sprite2D) -> void:
+	if not god.visible or god.has_meta("godlike"):
+		return
+	god.set_meta("godlike", true)
+	var shade := god.self_modulate
+	var slow := randf_range(4.0, 6.0)
+	var turn := god.create_tween()
+	turn.tween_interval(randf_range(0.8, 2.2))
+	# (him first, while it's still dark: then his violet rim and his eyes come up out of the black)
+	turn.tween_property(god.material, "shader_parameter/shadow_amount", 1.0, slow * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	turn.parallel().tween_property(god, "self_modulate", Color(1.0, 1.0, 1.0, maxf(shade.a, 0.92)), slow) 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+
+
+func _wait(seconds: float) -> bool:
+	await get_tree().create_timer(seconds).timeout
+	return is_inside_tree()
+
+
+## One of the TV's lines, typed out over it (_process: its sounds as it goes, the arrow when it's all there).
+func _tv_say(line: String) -> void:
+	_tv_bubble.text = line
+	_tv_bubble.visible_characters = 0
+	_tv_bubble.visible = true
+	_tv_typed = 0.0
+	_tv_typing = true
+
+
+## A tap while the TV speaks: all of its line at once, or (once it's all there) the next.
+func _tv_tap() -> void:
+	if not _tv_listening:
+		return
+	if _tv_typing:
+		_tv_typed = float(_tv_bubble.text.length())
+		_tv_bubble.visible_characters = -1
+		_tv_typing = false
+		return
+	_tv_next.emit()
+
+
+## A tap anywhere while the TV's talking (seen before the screen's full-screen CRT and scanline layers
+## take it), but on the pause button, or while the game's paused.
+func _tv_input(event: InputEvent) -> void:
+	if not _tv_listening or not event is InputEventMouseButton or not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if Engine.time_scale < 0.5:
+		return
+	var pause := get_node_or_null("Player/CanvasLayer/TouchScreenButtonPause/ColorRect") as Control
+	if pause != null and pause.is_visible_in_tree() and pause.get_global_rect().grow(12.0).has_point(event.position):
+		return
+	get_viewport().set_input_as_handled()
+	_tv_tap()
+
+
+## The TV off (its screen dark glass, no static) or coming on: a thunk, a line of light opening up into
+## the static, its hiss swelling in.
+func _tv_power(on: bool) -> void:
+	var hiss: AudioStreamPlayer2D = $Musecrtquarterview/AudioStreamPlayer2D
+	if not on:
+		_tv_glass.visible = true
+		_tv_glass.modulate.a = 1.0
+		_tv_flash.visible = false
+		hiss.stop()
+		return
+	var thunk := _tv_sound_player("res://assets/tv_on.wav", -8.0)
+	thunk.play()
+	thunk.finished.connect(thunk.queue_free)
+	_tv_flash.visible = true
+	_tv_flash.modulate.a = 1.0
+	_tv_flash.scale = Vector2(0.2, 0.03)
+	var light := create_tween()  # (a dot of light, a line across, the line opening up into the picture)
+	light.tween_interval(0.05)
+	light.tween_property(_tv_flash, "scale:x", 0.97, 0.14).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	light.tween_property(_tv_flash, "scale", Vector2.ONE, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	light.parallel().tween_property(_tv_glass, "modulate:a", 0.0, 0.3)
+	light.tween_property(_tv_flash, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN)
+	light.tween_callback(func() -> void:
+		_tv_flash.visible = false
+		_tv_glass.visible = false)
+	hiss.volume_db = _tv_db - 24.0
+	hiss.play()
+	create_tween().tween_property(hiss, "volume_db", _tv_db, 1.2).set_ease(Tween.EASE_OUT)
+
+
+## The tutorial's words round the start (how to jump, to pause, that it saves): hidden, or come up softly.
+func _tutorials(on: bool) -> void:
+	for each in ["tutorial", "tutorial2", "tutorial3", "tutorial4"]:
+		var words: CanvasItem = get_node("World Sprites/" + each)
+		words.visible = on
+		if on:
+			words.modulate.a = 0.0
+			words.create_tween().tween_property(words, "modulate:a", 1.0, 0.9).set_ease(Tween.EASE_OUT)
+
+
+## The arrow under the TV's words: in the middle of them, a little under their last line.
+func _place_tv_more() -> void:
+	var lines := _tv_bubble.text.count("\n") + 1
+	var pivot := _tv_bubble.pivot_offset
+	var bottom := _tv_bubble.position.y + pivot.y + (lines * _tv_bubble.get_line_height() - pivot.y) * _tv_bubble.scale.y
+	_tv_more.pixel = 2.0
+	_tv_more.position = Vector2(_tv_bubble.position.x + pivot.x - _tv_more.size.x * 0.5, bottom + 4.0).round()
 
 
 ## The climb's last words, in the finale's own look ("you are the"'s), just under the plank below the glass
@@ -207,13 +400,22 @@ func _make_no_gods_line() -> void:
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta):
-	# (not while the frog god's still asking what he looks like: once he's woken, in his bedroom)
-	if not _tv_done and not MusicManager.game_beaten and not $Player/titlescreen.visible and not $Player.has_node("CreatorIntro") \
-			and $Player.global_position.distance_to($Musecrtquarterview.global_position) < 220.0:
-		_tv_done = true
-		_tv_talk()
+	if _tv_typing:  # (the TV's line, typed out: its crackling voice every other letter, "bzzt" its static)
+		var total := _tv_bubble.text.length()
+		var before := int(_tv_typed)
+		_tv_typed = minf(float(total), _tv_typed + delta * TV_TYPE_SPEED)
+		_tv_bubble.visible_characters = int(_tv_typed)
+		var ch := _tv_bubble.text.substr(int(_tv_typed) - 1, 1)
+		if int(_tv_typed) / 2 != before / 2 and not ch in [" ", "\n", "."]:
+			var sound := _tv_crackle if _tv_bubble.text.contains("bzz") else _tv_voice
+			sound.pitch_scale = randf_range(0.9, 1.06)
+			sound.play()
+		if _tv_typed >= total:
+			_tv_typing = false
+	_tv_more.shown = _tv_listening and _tv_bubble.visible and not _tv_typing
 	if _tv_bubble.visible:
 		_keep_tv_words_in_view()
+		_place_tv_more()
 	# The lost frog, let out by the gate he opened, turns up by the castle (while he's well away from both).
 	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > 400.0:
 		_lost_frog_up = true
@@ -254,6 +456,7 @@ func _process(delta):
 
 #body of script
 func _input(event):
+	_tv_input(event)
 	if Input.is_action_just_pressed("toggle_fullscreen"):
 		current_window = DisplayServer.window_get_mode()
 		if current_window != 3:
@@ -825,33 +1028,6 @@ func _on_area_2d_6_body_shape_exited(body_rid, body, body_shape_index, local_sha
 
 
 
-
-
-func _loop_cave_audio(player: AudioStreamPlayer2D) -> void:
-	var length: float = player.stream.get_length()
-	if length <= 0.0:
-		return
-	const XFADE: float = 3.0
-	var delay: float = max(0.0, length - player.get_playback_position() - XFADE)
-	await get_tree().create_timer(delay).timeout
-	if not is_instance_valid(player) or not player.playing:
-		return
-	var p2 := AudioStreamPlayer2D.new()
-	p2.stream = player.stream
-	p2.volume_db = -80.0
-	p2.max_distance = player.max_distance
-	p2.bus = player.bus
-	p2.position = player.position
-	player.get_parent().add_child(p2)
-	p2.play()
-	var target_vol: float = player.volume_db
-	var t := create_tween().set_parallel(true)
-	t.tween_property(player, "volume_db", -80.0, XFADE)
-	t.tween_property(p2, "volume_db", target_vol, XFADE)
-	await t.finished
-	player.stop()
-	player.queue_free()
-	_loop_cave_audio(p2)
 
 
 func _on_castleaudiocue_body_entered(body):

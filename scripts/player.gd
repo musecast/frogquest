@@ -63,6 +63,12 @@ var _crt_normal_volume: float = -20.0
 var _banner_hidden_for_landscape_pause: bool = false
 var _title_glide: Tween = null  # (the title moving to where it now goes: _place_title)
 var _title_laid_out_for := Vector2.ZERO  # (the screen size the title was last laid out for)
+## Waking up at home (Main.wake_up): asleep in his beanbag, then up as the TV has its say. While he's
+## waking there's no jumping (Trajectory) and the clock's held, till the tutorial's up.
+var waking := false
+var asleep := false
+var _from_the_dark := false  # (the frog god's intro has just cut to black: the game fades in on him)
+var _zzz: Node2D = null
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
 var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
@@ -70,6 +76,16 @@ var highScore
 var currentHeight
 var _fall_top := 0.0  # (the highest he's been since he last stood: a fall's how far below that he lands)
 const GHOST_FALL := 150.0  # (a fall this big, in currentHeight: the Ghost skin)
+const LONG_FALL := 45.0  # (a fall this big, in currentHeight, a tenth of a pixel: he lands hard, with a "!". A mushroom throws him ~33)
+const SLEEPY := 45.0  # (seconds left alone, standing still, before he nods off)
+const DUST := Color(0.93, 0.89, 0.80)  # (the dust he kicks up, jumping and landing)
+## Landed hard: seconds left of him stuck there shivering (no jumping till it's done), and the shiver's
+## own clock.
+var stunned := 0.0
+var _shiver_t := 0.0
+var _idle_s := 0.0
+var _fall_air: AudioStreamPlayer = null  # (the rush of air as he falls a long way)
+var _napping := false  # (nodded off from being left alone: a touch wakes him)
 
 func _trace(label: String) -> void:
 	print("StartupTrace: %s at %d ms" % [label, Time.get_ticks_msec()])
@@ -177,7 +193,7 @@ func _physics_process(delta):
 	
 	currentHeight = (-position.y - 472) /10
 	
-	if Engine.time_scale != 0.05 and $Trajectory.endGame == 0:
+	if Engine.time_scale != 0.05 and $Trajectory.endGame == 0 and not waking:
 		time_now = Time.get_unix_time_from_system()
 		var time_elapsed = time_now - time_start
 
@@ -262,6 +278,10 @@ func _physics_process(delta):
 	
 
 		
+	_nap(delta)
+	_fall_sound(delta)
+	_shivering(delta)
+
 	# Add the gravity.
 	if not is_on_floor():
 		if not was_airborne:
@@ -281,8 +301,12 @@ func _physics_process(delta):
 	if is_on_floor():
 		if was_airborne:
 			was_airborne = false
-			if _fall_top - currentHeight >= GHOST_FALL:
+			var fell: float = _fall_top - currentHeight
+			if fell >= GHOST_FALL:
 				MusicManager.unlock("ghost")  # (a really big fall: the Ghost skin)
+			if fell >= LONG_FALL:
+				_exclaim()  # (that was a long way down)
+				_land_hard(fell)
 			save_game()
 		$Sprite2D.rotation = lerp_angle($Sprite2D.rotation, get_floor_normal().angle() + PI / 2, 25.0 * delta)
 		$Shadow.rotation = $Sprite2D.rotation
@@ -495,6 +519,201 @@ func _on_button_pressed():
 		$"../World Sprites/tutorial2".visible = true
 		$"../World Sprites/tutorial3".visible = true
 		$"../World Sprites/tutorial4".visible = true
+	if _waking_at_home():
+		get_parent().wake_up(_from_the_dark)  # (asleep in his beanbag, the TV off: it comes on, he wakes...)
+	_from_the_dark = false
+
+
+## A climb starting at home, his own: by the TV (where a new one starts), the game not won yet, not with
+## friends (up the tree with them he's straight off). Then he wakes up there first (Main.wake_up).
+func _waking_at_home() -> bool:
+	var tv := get_node_or_null("../Musecrtquarterview") as Node2D
+	return tv != null and get_parent().has_method("wake_up") and not MusicManager.game_beaten and not Party.in_run 		and global_position.distance_to(tv.global_position) < 220.0
+
+
+## Asleep (his eyes shut, little z's drifting up off him: Zzz) or not.
+func set_asleep(on: bool) -> void:
+	asleep = on
+	_shut_eyes(on)
+	if on and _zzz == null:
+		_zzz = load("res://scripts/Zzz.gd").new()
+		_zzz.anchor = Vector2(6.0, -9.0)  # (just over the top of his head)
+		add_child(_zzz)
+	elif not on and _zzz != null:
+		_zzz.stop()
+		_zzz = null
+
+
+func _shut_eyes(on: bool) -> void:
+	var mat := $Sprite2D.material as ShaderMaterial
+	if mat != null and mat.shader != null and mat.shader.resource_path.ends_with("froggy_look.gdshader"):
+		mat.set_shader_parameter("eyes_shut", on)
+
+
+## Awake: his eyes open, and he starts up out of his beanbag a little (squashed, stretched, back), a "!"
+## popping up over him.
+func wake() -> void:
+	set_asleep(false)
+	var body: Node2D = $Sprite2D
+	var base := Vector2(0.76, 0.76)  # (his size, as player.tscn has it)
+	var hop := create_tween()
+	hop.tween_property(body, "scale", base * Vector2(1.16, 0.84), 0.07)
+	hop.tween_property(body, "scale", base * Vector2(0.9, 1.14), 0.1)
+	hop.tween_property(body, "scale", base, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_exclaim()
+
+
+## Left alone long enough (SLEEPY), standing still, he nods off: his eyes shut, z's drifting up off him.
+## A touch, or anything moving him, and he's awake again (and the touch is his jump as ever).
+func _nap(delta: float) -> void:
+	var playing: bool = $Trajectory.endGame == 0 and not waking and Engine.time_scale > 0.5 and not $PauseScreen.visible
+	var still: bool = is_on_floor() and velocity.length() < 1.0 and not Input.is_action_pressed("ui_mouse")
+	if _napping:
+		if not playing or not still or Input.is_action_just_pressed("ui_mouse"):
+			_napping = false
+			_idle_s = 0.0
+			set_asleep(false)
+		return
+	if playing and still:
+		_idle_s += delta
+		if _idle_s >= SLEEPY:
+			_napping = true
+			set_asleep(true)
+	else:
+		_idle_s = 0.0
+
+
+## A red "!" popping up just over his head with a little chirp (woken up; landed after a long fall), then
+## fading. Its own (taking nothing of his but where his head is: never stretched with him), at three whole
+## pixels to each of the font's, crisp.
+func _exclaim() -> void:
+	var holder: Node2D = load("res://scripts/Follow.gd").new()
+	holder.name = "Exclaim"
+	holder.z_index = 25
+	holder.z_as_relative = false
+	holder.anchor = Vector2(3.0, -21.0)
+	add_child(holder)
+	var mark := Label.new()
+	mark.text = "!"
+	load("res://scripts/UIStyle.gd").style_label(mark, 16, Color(1.0, 0.24, 0.2))
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mark.pivot_offset = (mark.get_minimum_size() * 0.5).round()  # (it pops up from its middle)
+	mark.position = -mark.pivot_offset
+	mark.scale = Vector2(0.05, 0.05)
+	holder.add_child(mark)
+	var pop := mark.create_tween()
+	pop.tween_property(mark, "scale", Vector2(3.0, 3.0), 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	pop.tween_interval(1.0)
+	pop.tween_property(mark, "modulate:a", 0.0, 0.5)
+	pop.tween_callback(holder.queue_free)
+	_sound("res://assets/exclaim.wav", -9.0, randf_range(0.96, 1.04))
+
+
+## A sound, once, from him (not where he is: he's always where the camera is).
+func _sound(path: String, db: float, pitch := 1.0) -> AudioStreamPlayer:
+	var p := AudioStreamPlayer.new()
+	p.stream = load(path)
+	p.bus = &"FX"
+	p.volume_db = db
+	p.pitch_scale = pitch
+	add_child(p)
+	p.play()
+	p.finished.connect(p.queue_free)
+	return p
+
+
+## Landing hard, after a long fall (`fell`, in currentHeight): a thud (the further, the deeper and louder),
+## and dust shooting out either side of him.
+func _land_hard(fell: float) -> void:
+	var hard := clampf((fell - LONG_FALL) / 120.0, 0.0, 1.0)
+	_sound("res://assets/land_hard.wav", lerpf(-12.0, -3.0, hard), lerpf(1.08, 0.86, hard))
+	_dust(to_global(Vector2(0.0, 11.0)), int(lerpf(12.0, 26.0, hard)), lerpf(1.0, 1.7, hard), 82.0)
+	# (and there he stays a moment, squashed flat, then shivering: no jumping till he's shaken it off)
+	stunned = lerpf(0.6, 0.95, hard)
+	_shiver_t = 0.0
+	var body: Node2D = $Sprite2D
+	var base := Vector2(0.76, 0.76)
+	var squash := create_tween()
+	squash.tween_property(body, "scale", base * Vector2(1.28, 0.74), 0.06)
+	squash.tween_property(body, "scale", base * Vector2(1.12, 0.9), 0.22)
+	squash.tween_property(body, "scale", base, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Stuck after a hard landing (stunned): a little shiver side to side, quick and dying away, then still.
+func _shivering(delta: float) -> void:
+	var body: Node2D = $Sprite2D
+	if stunned <= 0.0:
+		if body.position.x != 0.0:
+			body.position.x = 0.0
+		return
+	stunned = maxf(0.0, stunned - delta)
+	_shiver_t += delta
+	var shake := 1.0 if int(_shiver_t * 28.0) % 2 == 0 else -1.0
+	body.position.x = 0.0 if stunned <= 0.0 else shake * (1.0 if stunned > 0.25 else 0.5)
+
+
+## Free to jump: not waking up at home, not stuck shivering after a hard landing (Trajectory asks).
+func can_act() -> bool:
+	return not waking and stunned <= 0.0
+
+
+## A little puff of dust from under him as he jumps (Trajectory, as he lets go).
+func jumped() -> void:
+	_dust(to_global(Vector2(0.0, 11.0)), 7, 0.45, 70.0)
+
+
+## Dust from `at`: `amount` specks, `power` how hard they fly, `spread` how far round from straight up.
+func _dust(at: Vector2, amount: int, power: float, spread: float) -> void:
+	var dust := CPUParticles2D.new()
+	dust.name = "Dust"
+	dust.one_shot = true
+	dust.explosiveness = 0.95
+	dust.amount = amount
+	dust.lifetime = 0.45 + 0.35 * power
+	dust.direction = Vector2(0.0, -1.0)
+	dust.spread = spread
+	dust.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	dust.emission_rect_extents = Vector2(7.0, 1.0)
+	dust.initial_velocity_min = 45.0 * power
+	dust.initial_velocity_max = 120.0 * power
+	dust.gravity = Vector2(0.0, 320.0)
+	dust.damping_min = 30.0
+	dust.damping_max = 60.0
+	dust.scale_amount_min = 1.5
+	dust.scale_amount_max = 3.0
+	var fade := Gradient.new()
+	fade.set_color(0, Color(DUST, 0.95))
+	fade.set_color(1, Color(DUST, 0.0))
+	dust.color_ramp = fade
+	dust.z_index = 22
+	dust.z_as_relative = false
+	get_parent().add_child(dust)
+	dust.global_position = at
+	dust.emitting = true
+	dust.finished.connect(dust.queue_free)
+
+
+## The rush of air as he falls a long way: in once he's well into a fall and going fast, louder and
+## higher the faster he goes, gone the moment he lands.
+func _fall_sound(delta: float) -> void:
+	var want := -60.0
+	if not is_on_floor() and velocity.y > 760.0 and _fall_top - currentHeight > 40.0 and Engine.time_scale > 0.5:
+		want = lerpf(-24.0, -7.0, clampf((velocity.y - 760.0) / 900.0, 0.0, 1.0))
+	if _fall_air == null:
+		if want <= -59.0:
+			return
+		_fall_air = AudioStreamPlayer.new()
+		_fall_air.stream = load("res://assets/fall_wind.wav")
+		_fall_air.bus = &"FX"
+		_fall_air.volume_db = -60.0
+		add_child(_fall_air)
+	var rate := 40.0 if want > _fall_air.volume_db else 160.0  # (in as the fall picks up; cut off on landing)
+	_fall_air.volume_db = move_toward(_fall_air.volume_db, want, rate * delta)
+	_fall_air.pitch_scale = lerpf(0.85, 1.3, clampf((velocity.y - 760.0) / 900.0, 0.0, 1.0))
+	if _fall_air.volume_db > -58.0 and not _fall_air.playing:
+		_fall_air.play()
+	elif _fall_air.volume_db <= -59.5 and _fall_air.playing:
+		_fall_air.stop()
 	
 
 
@@ -510,23 +729,28 @@ func _meet_the_frog_god(then: Callable, cut_sound := true, fade_in := false) -> 
 	var intro: CanvasLayer = load("res://scenes/CreatorIntro.gd").new()
 	intro.cut_sound = cut_sound
 	intro.fade_in = fade_in
+	intro.slow_end = then == _on_button_pressed  # (into his bedroom, asleep: a long black, a slow fade)
 	add_child(intro)
 	var tv := get_node_or_null("../Musecrtquarterview/AudioStreamPlayer2D") as AudioStreamPlayer2D
 	var tv_db := tv.volume_db if tv else 0.0
 	if tv:
 		tv.volume_db = -80.0
 	intro.tree_exited.connect(func() -> void:
-		if is_instance_valid(tv) and tv.volume_db <= -79.0:
+		if is_instance_valid(tv) and tv.volume_db <= -79.0 and not waking:
 			tv.volume_db = tv_db)  # (gone some other way: the static as it was)
 	intro.done.connect(func() -> void:
 		_apply_equipped_cosmetics()
 		_refresh_title_menu()
+		_from_the_dark = true
 		then.call()
+		_from_the_dark = false
+		if waking:
+			return  # (he's asleep at home, the TV off: it comes on by itself, Main.wake_up)
 		if is_instance_valid(tv):
 			var up := tv.create_tween()
-			up.tween_interval(intro.HOLD * 0.8)
+			up.tween_interval(intro.hold() * 0.8)
 			up.tween_callback(func() -> void: tv.volume_db = -30.0)
-			up.tween_property(tv, "volume_db", tv_db, intro.FADE + 0.4).set_ease(Tween.EASE_OUT))
+			up.tween_property(tv, "volume_db", tv_db, intro.fade() + 0.4).set_ease(Tween.EASE_OUT))
 
 
 func _on_thanksforplaying_timer_timeout():
@@ -818,6 +1042,7 @@ func _apply_equipped_cosmetics() -> void:
 	# (your froggy, as you made him, with your skin's effect over him: FroggyLook)
 	var skin := MusicManager.equipped_skin
 	$Sprite2D.material = load("res://scripts/FroggyLook.gd").material(MusicManager.look, skin)
+	_shut_eyes(asleep)
 	$Shadow.visible = (skin != "negative_skin")
 	_place_hats()
 
@@ -1445,6 +1670,9 @@ func _apply_ui_layout() -> void:
 		$PauseScreen.get_node_or_null("RemoveAdsPauseBtn")])
 
 	# ── PAUSE BUTTON ──────────────────────────────────────────────────────
+	# (it and the clock up in the corners, in from the notch, a Dynamic Island, the closed iPhone Duo's
+	# camera strip and the ad banners: UIStyle.room)
+	var room: Rect2 = ui.room(vp)
 	var pause_btn := $CanvasLayer/TouchScreenButtonPause
 	if pause_btn:
 		var ratio: float = vp.y / vp.x
@@ -1452,7 +1680,7 @@ func _apply_ui_layout() -> void:
 		var btn_scale: float = lerp(1.5, 2.5, t_btn)
 		var btn_pos: float = lerp(26.0, 42.0, t_btn)
 		pause_btn.scale = Vector2(btn_scale, btn_scale)
-		pause_btn.position = Vector2(btn_pos, btn_pos)
+		pause_btn.position = (room.position + Vector2(btn_pos, btn_pos)).round()
 
 	# ── HUD LABELS ───────────────────────────────────────────────────────
 	var ratio_hud: float = vp.y / vp.x
@@ -1463,6 +1691,9 @@ func _apply_ui_layout() -> void:
 		for child in vbox.get_children():
 			if child is Label:
 				_text_size(child, hud_font_size)
+		var hud: MarginContainer = vbox.get_parent()  # (the clock, height and jumps: up in the room's corner)
+		hud.add_theme_constant_override("margin_top", int(room.position.y) + 15)
+		hud.add_theme_constant_override("margin_right", int(vp.x - room.end.x) + 15)
 
 	# ── WIN SCREEN ────────────────────────────────────────────────────────
 	_apply_win_layout()

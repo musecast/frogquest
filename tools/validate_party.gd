@@ -176,6 +176,7 @@ func _rubber_banding(endless: Node2D, party: Node) -> void:
 	endless._tether(0.016)
 	_expect(endless._tether_peer == 2, "the band ties to the nearest friend")
 	endless._last_floor_y = y
+	endless._fall_from_y = y  # (an ordinary fall: from where he stood)
 	player.global_position.y = y + 30.0
 	player.velocity = Vector2(0.0, 400.0)
 	endless._tether(0.016)
@@ -198,6 +199,28 @@ func _rubber_banding(endless: Node2D, party: Node) -> void:
 	player.global_position.y = friend_y + endless.fail_y_threshold + 10.0
 	endless._trigger_reset()
 	_expect(not endless.is_resetting and not endless._reel.is_empty(), "past the point of no return, a friend above still pulls you up")
+	await create_timer(endless.TETHER_REEL + 0.3).timeout
+
+	# Fallen way too far by the time it'd catch you: the band snaps (no pulling up); a friend back down beside
+	# you ties it back on.
+	player.set_physics_process(false)
+	endless._reel = {}
+	endless.snapped = false
+	endless._tether_peer = 2
+	endless._last_floor_y = friend_y
+	endless._fall_from_y = friend_y - 1300.0  # (come down from way above them)
+	player.global_position.y = friend_y + 200.0
+	player.velocity = Vector2(0.0, 1400.0)
+	endless._tether(0.016)
+	_expect(endless.snapped and endless._reel.is_empty() and endless._tether_peer == 0, "fallen way too far: the band snaps, nobody pulls you up")
+	endless._tether(0.016)
+	_expect(endless.snapped and endless._tether_peer == 0, "and it stays snapped")
+	endless._on_frog_moved(2, [player.global_position.x + 40.0, player.global_position.y, "default", 0, false, 0.0, 0, 30, 1])
+	for _f in 40:
+		await process_frame
+	player.velocity = Vector2.ZERO
+	endless._tether(0.016)
+	_expect(not endless.snapped and endless._tether_peer == 2, "a friend back down beside you ties it back on")
 	await create_timer(endless.TETHER_REEL + 0.3).timeout
 	party.players = {}
 

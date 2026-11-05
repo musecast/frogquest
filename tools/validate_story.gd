@@ -44,19 +44,178 @@ func _run() -> void:
 	_expect(main.npc1 == 0 and main.npc5 == 0, "a conversation cut off by closing the game starts over (%s, %s)" % [main.npc1, main.npc5])
 	_expect(main.npc3 == 1, "the campfire frog's is done once he has the lantern (%s)" % main.npc3)
 
-	# The TV, as he starts at home.
+	# Home: he wakes up there. Asleep in his beanbag, the TV off (a press is no jump yet); it comes on by
+	# itself and he wakes; it speaks, a line a tap (the arrow under it once it's all there, on the screen
+	# upright); then the tutorial comes up, and he can jump.
+	var hiss: AudioStreamPlayer2D = main.get_node("Musecrtquarterview/AudioStreamPlayer2D")
+	var aim: Node2D = player.get_node("Trajectory")
+	var how_to: CanvasItem = main.get_node("World Sprites/tutorial")
+	var eyes: ShaderMaterial = player.get_node("Sprite2D").material
 	player._on_button_pressed()
 	for _i in 3:
 		await process_frame
-	_expect(main._tv_done and main._tv_bubble.visible and main._tv_bubble.text == main.TV_LINES[0], "the TV talks as he starts at home")
+	_expect(main._tv_done and player.waking and player.asleep and not hiss.playing and main._tv_glass.visible
+		and not main._tv_bubble.visible and not how_to.visible and player._zzz != null,
+		"starting at home, he's asleep in his beanbag (z's drifting up), the TV's off, no tutorial yet")
+	_expect(eyes.get_shader_parameter("eyes_shut") == true, "his eyes shut")
+	Input.action_press("ui_mouse")
+	await process_frame
+	await process_frame
+	_expect(aim.mouseOrigin == Vector2.ZERO, "a press is no jump while he's waking")
+	Input.action_release("ui_mouse")
+	await process_frame
+	await _game_time(2.6)
+	_expect(hiss.playing and player.asleep, "the TV comes on by itself (he's still asleep)")
+	await _game_time(1.3)
+	_expect(not player.asleep and player.waking and eyes.get_shader_parameter("eyes_shut") == false, "and he wakes")
+	await _game_time(1.0)
+	_expect(main._tv_bubble.visible and main._tv_bubble.text == main.TV_LINES[0], "the TV speaks")
+	await _game_time(4.0)
+	_expect(main._tv_bubble.text == main.TV_LINES[0] and not main._tv_typing and main._tv_typed >= main.TV_LINES[0].length(),
+		"all of its line, and it stays: no going on without a tap")
+	_expect(main._tv_more.shown and main._tv_more.modulate.a > 0.5 and main._tv_more.visible, "the arrow under it, for a tap")
 	_expect(_tv_words_seen(main), "its words on the screen (upright)")
-	await _game_time(3.0)
-	_expect(main._tv_bubble.text == main.TV_LINES[1], "line by line (%s)" % main._tv_bubble.text.c_escape())
-	_expect(_tv_words_seen(main), "all of them on the screen, not off its edge: %s" % main._tv_bubble.text.c_escape())
-	await _game_time(2.8)
-	_expect(main._tv_bubble.text == main.TV_LINES[2] and _tv_words_seen(main), "all of them on the screen, not off its edge: %s" % main._tv_bubble.text.c_escape())
-	await _game_time(6.2)
-	_expect(not main._tv_bubble.visible, "and goes back to static")
+	root.get_node("AdsManager").test_safe_insets = Vector4(0.0, 0.0, PORTRAIT.x * 0.18, 0.0)  # (a closed iPhone Duo: its strip)
+	var pause: Control = player.get_node("CanvasLayer/TouchScreenButtonPause/ColorRect")
+	_tap_screen(pause.get_global_rect().get_center())
+	await process_frame
+	_expect(main._tv_bubble.text == main.TV_LINES[0], "a tap on the pause button isn't one for the TV")
+	for line in [1, 2, 3]:
+		_tap_screen(Vector2(_view.size) * Vector2(0.5, 0.62))  # (a finger on the screen, as it comes: over its CRT layers)
+		_expect(main._tv_bubble.text == main.TV_LINES[line] and main._tv_typing, "a tap: its next line, typed out (%s)" % main._tv_bubble.text.c_escape())
+		await process_frame
+		await process_frame  # (a whole frame: the arrow's put away as it's typed)
+		_expect(not main._tv_more.shown, "the arrow gone while it comes (%s: typing %s, %.1f of %d)" % [main._tv_bubble.text.c_escape(),
+			main._tv_typing, main._tv_typed, main._tv_bubble.text.length()])
+		main._tv_tap()  # (all of it at once)
+		await process_frame
+		await process_frame
+		_expect(_tv_words_seen(main), "all of them on the screen, not off its edge: %s" % main._tv_bubble.text.c_escape())
+		_expect(player.waking and not how_to.visible, "still waking up: no tutorial, no jumping")
+	_tap_screen(Vector2(_view.size) * Vector2(0.5, 0.62))
+	await process_frame
+	root.get_node("AdsManager").test_safe_insets = Vector4(-1.0, -1.0, -1.0, -1.0)
+	_expect(not main._tv_bubble.visible and not player.waking and how_to.visible, "its last line tapped: the tutorial comes up, and he's off")
+	Input.action_press("ui_mouse")
+	await process_frame
+	await process_frame
+	_expect(aim.mouseOrigin != Vector2.ZERO, "and a press is the start of a jump now")
+	Input.action_release("ui_mouse")
+	await process_frame
+	await _game_time(1.0)
+	player.jumpCount = 0
+
+	# Left alone, standing still, he nods off (his eyes shut, z's drifting up); a touch and he's awake. And
+	# landing after a long fall: a "!" over him (not after a hop).
+	await _game_time(player.SLEEPY * 0.5)
+	_expect(not player.asleep, "not asleep after a little while")
+	await _game_time(player.SLEEPY * 0.5 + 1.5)
+	_expect(player.asleep and player._napping and player._zzz != null and eyes.get_shader_parameter("eyes_shut") == true,
+		"left alone a while, standing still, he nods off")
+	Input.action_press("ui_mouse")
+	for _i in 3:
+		await physics_frame
+	_expect(not player.asleep and not player._napping and eyes.get_shader_parameter("eyes_shut") == false, "a touch and he's awake")
+	Input.action_release("ui_mouse")
+	await _game_time(1.0)
+	player.jumpCount = 0
+	await _game_time(2.5)  # (the "!" from waking up long gone)
+	player.was_airborne = true
+	player._fall_top = player.currentHeight + 5.0
+	await _physics(2)
+	_expect(_marks(player).is_empty() and player.stunned <= 0.0, "a hop: no \"!\" when he lands, and on he goes")
+	player.was_airborne = true
+	player._fall_top = player.currentHeight + player.LONG_FALL + 5.0
+	await _physics(2)
+	var mark: Array = _marks(player)
+	_expect(mark.size() == 1 and mark[0].top_level and (mark[0].get_child(0) as Label).get_theme_color("font_color").r > 0.9
+		and (mark[0].get_child(0) as Label).get_theme_color("font_color").g < 0.4,
+		"landing after a long fall: a red \"!\" over him (its own: nothing of his stretches it)")
+	_expect(_playing(player, "land_hard.wav"), "and a thud")
+	_expect(_dust_flying(main) >= 1, "dust shooting out from under him")
+	_expect(player.stunned > 0.3 and not player.can_act(), "and he's stuck there a moment, shivering")
+	Input.action_press("ui_mouse")
+	await process_frame
+	await process_frame
+	_expect(aim.mouseOrigin == Vector2.ZERO, "(no jumping while he shivers)")
+	Input.action_release("ui_mouse")
+	await _game_time(1.2)
+	_expect(player.stunned <= 0.0 and player.can_act() and player.get_node("Sprite2D").position.x == 0.0, "then he's shaken it off")
+	await process_frame  # (a fresh frame: the press is new in it)
+	Input.action_press("ui_mouse")
+	await process_frame
+	await process_frame
+	await process_frame
+	var jumped_dust: int = _dust_flying(main)
+	Input.action_release("ui_mouse")
+	await process_frame
+	await process_frame
+	_expect(_dust_flying(main) > jumped_dust or player.jumpCount > 0, "a jump: a little puff of dust from under him (jumps %d, dust %d, on the floor %s, aim from %s, stunned %.2f)"
+		% [player.jumpCount, _dust_flying(main), player.is_on_floor(), aim.mouseOrigin, player.stunned])
+	await _game_time(1.5)
+	player.jumpCount = 0
+	# (a real long fall: the rush of air as he falls)
+	var air_heard := false
+	await _put(player, Vector2(2787, -4400))  # (in the mushrooms: open down to a ledge at -4004)
+	await _game_time(1.0)
+	player.global_position = Vector2(2787, -4380)
+	player.velocity = Vector2(0.0, 700.0)
+	player.reset_physics_interpolation()
+	for _i in 10:  # (in the air, as he sees it: then it's as if he'd come down from way above)
+		await physics_frame
+		if player.was_airborne:
+			break
+	player._fall_top += 40.0
+	for i in 90:
+		await physics_frame
+		if player._fall_air != null and player._fall_air.playing and player._fall_air.volume_db > -55.0:
+			air_heard = true
+		if i > 4 and player.is_on_floor():  # (not the floor he was on before he was put up here)
+			break
+	_expect(air_heard, "falling a long way: the rush of air comes in (at %s, falling %.0f, fell %.1f, air %s)"
+		% [player.global_position.round(), player.velocity.y, player._fall_top - player.currentHeight,
+		"none" if player._fall_air == null else "%.1f dB" % player._fall_air.volume_db])
+	await _game_time(1.5)
+	_expect(player._fall_air == null or not player._fall_air.playing, "gone once he's landed")
+	await _put(player, Vector2(1291.1925, 262.79996))
+	await _game_time(5.0)  # (THE MUSHROOMS named on the way: faded)
+
+	# A glimpse of the frog god up the climb (FROG KING2...): a plain shadow when it comes, then slowly the
+	# frog god as the intro shows him (his shadow look: the violet rim, the glowing eyes).
+	var god: Sprite2D = main.get_node("finale/Control/FROG KING2")
+	var god_look := god.material as ShaderMaterial
+	_expect(god_look != null and float(god_look.get_shader_parameter("shadow_amount")) == 0.0, "a glimpse of the frog god: a plain shadow at first")
+	god.visible = true
+	await _game_time(9.0)
+	_expect(float(god_look.get_shader_parameter("shadow_amount")) > 0.95 and god.self_modulate.r > 0.9,
+		"then, slowly, the frog god as the intro shows him (%.2f, %s)" % [float(god_look.get_shader_parameter("shadow_amount")), god.self_modulate])
+	god.visible = false
+
+	# Where he is, named as he gets there: not at home, nor on the way out of it (its signs are telling him
+	# how to play); THE WORLD TREE, once he's up in it (fading again); not again straight away; and up the
+	# tree, each of its parts.
+	var titles: Node = main.get_node("AreaTitle")
+	_expect(titles.area_at(player.global_position) == "" and titles.showing == "", "at home: no name")
+	_expect(titles.area_at(Vector2(250, -150)) == "" and titles.area_at(Vector2(2797, -1240)) == "THE WORLD TREE"
+		and titles.area_at(Vector2(2831, -2950)) == "THE DARK" and titles.area_at(Vector2(1150, -2700)) == ""
+		and titles.area_at(Vector2(2787, -4400)) == "THE MUSHROOMS"
+		and titles.area_at(main.LOST_FROG_TOP) == "THE CASTLE" and titles.area_at(Vector2(1500, -6300)) == "THE CLOUDS"
+		and titles.area_at(Vector2(2800, -7300)) == "THE TOP OF THE TREE", "the tree's parts, each with its name")
+	var home: Vector2 = player.global_position
+	await _put(player, Vector2(250, -150))
+	await _game_time(0.6)
+	_expect(titles.showing == "", "out of his bedroom, the way out under the tree: no name yet")
+	await _put(player, Vector2(2797, -1240))
+	await _game_time(0.6)
+	_expect(titles.showing == "THE WORLD TREE" and titles._box.modulate.a > 0.3, "up in the tree: THE WORLD TREE (%s)" % titles.showing)
+	await _game_time(5.5)
+	_expect(titles.showing == "" and titles._box.modulate.a < 0.05, "and it fades away")
+	await _put(player, home)
+	await _game_time(0.6)
+	await _put(player, Vector2(2797, -1240))
+	await _game_time(0.6)
+	_expect(titles.showing == "", "back up a moment later: not named again straight away")
+	await _put(player, home)
 
 	# Coming back down past the hut frog after being far higher: their lines, in turn; not before.
 	var hut: Node2D = main.get_node("frogNPC1")
@@ -182,6 +341,44 @@ func _run() -> void:
 	_finish()
 
 
+## The "!"s up over him now (each its own node: Exclaim, with the "!" in it).
+func _marks(player: Node) -> Array:
+	var out := []
+	for c in player.get_children():
+		if str(c.name).begins_with("Exclaim") and not c.is_queued_for_deletion() and c.get_child_count() > 0 \
+				and c.get_child(0) is Label and (c.get_child(0) as Label).text == "!":
+			out.append(c)
+	return out
+
+
+## Dust flying in the level now (CPUParticles2D, emitting).
+func _dust_flying(main: Node) -> int:
+	var n := 0
+	for c in main.get_children():
+		if c is CPUParticles2D and c.emitting:
+			n += 1
+	return n
+
+
+## Whether a sound of his (`file`) is playing now.
+func _playing(player: Node, file: String) -> bool:
+	for c in player.get_children():
+		if c is AudioStreamPlayer and c.playing and c.stream != null and str(c.stream.resource_path).ends_with(file):
+			return true
+	return false
+
+
+## A tap on the screen at `at`, as a finger's comes into the game (a click: a touch is one too).
+func _tap_screen(at: Vector2) -> void:
+	for down in [true, false]:
+		var tap := InputEventMouseButton.new()
+		tap.button_index = MOUSE_BUTTON_LEFT
+		tap.pressed = down
+		tap.position = at
+		tap.global_position = at
+		_view.push_input(tap)
+
+
 func _game() -> Node:
 	var main: Node = load("res://scenes/Main.tscn").instantiate()
 	main.get_node("Player").save_path = SAVE
@@ -209,7 +406,8 @@ func _tv_words_seen(main: Node) -> bool:
 	var at: Transform2D = words.get_global_transform()
 	var mid := (at * Vector2(words.size.x * 0.5, 0.0)).x
 	var half := (words.get_minimum_size().x * 0.5 + words.get_theme_constant("outline_size")) * at.get_scale().x
-	var seen: Rect2 = _view.get_canvas_transform().affine_inverse() * _view.get_visible_rect()
+	var room: Rect2 = load("res://scripts/UIStyle.gd").room(_view.get_visible_rect().size)  # (clear of a camera strip)
+	var seen: Rect2 = _view.get_canvas_transform().affine_inverse() * room
 	return mid - half >= seen.position.x and mid + half <= seen.end.x
 
 

@@ -83,6 +83,7 @@ func _ready() -> void:
 	_build_ui()
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	add_to_group("banner_reserve_ui")  # (AdsManager calls _apply_ui_layout when a banner comes or goes)
+	_play_sfx("res://assets/wardrobe_open.wav", -11.0)  # (its door: a soft knock, a little creak)
 
 
 func _apply_ui_layout() -> void:
@@ -345,7 +346,6 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	btn.clip_text = false
 	btn.add_theme_font_size_override("font_size", font_size)
 	btn.pressed.connect(_on_item_button_pressed.bind(id, btn))
-	btn.pressed.connect(_play_sfx.bind("res://assets/frogaim.wav"))
 	_item_buttons[id] = btn
 	button_row.add_child(btn)
 	_update_button_label(btn, id)
@@ -416,13 +416,29 @@ static func _trimmed(texture: Texture2D) -> Texture2D:
 	return cut
 
 
-func _play_sfx(path: String) -> void:
+func _play_sfx(path: String, db := -8.0, pitch := 1.0) -> void:
 	var sfx := AudioStreamPlayer.new()
 	sfx.stream = load(path)
-	sfx.volume_db = -8.0
+	sfx.volume_db = db
+	sfx.pitch_scale = pitch
+	sfx.bus = &"FX"
 	get_tree().root.add_child(sfx)
 	sfx.play()
 	sfx.finished.connect(sfx.queue_free)
+
+
+## What putting something on (or taking it off) sounds like: a hat, a pop and a little boing; a pattern, a
+## sparkle; a skin, a shimmer; anything off, a soft fwop. Soft, and a hair different each time.
+func _wear_sound(type: String, on: bool) -> void:
+	var pitch := randf_range(0.97, 1.03)
+	if not on:
+		_play_sfx("res://assets/look_off.wav", -12.0, pitch)
+	elif type == "hat":
+		_play_sfx("res://assets/hat_on.wav", -11.0, pitch)
+	elif type == "pattern":
+		_play_sfx("res://assets/pattern_on.wav", -13.0, pitch)
+	else:
+		_play_sfx("res://assets/skin_on.wav", -13.0, pitch)
 
 
 func _on_info_pressed(id: String) -> void:
@@ -551,6 +567,7 @@ func _process(delta: float) -> void:
 
 func _on_item_button_pressed(id: String, btn: Button) -> void:
 	if id == "lil_froggy":
+		_play_sfx("res://assets/frogjump.wav", -10.0)
 		var link = _desktop_frog_link()
 		if link.is_out():
 			link.send_command("home", link.game_window_rect())  # he hops back into this window
@@ -560,6 +577,7 @@ func _on_item_button_pressed(id: String, btn: Button) -> void:
 		_update_button_label(btn, id)
 		return
 	var def = ITEMS[id]
+	_wear_sound(def["type"], not _is_equipped(id))
 	if def["type"] == "hat":
 		MusicManager.equipped_hat = "" if _is_equipped(id) else id
 	elif def["type"] == "pattern":

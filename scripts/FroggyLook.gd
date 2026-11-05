@@ -1,9 +1,9 @@
 extends RefCounted
-## Your froggy (MusicManager.look): his skin's colour, his eyes' and his belly's (chosen one by one in
-## the intro, CreatorIntro, from a palette of each, and again in the wardrobe), a pattern over him and its
-## colour (the patterns are earned by playing, UNLOCKS), and his stretchy band's colour (the tether, when
-## you climb with friends: a random one of its own to start with, changed in Play Together). Froggy's own
-## frames are never redrawn: a shader recolours his mint body, cream belly and black eyes, keeping their
+## Your froggy (MusicManager.look): his skin's colour and his belly's (chosen one after the other in the
+## intro, CreatorIntro, from a palette of each, and again in the wardrobe; his eyes are always Froggy's own
+## black: coloured, they never looked right), a pattern over him and its colour (the patterns are earned by
+## playing, UNLOCKS), and his stretchy band's colour (the tether, when you climb with friends: a random one
+## of its own to start with, changed in Play Together). Froggy's own frames are never redrawn: a shader recolours his mint body, cream belly and black eyes, keeping their
 ## shading and soft edges (FroggyLook.material). Friends online see your froggy as you made him (Party
 ## sends the look). Colours are kept as "rrggbb"; a look from before (a number into these lists) still
 ## reads as that list's colour.
@@ -19,8 +19,7 @@ const BODY := [["Mint", Color(0.627, 1.0, 0.671)], ["Lime", Color(0.80, 1.0, 0.4
 const BELLY := [["Cream", Color(0.988, 1.0, 0.804)], ["Snow", Color(1.0, 1.0, 1.0)], ["Peach", Color(1.0, 0.86, 0.73)],
 	["Sunny", Color(1.0, 0.93, 0.52)], ["Pink", Color(1.0, 0.83, 0.91)], ["Mint", Color(0.82, 1.0, 0.87)],
 	["Sky", Color(0.83, 0.92, 1.0)], ["Lavender", Color(0.91, 0.85, 1.0)]]
-const EYES := [["Black", Color(0.0, 0.0, 0.0)], ["Brown", Color(0.36, 0.21, 0.10)], ["Blue", Color(0.10, 0.27, 0.62)],
-	["Green", Color(0.08, 0.40, 0.16)], ["Purple", Color(0.34, 0.13, 0.52)], ["Red", Color(0.56, 0.08, 0.10)]]
+const EYES := [["Black", Color(0.0, 0.0, 0.0)]]  # (his eyes: always Froggy's own black)
 const PATTERNS := ["None", "Spots", "Stripes", "Freckles", "Two-Tone", "Hearts", "Stars"]
 ## Each pattern's unlock (UNLOCKS): they're earned by playing, not chosen at the start. ("-": Freckles,
 ## gone; one worn from before comes off.)
@@ -44,7 +43,7 @@ static func clean(look) -> Dictionary:
 	var out := defaults()
 	out.body = _field(d.get("body"), BODY, out.body)
 	out.belly = _field(d.get("belly"), BELLY, out.belly)
-	out.eyes = _field(d.get("eyes"), EYES, out.eyes)
+	# (his eyes are always Froggy's own black, whatever a look from before, or a friend's, says)
 	out.band = _field(d.get("band"), BANDS, out.band)
 	out.pattern_colour = _field(d.get("pattern_colour"), BODY, "")
 	out.pattern = clampi(int(d.get("pattern", 0)), 0, PATTERNS.size() - 1)
@@ -100,20 +99,18 @@ static func _apart(a: Color, b: Color) -> float:
 const HUES := [125.0, 168.0, 205.0, 268.0, 320.0, 356.0, 28.0, 52.0]
 const SHADES := {
 	"skin": [[0.20, 1.0], [0.37, 1.0], [0.60, 0.96], [0.62, 0.64]],
-	"eyes": [[0.45, 0.95], [0.75, 0.85], [0.80, 0.58], [0.80, 0.36]],
 	"belly": [[0.06, 1.0], [0.16, 1.0], [0.30, 0.98], [0.42, 0.92]],
 	"band": [[0.35, 1.0], [0.62, 1.0], [0.85, 0.95], [0.80, 0.62]],
 }
 const NEUTRALS := {
 	"skin": ["f7faff", "bdc2cc", "8c919c", "5c5e80", "f0d6a8", "bd8a66", "8c5e40", "4d3a2e"],
-	"eyes": ["000000", "2e2e33", "73757f", "bfc2cc", "f2f2f7", "5c361a", "8c6b2e", "cc8c26"],
 	"belly": ["fcffcd", "ffffff", "ffdbba", "f0e0bd", "dbdee6", "b3b8bf", "dbbd99", "b38f70"],
 	"band": ["ffd14d", "ffffff", "c7cad1", "6b6e78", "26262b", "d9a621", "a6703f", "5c3d29"],
 }
 const ACROSS := 8  # (colours in a row)
 
 
-## A kind's palette ("skin", "eyes", "belly", "band"; a pattern's colour is from his skin's), row by row.
+## A kind's palette ("skin", "belly", "band"; a pattern's colour is from his skin's), row by row.
 static func palette(kind: String) -> Array:
 	var shades: Array = SHADES.get(kind, SHADES.skin)
 	var out := []

@@ -1,8 +1,8 @@
 shader_type canvas_item;
 // Your froggy (FroggyLook.gd) over Froggy's own frames, never redrawn: his mint body, cream belly and
 // black eyes recoloured by their hue, keeping their shading and soft edges; a pattern on his body, on
-// his own pixel grid; an effect over him (the ones you unlock); and, in the intro, how much of him is
-// still the frog god's shadow.
+// his own pixel grid; an effect over him (the ones you unlock); in the intro, how much of him is still
+// the frog god's shadow; and, asleep, his eyes shut.
 
 uniform vec3 body_colour : source_color = vec3(0.627, 1.0, 0.671);
 uniform vec3 belly_colour : source_color = vec3(0.988, 1.0, 0.804);
@@ -15,6 +15,9 @@ uniform int effect = 0;
 uniform vec3 effect_colour : source_color = vec3(1.0, 0.82, 0.30);  // (the glow's: your band's colour)
 uniform float shadow_amount : hint_range(0.0, 1.0) = 0.0;  // (how much of him is the frog god's shadow)
 uniform vec2 tex_px = vec2(32.0, 32.0);  // (his frame, in its own pixels)
+uniform bool eyes_shut = false;  // (asleep, in his beanbag)
+
+varying vec4 tint;  // (his node's modulate: kept, e.g. the frog god's glimpses up the climb start as a plain shadow)
 
 const vec3 BODY_BASE = vec3(0.627, 1.0, 0.671);
 const vec3 BELLY_BASE = vec3(0.988, 1.0, 0.804);
@@ -47,6 +50,19 @@ float hash(vec2 p) {
 // Whether this pixel of his is the dark middle of one of his eyes.
 float eye_px(vec4 c) {
 	return (c.a > 0.5 && max(c.r, max(c.g, c.b)) < 0.12) ? 1.0 : 0.0;
+}
+
+// Whether a pixel of his is one of his eyes (up on his head: not his body's green, his belly, his mouth's
+// pink or where it meets his green; its white, its grey rim, its dark middle).
+bool in_eye(vec4 c) {
+	vec3 h = rgb2hsv(c.rgb);
+	vec3 across = BODY_BASE - MOUTH;
+	float toward = clamp(dot(c.rgb - MOUTH, across) / dot(across, across), 0.0, 1.0);
+	bool mouth = distance(c.rgb, MOUTH + across * toward) < 0.04 && toward < 0.97;
+	bool body = h.x > 0.25 && h.x < 0.48 && h.y > 0.12;
+	bool belly = !body && h.x > 0.10 && h.x <= 0.25 && h.y > 0.08 && h.z > 0.6;
+	bool pink = (h.x < 0.1 || h.x > 0.9) && h.y > 0.15 && h.z > 0.5;
+	return !mouth && !body && !belly && !pink;
 }
 
 // The frog god's shadow over him, by amount: dark all through (a little of his shape left in it), a
@@ -98,6 +114,10 @@ float pattern_at(vec2 cell) {
 	return 0.0;
 }
 
+void vertex() {
+	tint = COLOR;
+}
+
 void fragment() {
 	vec2 uv = UV;
 	if (effect == 4) {  // ghost: a gentle waver
@@ -108,10 +128,11 @@ void fragment() {
 	vec3 hsv = rgb2hsv(px.rgb);
 	bool eye = hsv.z < 0.12;
 	// (where his pink mouth meets his green, the art blends the two: those pixels are that mix of the
-	// pink and his own colour, not left green, nor taken for his belly)
+	// pink and his own colour, not left green, nor taken for his belly. Only up on his face, where his
+	// mouth is: the deepest of his belly's shading, down at its bottom, is near that mix too)
 	vec3 across = BODY_BASE - MOUTH;
 	float toward = clamp(dot(px.rgb - MOUTH, across) / dot(across, across), 0.0, 1.0);
-	bool mouth = !eye && toward > 0.05 && toward < 0.97 && distance(px.rgb, MOUTH + across * toward) < 0.04;
+	bool mouth = !eye && uv.y < 0.45 && toward > 0.05 && toward < 0.97 && distance(px.rgb, MOUTH + across * toward) < 0.04;
 	bool body = !mouth && hsv.x > 0.25 && hsv.x < 0.48 && hsv.y > 0.12;
 	bool belly = !mouth && !body && hsv.x > 0.10 && hsv.x <= 0.25 && hsv.y > 0.08 && hsv.z > 0.6;
 	// (and the faint green in the greys and whites round his eyes, where his green meets them: his tint)
@@ -132,6 +153,13 @@ void fragment() {
 		col = eye_colour + px.rgb;
 	} else if (tinted) {
 		col = mix(vec3(lum(px.rgb)), base * (lum(px.rgb) / lum(BODY_BASE)), clamp(hsv.y / 0.12, 0.0, 1.0));
+	}
+	// (asleep: each eye shut, from his own frames. All of it, its white, its grey rim and its dark middle,
+	// is his skin, but for the lowest of the dark in each column of it: a line, the shut eye)
+	if (eyes_shut && px.a > 0.5 && uv.y < 0.36 && in_eye(px)) {
+		vec4 below = texture(TEXTURE, uv + vec2(0.0, 1.0 / tex_px.y));
+		bool lowest = hsv.z < 0.5 && !(below.a > 0.5 && in_eye(below) && rgb2hsv(below.rgb).z < 0.5);
+		col = lowest ? mix(base, vec3(0.06, 0.04, 0.08), 0.8) : base * 0.95;
 	}
 	float alpha = px.a;
 
@@ -181,5 +209,5 @@ void fragment() {
 	if (shadow_amount > 0.0 && effect != 7) {  // (the intro: the shadow he starts as, his colours filling in)
 		shadowed(col, alpha, px, eye, near, by_eye, shadow_amount);
 	}
-	COLOR = vec4(col, alpha);
+	COLOR = vec4(col, alpha) * tint;
 }

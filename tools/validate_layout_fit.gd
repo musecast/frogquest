@@ -9,7 +9,9 @@ extends SceneTree
 ## font's words must be crisp (whole steps of its grid, 1:1, a one-pixel outline). The menus sit in the
 ## middle of the screen across, even beside an upright iPhone Duo's side strip (and clear of it); a
 ## finger slides their lists from anywhere on them; and nothing on the title moves when its banner's
-## asked for or turns up, its logo just where the loading screen put its own. Each screen is laid
+## asked for or turns up, its logo just where the loading screen put its own. The clock (the speedrun
+## timer, his height and his jumps) and the pause button are in from a closed iPhone Duo's camera strip,
+## a Dynamic Island upright and the notch's side sideways. Each screen is laid
 ## out in a SubViewport the size the game's stretch settings (viewport, expand) would give that window.
 ## The story climb saves to scratch files meanwhile, so yours is never touched.
 ##   Godot --headless --path . --script res://tools/validate_layout_fit.gd
@@ -267,12 +269,50 @@ func _check_story_menus() -> void:
 			_check_inside(settings, room, "%s: settings from the pause menu" % shape)
 			settings.closed.emit()
 		await _frames(2)
+		await _check_corners(player, vp, shape)
 	pause.visible = false
 	ads.test_banner_clearance = Vector2(-1.0, -1.0)
 	view.queue_free()
 	await _frames(3)
 	if FileAccess.file_exists(SCRATCH_SAVE):
 		DirAccess.remove_absolute(SCRATCH_SAVE)
+
+
+## The clock up in its corner (the speedrun timer, his height, his jumps) and the pause button in the
+## other: in from the safe area's edges, wherever the phone's camera is. Upright, an iPhone Duo's strip
+## down the right (its camera at the top of it: the clock was under it) and a Dynamic Island's notch at
+## the top; sideways, the notch's side and the home bar.
+func _check_corners(player: Node, vp: Vector2, shape: String) -> void:
+	var ads := root.get_node("AdsManager")
+	var real_insets: Vector4 = ads.test_safe_insets
+	var real_banner: Vector2 = ads.test_banner_clearance
+	ads.test_banner_clearance = Vector2(0.0, 0.0)
+	var labels := []
+	for each in ["time", "current height", "jumpcount"]:
+		var l: Label = player.get_node("CanvasLayer/MarginContainer/VBoxContainer/" + each)
+		labels.append([l, l.visible])
+		l.visible = true
+	var cases := {"a Duo's camera strip": Vector4(0.0, 0.0, vp.x * 0.18, 0.0),
+		"a Dynamic Island": Vector4(0.0, vp.y * 0.07, 0.0, vp.y * 0.04),
+		"a notch sideways": Vector4(vp.x * 0.07, 0.0, vp.x * 0.07, vp.y * 0.05)}
+	for case in cases:
+		ads.test_safe_insets = cases[case]
+		player._apply_ui_layout()
+		await _frames(3)
+		var room: Rect2 = load("res://scripts/UIStyle.gd").room(vp)
+		for each in labels:
+			var r: Rect2 = (each[0] as Label).get_global_rect()
+			if r.position.x < room.position.x - 0.5 or r.position.y < room.position.y - 0.5 or r.end.x > room.end.x + 0.5:
+				_failures.append("%s, %s: the clock's %s is out of the safe area (%s, the room %s)" % [shape, case, each[0].name, r, room])
+		var pr: Rect2 = (player.get_node("CanvasLayer/TouchScreenButtonPause/ColorRect") as Control).get_global_rect()
+		if pr.position.x < room.position.x - 0.5 or pr.position.y < room.position.y - 0.5:
+			_failures.append("%s, %s: the pause button's out of the safe area (%s, the room %s)" % [shape, case, pr, room])
+	for each in labels:
+		each[0].visible = each[1]
+	ads.test_safe_insets = real_insets
+	ads.test_banner_clearance = real_banner
+	player._apply_ui_layout()
+	await _frames(2)
 
 
 ## Nothing on the title moves when its banner's asked for, or when it turns up (its room's kept from

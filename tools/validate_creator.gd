@@ -2,7 +2,7 @@ extends SceneTree
 ## Your froggy (FroggyLook) and the frog god's intro (CreatorIntro), in the real level: a new player's
 ## game starts with it, no title, out of the dark with a low hum (the TV's static quiet), the frog god's
 ## shadow speaking, slowly, in a low voice; tapping goes through its words to "what do you look like?"
-## (in even lines), his skin, then his eyes, then his belly, each from a palette of 40 (a tap or a slide,
+## (in even lines), his skin, then his belly (his eyes always Froggy's black), each from a palette of 40 (a tap or a slide,
 ## gliding onto him; NEXT and BACK); "Is this you?" No goes back, Yes keeps it (in the wardrobe's save:
 ## no hat, no pattern, they're earned by playing; his band a random colour of its own); it cuts to black,
 ## the hum cut off, the climb begins behind it, and he fades in in his bedroom as that froggy, the TV's
@@ -45,7 +45,7 @@ func _run() -> void:
 	var player: Node = main.get_node("Player")
 	var start: Vector2 = player.global_position
 	var tv: AudioStreamPlayer2D = main.get_node("Musecrtquarterview/AudioStreamPlayer2D")
-	var tv_db := 0.0  # (the TV's static, as the level has it)
+	var tv_db: float = main._tv_db  # (the TV's static, as the level has it)
 	var intro = player.get_node_or_null("CreatorIntro")
 	_expect(intro != null and intro.fade_in and not player.get_node("titlescreen").visible and player.get_node("Trajectory").endGame != 0,
 		"a new player's game starts with the frog god, not the title")
@@ -58,6 +58,17 @@ func _run() -> void:
 	_expect(tv.volume_db < -70.0, "the TV's static quiet while it's there")
 	await _until(func() -> bool: return intro._words.text != "", 4.0)
 	_expect(intro._words.text == "...LITTLE ONE..." and intro._shadow > 0.9 and intro._black.color.a < 0.5, "he's the frog god's shadow, and it speaks")
+	_expect(intro._hum.stream.resource_path == "res://assets/froggod_hum.wav" and (intro._hum.stream as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_FORWARD,
+		"its hum deep, with a bass and a rush through it (froggod_hum.wav, looping)")
+	await _until(func() -> bool: return intro._typed >= intro._words.text.length(), 4.0)
+	await _wait(2.0)
+	_expect(intro._words.text == "...LITTLE ONE..." and intro._more.shown and intro._more.modulate.a > 0.5,
+		"its words stay till a tap (no going on by themselves), the arrow under them saying so")
+	_expect(intro._more.position.y > intro._words.position.y and intro._more.position.y < intro._frog.position.y,
+		"the arrow between its words and him")
+	intro._advance()
+	await _frames(1)
+	_expect(intro._words.text.begins_with("YOU HAVE COME") and not intro._more.shown, "a tap: its next words (the arrow gone while they come)")
 	_expect(intro.TYPE_SPEED <= 15.0 and intro.VOICE_PITCH.y < 0.5 and intro.VOICE_PITCH.x < intro.VOICE_PITCH.y,
 		"slowly, in a low voice (%.0f letters a second, pitch %.2f to %.2f)" % [intro.TYPE_SPEED, intro.VOICE_PITCH.x, intro.VOICE_PITCH.y])
 	await _wait(1.0)
@@ -68,7 +79,7 @@ func _run() -> void:
 		intro._advance()
 		await _frames(1)
 	await _frames(2)
-	_expect(intro._step == "choose" and intro._steps == ["body", "eyes", "belly"] and intro._at == 0
+	_expect(intro._step == "choose" and intro._steps == ["body", "belly"] and intro._at == 0
 		and intro._said == "WHAT DO YOU LOOK LIKE?" and intro._part.text == "SKIN" and intro._choosing.visible,
 		"then it asks what he looks like: his skin first")
 	var lines: PackedStringArray = intro._words.text.split("\n")
@@ -91,26 +102,26 @@ func _run() -> void:
 	_expect(intro._shadow < 0.05 and _near(intro._frog.material.get_shader_parameter("body_colour"), skin, 0.02),
 		"his colours fill in, gliding onto him (shadow %.2f)" % intro._shadow)
 	intro._next_pressed()
-	_expect(intro._at == 1 and intro._part.text == "EYES" and intro._said == "WHAT DO YOU LOOK LIKE?" and intro._back.visible, "NEXT: his eyes")
-	grid._choose_at(grid.cell(10).get_center())
-	var eyes: Color = grid.colours[10]
+	_expect(intro._at == 1 and intro._part.text == "BELLY" and intro._said == "WHAT DO YOU LOOK LIKE?" and intro._back.visible, "NEXT: his belly")
+	grid._choose_at(grid.cell(33).get_center())
+	var belly: Color = grid.colours[33]
 	intro._back_pressed()
 	_expect(intro._at == 0 and intro._part.text == "SKIN" and grid.at == 21, "BACK: his skin again, as he left it")
 	intro._next_pressed()
-	intro._next_pressed()
-	_expect(intro._at == 2 and intro._part.text == "BELLY" and _near(look.colour(intro._look, "eyes"), eyes), "then his belly (his eyes kept)")
-	grid._choose_at(grid.cell(33).get_center())
+	_expect(intro._at == 1 and intro._part.text == "BELLY" and _near(look.colour(intro._look, "belly"), belly), "then his belly again (as he left it)")
 	intro._next_pressed()
 	_expect(intro._step == "sure" and intro._sure.visible and intro._said == "IS THIS YOU?",
-		"and that's all it asks (no name, no hat, no pattern): is this you?")
+		"and that's all it asks (no eyes, no name, no hat, no pattern): is this you?")
 	intro._no()
 	_expect(intro._step == "choose" and intro._at == 0, "No goes back to the start of it")
 	intro._ask_sure()
 	var made: Dictionary = look.clean(intro._look)
 	intro._yes()
 	await _frames(1)
-	_expect(mm.look_made and str(mm.look.body) == made.body and str(mm.look.eyes) == made.eyes and str(mm.look.belly) == made.belly
-		and mm.equipped_hat == "" and int(mm.look.pattern) == 0, "Yes keeps him as he is (hats and patterns are earned by playing)")
+	_expect(mm.look_made and str(mm.look.body) == made.body and str(mm.look.eyes) == "000000" and str(mm.look.belly) == made.belly
+		and mm.equipped_hat == "" and int(mm.look.pattern) == 0, "Yes keeps him as he is, Froggy's black eyes (hats and patterns are earned by playing)")
+	_expect(str(look.clean({"body": "ff8fd6", "eyes": "2a6fd6"}).eyes) == "000000" and str(look.clean({"eyes": 2}).eyes) == "000000",
+		"a look from before with coloured eyes (or a friend's): his eyes are Froggy's black")
 	var bright: Array = look.palette("band").slice(look.ACROSS, look.ACROSS * 3)
 	var rolled: Color = look.band_colour(mm.look)
 	var bands := {}
@@ -120,25 +131,41 @@ func _run() -> void:
 		"and gives him a band of a colour all his own, at random (%s; %d different in 60 froggies)" % [rolled.to_html(false), bands.size()])
 	_expect(intro._black.color.a > 0.99 and not intro._root.visible and not intro._hum.playing and player.get_node("Trajectory").endGame == 0,
 		"it cuts to black, the hum cut off, and the climb's begun behind it")
+	_expect(intro.slow_end and intro.hold() >= 2.0 and intro.fade() >= 3.0, "into his bedroom: a long black, then a slow fade")
+	await _wait(2.0)
+	_expect(is_instance_valid(intro) and intro._black.color.a > 0.99, "still black two seconds on, its sound ringing out")
 	var kept: Dictionary = mm.look.duplicate()
 	mm.look = {}
 	mm.look_made = false
 	mm.load_wardrobe()
 	_expect(mm.look_made and str(mm.look.get("body", "")) == made.body, "in the wardrobe's save (%s)" % [mm.look])
 	mm.look = kept
-	await _until(func() -> bool: return not is_instance_valid(intro), 6.0)
+	await _until(func() -> bool: return not is_instance_valid(intro), 10.0)  # (a long black, a slow fade)
 	_expect(not is_instance_valid(intro) and not player.get_node("titlescreen").visible and player.get_node("Trajectory").endGame == 0,
-		"and he fades in from it, climbing")
-	await _wait(0.3)
-	_expect(tv.volume_db > tv_db - 3.0, "the TV's static comes up as he fades in (%.1f dB)" % tv.volume_db)
+		"and he fades in from it")
+	_expect(player.asleep and player.waking and not tv.playing and main._tv_glass.visible,
+		"asleep in his beanbag, the TV off (its static quiet)")
 	var worn: ShaderMaterial = player.get_node("Sprite2D").material
 	_expect(worn != null and _near(worn.get_shader_parameter("body_colour"), look.colour(made, "body"))
-		and _near(worn.get_shader_parameter("eye_colour"), look.colour(made, "eyes")), "as the froggy he made")
+		and _near(worn.get_shader_parameter("eye_colour"), Color.BLACK) and worn.get_shader_parameter("eyes_shut") == true,
+		"as the froggy he made, his eyes shut")
 	_expect(player.global_position.distance_to(start) < 60.0, "in his bedroom, where a new climb starts")
-	await _wait(1.0)
-	_expect(main._tv_done, "and the TV has its words for him")
+	await _until(func() -> bool: return tv.playing, 5.0)
+	_expect(tv.playing and player.asleep, "the TV comes on by itself")
+	await _until(func() -> bool: return not player.asleep, 4.0)
+	_expect(not player.asleep and player.waking, "he wakes")
+	await _until(func() -> bool: return main._tv_bubble.visible, 4.0)
+	_expect(main._tv_done and main._tv_bubble.visible and main._tv_bubble.text == main.TV_LINES[0], "and the TV has its words for him")
+	_expect(tv.volume_db > tv_db - 3.0, "its static up (%.1f dB)" % tv.volume_db)
+	for _i in 12:
+		if not main._tv_listening:
+			break
+		main._tv_tap()
+		await _frames(1)
+	_expect(not player.waking and not main._tv_bubble.visible and main.get_node("World Sprites/tutorial").visible,
+		"a tap for each of its lines, then the tutorial, and he's off")
 	var info: Dictionary = root.get_node("Party").my_info()
-	_expect(str(info.look.body) == made.body and str(info.look.eyes) == made.eyes and info.name == "lil froggy",
+	_expect(str(info.look.body) == made.body and str(info.look.belly) == made.belly and info.name == "lil froggy",
 		"his party sees his look, and he's lil froggy (%s)" % [info])
 
 	# A hat he's found: worn in front of his head.
@@ -170,11 +197,16 @@ func _run() -> void:
 	await _frames(3)
 	main = await _game()
 	player = main.get_node("Player")
+	var opening = player.get_node_or_null("CreatorIntro")  # (the game's own start, the very first time: put by)
+	_expect(opening != null and opening.slow_end, "(the game starts with it, into his bedroom: the long black, the slow fade)")
+	if opening:
+		opening.free()
+	player.get_node("titlescreen").visible = true
 	player._on_endlessmodebutton_pressed()
 	await _frames(3)
 	var first = player.get_node_or_null("CreatorIntro")
-	_expect(first != null and root.get_node_or_null("EndlessMode") == null and is_instance_valid(main) and main.is_inside_tree(),
-		"a new player's ENDLESS brings the frog god first, not Endless")
+	_expect(first != null and root.get_node_or_null("EndlessMode") == null and is_instance_valid(main) and main.is_inside_tree()
+		and not first.slow_end, "a new player's ENDLESS brings the frog god first, not Endless (and it's quick into it, after)")
 	if first:
 		first.queue_free()
 	await _frames(2)
@@ -256,11 +288,11 @@ func _run() -> void:
 		_expect(again != null and again.from_wardrobe and again._said == "WHAT DO YOU LOOK LIKE?" and again._part.text == "SKIN"
 			and again._shadow < 0.05, "which goes straight to the choosing, no shadow")
 		if again:
-			_expect(again._steps == ["body", "eyes", "belly", "pattern_colour"], "his skin, eyes and belly, his pattern's colour (not his band's)")
+			_expect(again._steps == ["body", "belly", "pattern_colour"], "his skin and belly, his pattern's colour (not his eyes', not his band's)")
 			again._grid._choose_at(again._grid.cell(4).get_center())
 			var new_skin: Color = look.colour(again._look, "body")
 			var band: Color = look.band_colour(mm.look)
-			for _i in 3:
+			for _i in 2:
 				again._next_pressed()
 			await _frames(1)
 			_expect(again._part.text == "PATTERN" and again._next.text == "DONE", "his pattern's colour last")

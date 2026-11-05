@@ -28,6 +28,8 @@ const TETHER_REEL := 0.8  # seconds a friend takes to pull you back up
 const TETHER_FALLING := 150.0  # (falling at least this fast,
 const TETHER_DROP := 80.0  # and this far below where he last stood: coming down onto a ledge isn't a fall)
 const TETHER_DRAWN := 1600.0  # (a band longer than this is off the screen: not drawn)
+const TETHER_SNAP := 1000.0  # (a fall this long before it's caught, and the band snaps)
+const TETHER_RETIE := 180.0  # (snapped: a friend back down this near ties it on again)
 const RETRY_EVERY := 180.0  # seconds before trying everyone online again, when it didn't work
 const BESIDE := [Vector2(32, 0), Vector2(-32, 0), Vector2(46, 0), Vector2(-46, 0), Vector2(22, 0), Vector2(-22, 0)]  # (beside a friend, on what they stand on)
 const NEARBY := [Vector2(0, 0), Vector2(0, -8), Vector2(0, -16), Vector2(-12, -4), Vector2(12, -4),
@@ -46,6 +48,8 @@ var _tether_peer := 0
 var _reel := {}
 var _ropes := {}  # "a-b" -> TetherRope: each band showing, hanging against the world
 var _last_floor_y := 0.0
+var _fall_from_y := 0.0  # (the top of this fall: where he last stood, or the top of his jump since)
+var snapped := false  # (his band snapped on a fall too far: none till a friend comes back down for him)
 var _tried := false  # (asked to climb with everyone, this climb)
 var _asking := false  # (and waiting to hear back)
 var _next_try := 0.0  # (seconds since the game started: not before then, after it didn't work)
@@ -243,6 +247,7 @@ func _clear() -> void:
 		frog.queue_free()
 	_frogs.clear()
 	_tether_peer = 0
+	snapped = false
 	if not _reel.is_empty():
 		_reel = {}
 		player.set_physics_process(true)
@@ -333,7 +338,8 @@ func _free_at(spot: Vector2) -> bool:
 
 ## The band: tied to your nearest friend (chosen again whenever you're standing or going up). Falling,
 ## once you're its slack below a friend who's standing somewhere your own world has open, they reel
-## you up.
+## you up; unless you'd fallen way too far by then (TETHER_SNAP): it snaps, and there's none till a friend
+## comes back down for you (TETHER_RETIE).
 func _tether(delta: float) -> void:
 	if not _reel.is_empty():
 		_reel_in(delta)
@@ -344,6 +350,16 @@ func _tether(delta: float) -> void:
 	var at: Vector2 = player.global_position
 	if player.is_on_floor() and player.velocity.y <= 1.0:  # (standing: not on the way down)
 		_last_floor_y = at.y
+		_fall_from_y = at.y
+	else:
+		_fall_from_y = minf(_fall_from_y, at.y)  # (the top of his jump)
+	if snapped:
+		_tether_peer = 0
+		for peer in _frogs:
+			if _ties_to(peer) and _frogs[peer].spot().distance_to(at) <= TETHER_RETIE:
+				_retie(peer)
+				break
+		return
 	if player.velocity.y <= TETHER_FALLING:
 		var nearest := 0
 		for peer in _frogs:
@@ -353,7 +369,69 @@ func _tether(delta: float) -> void:
 	elif _tether_peer != 0 and _ties_to(_tether_peer):
 		var friend = _frogs[_tether_peer]
 		if friend.standing and _reaches(friend) and at.y > _last_floor_y + TETHER_DROP and at.y > friend.spot().y + TETHER_SLACK:
-			_start_reel(friend)
+			if at.y - _fall_from_y >= TETHER_SNAP:
+				_snap(friend)
+			else:
+				_start_reel(friend)
+
+
+## A fall way too far for the band: it snaps (a crack and a twang, bits of it flying, there and gone), and
+## down he goes; no band now till a friend comes back down for him.
+func _snap(friend: Node2D) -> void:
+	snapped = true
+	_tether_peer = 0
+	var at: Vector2 = player.global_position + Vector2(0.0, -8.0)
+	var colour: Color = load("res://scripts/FroggyLook.gd").band_colour(MusicManager.look)
+	_float_words(at + Vector2(0, -36), "your band snapped!", RED)
+	_burst(at, colour)
+	_play_sound("res://assets/band_snap.wav", 1.0, -4.0)
+	if friend:
+		_burst(friend.global_position + Vector2(0.0, -8.0), colour)
+
+
+## A friend back down beside him: the band's tied on again.
+func _retie(peer: int) -> void:
+	snapped = false
+	_tether_peer = peer
+	_float_words(player.global_position + Vector2(0, -40), "%s tied your band back on!" % Party.name_of(peer), GOLD)
+	_play_sound("res://assets/coolfind.mp3", 1.35, -9.0)
+
+
+## Bits of band flying out from `at`, in its colour, gone in a moment.
+func _burst(at: Vector2, colour: Color) -> void:
+	var bits := CPUParticles2D.new()
+	bits.one_shot = true
+	bits.explosiveness = 1.0
+	bits.amount = 14
+	bits.lifetime = 0.6
+	bits.direction = Vector2(0.0, -1.0)
+	bits.spread = 180.0
+	bits.initial_velocity_min = 90.0
+	bits.initial_velocity_max = 190.0
+	bits.gravity = Vector2(0.0, 420.0)
+	bits.scale_amount_min = 2.0
+	bits.scale_amount_max = 3.0
+	var fade := Gradient.new()
+	fade.set_color(0, colour)
+	fade.set_color(1, Color(colour, 0.0))
+	bits.color_ramp = fade
+	bits.z_index = 22
+	bits.z_as_relative = false
+	add_child(bits)
+	bits.global_position = at
+	bits.emitting = true
+	bits.finished.connect(bits.queue_free)
+
+
+func _play_sound(path: String, pitch: float, db: float) -> void:
+	var p := AudioStreamPlayer.new()
+	p.stream = load(path)
+	p.pitch_scale = pitch
+	p.volume_db = db
+	p.bus = &"FX"
+	add_child(p)
+	p.play()
+	p.finished.connect(p.queue_free)
 
 
 ## Whether his band can tie to them: a friend he can see, somewhere his own world could pull him to (a
@@ -410,6 +488,7 @@ func _reel_in(delta: float) -> void:
 		player.velocity = Vector2.ZERO
 		player.set_physics_process(true)
 		_last_floor_y = player.global_position.y
+		_fall_from_y = _last_floor_y
 
 
 ## Toward a spot as his body can go: up against anything in the way and along it, never into it.

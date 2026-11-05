@@ -120,7 +120,10 @@ func can_jump() -> bool:
 
 
 func _process(delta):
-	if Engine.time_scale != 0.05 and Engine.time_scale != 0.0 and endGame == 0:
+	# (not while he's waking up at home, a tap's for the TV's words till the tutorial's up; nor while he's
+	# shivering after a hard landing)
+	var free: bool = not get_parent().has_method("can_act") or get_parent().can_act()
+	if Engine.time_scale != 0.05 and Engine.time_scale != 0.0 and endGame == 0 and free:
 		var grounded: bool = get_parent().is_on_floor()
 		if grounded:
 			_floor_ms = Time.get_ticks_msec()
@@ -151,6 +154,8 @@ func _process(delta):
 				$"../frogjump".pitch_scale = randf_range(0.8, 1.2)
 				$"../frogjump".play()
 				$"..".jumpCount += 1
+				if get_parent().has_method("jumped"):
+					get_parent().jumped()  # (a little puff of dust from under him)
 			mouseOrigin = Vector2(0, 0)
 			mousePath = Vector2(0, 0)
 			mousePosition = Vector2(0, 0)

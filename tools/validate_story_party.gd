@@ -103,6 +103,28 @@ func _run() -> void:
 	await _fall_below(air)
 	_expect(sp._reel.is_empty(), "a friend in the air can't pull anyone up")
 
+	# Fallen way too far by the time it'd catch him: the band snaps (no pulling up), and stays snapped till
+	# a friend comes back down for him.
+	_friend(2, air, "default", 0)
+	sp._reel = {}
+	sp.snapped = false
+	player.set_physics_process(true)
+	sp._tether_peer = 2
+	player.global_position = air + Vector2(0, 230)
+	player.velocity = Vector2(0, 1400)
+	sp._last_floor_y = air.y - 200.0
+	sp._fall_from_y = air.y - 1300.0  # (he'd come down from way above them)
+	await _frames(3)
+	_expect(sp.snapped and sp._reel.is_empty() and sp._tether_peer == 0, "fallen way too far: the band snaps, and nobody's pulling him up")
+	await _frames(6)
+	_expect(sp.snapped and sp._tether_peer == 0, "and it stays snapped")
+	player.set_physics_process(false)
+	_friend(2, player.global_position + Vector2(40, 0), "default", 0)
+	await _frames(4)
+	_expect(not sp.snapped and sp._tether_peer == 2, "till a friend comes back down beside him: tied back on")
+	sp._fall_from_y = player.global_position.y  # (that fall's over)
+	player.set_physics_process(true)
+
 	# The band caught over a ledge (never through the tree), and him pulled up round it (never into it).
 	var spot := _tree_ledge()
 	_expect(not spot.is_empty(), "there's a ledge up the tree with open air off its edge")
@@ -127,6 +149,7 @@ func _run() -> void:
 		player.set_physics_process(true)
 		player.velocity = Vector2(0, 420)
 		sp._last_floor_y = spot.ledge.y - 300.0
+		sp._fall_from_y = spot.ledge.y - 300.0
 		var inside := ""
 		var reeled := false
 		for _f in 150:
@@ -306,6 +329,7 @@ func _fall_below(above: Vector2) -> void:
 	player.global_position = above + Vector2(0, 230)
 	player.velocity = Vector2(0, 420)
 	sp._last_floor_y = above.y - 200.0
+	sp._fall_from_y = above.y - 200.0  # (an ordinary fall: from just over them)
 	await _frames(3)
 
 

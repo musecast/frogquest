@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## How the game starts, the first time: out of the dark, slowly, a place between the stars and the frog
 ## god's voice, a low hum under it. He's a shadow, the frog god's own; it asks what he looks like, and he
-## chooses, one thing at a time (his skin, then his eyes, then his belly), each from a palette of
+## chooses, one thing at a time (his skin, then his belly), each from a palette of
 ## colours to tap or slide a finger across, his colours gliding to each as he fills in. "Is this you?"
 ## Yes: it cuts to black (the hum cut off, with the sound the finale makes as it closes in), the TV's
 ## static comes up, and he fades into his bedroom as that froggy. Nothing else is asked, not even a name
@@ -16,16 +16,18 @@ signal done
 const LINES := ["...LITTLE ONE...", "YOU HAVE COME FROM BELOW.", "BEFORE THE TREE CAN KNOW YOU...", "TELL ME."]
 const ASK := "WHAT DO YOU LOOK LIKE?"
 const SURE := "IS THIS YOU?"
-const PARTS := {"body": "SKIN", "eyes": "EYES", "belly": "BELLY", "pattern_colour": "PATTERN"}
-const PALETTES := {"body": "skin", "eyes": "eyes", "belly": "belly", "pattern_colour": "skin"}
+const PARTS := {"body": "SKIN", "belly": "BELLY", "pattern_colour": "PATTERN"}
+const PALETTES := {"body": "skin", "belly": "belly", "pattern_colour": "skin"}
 const SHADER_KEYS := {"body": "body_colour", "belly": "belly_colour", "eyes": "eye_colour", "pattern_colour": "pattern_colour"}
 const FADE_IN := 3.0  # (the first time: out of the dark, slowly)
-const HOLD := 1.1  # (seconds of black after the cut, its sound ringing, before he fades in)
-const FADE := 1.8  # (and the fade into the game)
-const HUM_DB := -10.0
+const HOLD := 2.5  # (seconds of black after the cut, its sound ringing out, before he fades in at home)
+const FADE := 3.5  # (and the slow fade into his bedroom: he's asleep in it)
+const QUICK_HOLD := 1.1  # (into Endless, or Play Together's menu: on with it)
+const QUICK_FADE := 1.8
+const HUM_DB := -12.0  # (its file's loud: as loud as the old one was)
 const IDLE := ["res://assets/frog.png", "res://assets/frog2.png"]
-const TYPE_SPEED := 14.0  # letters a second (slow: the frog god is old, and big)
-const VOICE_PITCH := Vector2(0.38, 0.47)  # (its voice, a blip every other letter: low, a little different each time)
+const TYPE_SPEED := 10.0  # letters a second (slow: the frog god is old, and big)
+const VOICE_PITCH := Vector2(0.28, 0.34)  # (its voice, a blip every other letter: deep, a little different each time)
 const CREAM := Color(0.97, 0.92, 0.80)
 const DIM := Color(0.70, 0.66, 0.82)
 const VOICE := Color(0.93, 0.90, 1.0)
@@ -42,11 +44,12 @@ const ART_HATS := {"froggycrown": ["res://assets/froggycrown.png", 1.0, -7.25], 
 var from_wardrobe := false
 var fade_in := false  # (the game's very first moments: out of the black, slowly)
 var cut_sound := true  # (the finale's closing-in sound at the cut; START plays it itself, so not from there)
+var slow_end := true  # (into his bedroom, where he's asleep: a long black, a slow fade. Not into Endless or Play Together)
 
 var _looks: GDScript = load("res://scripts/FroggyLook.gd")
 var _look := {}
 var _hat := ""
-var _steps: Array = []  # (what's chosen, in turn: "body", "eyes", "belly"; from the wardrobe, maybe more)
+var _steps: Array = []  # (what's chosen, in turn: "body", "belly"; from the wardrobe, maybe more. His eyes are his own)
 var _at := 0  # (which of them)
 var _step := ""  # talk, choose, sure ("" once he's going)
 var _line := 0
@@ -82,6 +85,7 @@ var _fly: Control
 var _spaced: FontVariation
 var _black: ColorRect
 var _hum: AudioStreamPlayer
+var _more: Control  # (MoreArrow: under its words once they're all there, for a tap)
 var _blip: AudioStreamPlayer
 
 
@@ -91,7 +95,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_look = _looks.clean(MusicManager.look)
 	_hat = MusicManager.equipped_hat
-	_steps = ["body", "eyes", "belly"]
+	_steps = ["body", "belly"]
 	if from_wardrobe:
 		if int(_look.pattern) != 0:
 			_steps.append("pattern_colour")
@@ -147,6 +151,9 @@ func _ready() -> void:
 	_words.add_theme_font_override("font", _spaced)
 	_words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_words)
+	_more = load("res://scripts/MoreArrow.gd").new()  # (its words go on only with a tap: this says so)
+	_more.colour = VOICE
+	_root.add_child(_more)
 
 	_choosing = Control.new()  # (which part, its palette, which of them this is, and back and next)
 	_choosing.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -191,8 +198,8 @@ func _ready() -> void:
 	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_black)
 
-	_hum = AudioStreamPlayer.new()  # (a low hum: it comes in, and it's cut off at the end)
-	_hum.stream = _hum_sound()
+	_hum = AudioStreamPlayer.new()  # (a low hum with a deep bass and a soft rush through it: it comes in, and it's cut off at the end)
+	_hum.stream = load("res://assets/froggod_hum.wav")
 	_hum.bus = &"Music"
 	_hum.volume_db = -50.0
 	add_child(_hum)
@@ -219,31 +226,6 @@ func _ready() -> void:
 	_fit()
 
 
-## A low hum, made here: a deep note and the note an octave up, a hair apart so it slowly throbs, with
-## a little of the notes over it (so it's heard on a phone's small speaker too), two seconds, looped.
-static func _hum_sound() -> AudioStreamWAV:
-	var rate := 11025
-	var n := rate * 2
-	var data := PackedByteArray()
-	data.resize(n * 2)
-	var notes := [[55.0, 0.30], [110.0, 0.36], [110.5, 0.30], [220.0, 0.16], [330.0, 0.07], [440.0, 0.03]]
-	for i in n:
-		var t := float(i) / rate
-		var v := 0.0
-		for each in notes:
-			v += sin(TAU * each[0] * t) * each[1]
-		data.encode_s16(i * 2, int(clampf(v * 0.55, -1.0, 1.0) * 32767.0))
-	var wav := AudioStreamWAV.new()
-	wav.format = AudioStreamWAV.FORMAT_16_BITS
-	wav.mix_rate = rate
-	wav.stereo = false
-	wav.data = data
-	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	wav.loop_begin = 0
-	wav.loop_end = n
-	return wav
-
-
 func _process(delta: float) -> void:
 	_clock += delta
 	if _quiet > 0.0:
@@ -260,6 +242,7 @@ func _process(delta: float) -> void:
 		if int(_typed) / 2 != before / 2 and ch != " " and ch != "\n":
 			_blip.pitch_scale = randf_range(VOICE_PITCH.x, VOICE_PITCH.y)
 			_blip.play()
+	_more.shown = _step == "talk" and _quiet <= 0.0 and total > 0 and _typed >= total
 	_frame_t += delta
 	if _frame_t > 0.6:
 		_frame_t = 0.0
@@ -411,10 +394,20 @@ func _end() -> void:
 		boom.finished.connect(boom.queue_free)
 	done.emit()
 	var out := create_tween()
-	out.tween_interval(HOLD)
-	out.tween_property(_black, "color:a", 0.0, FADE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	out.tween_interval(hold())
+	out.tween_property(_black, "color:a", 0.0, fade()).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await out.finished
 	queue_free()
+
+
+## How long it's black after the cut, and then how long it fades: long and slow into his bedroom, quicker
+## into Endless or Play Together's menu.
+func hold() -> float:
+	return HOLD if slow_end else QUICK_HOLD
+
+
+func fade() -> float:
+	return FADE if slow_end else QUICK_FADE
 
 
 ## His hat (the one he's wearing, if any: they're earned by playing), as in the game.
@@ -481,6 +474,11 @@ func _fit() -> void:
 	words_w = lerpf(words_w, room.size.x - 32.0, k)
 	_words.size = Vector2(words_w, words_h)
 	_words.position = Vector2(centre.x - words_w * 0.5, centre.y - frog_size.y * 0.5 - gap - words_h).round()
+	var lines := _words.text.count("
+") + 1
+	var text_bottom := _words.position.y + words_h * 0.5 + lines * _words.get_line_height() * 0.5
+	_more.pixel = 2.0
+	_more.position = Vector2(centre.x - _more.size.x * 0.5, text_bottom + (8.0 if portrait else 3.0)).round()
 	var even := _even(_said, words_w - 8.0)  # (in even lines: never one word left alone on the last)
 	if _words.text != even:
 		_words.text = even
