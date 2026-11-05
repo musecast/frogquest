@@ -142,6 +142,7 @@ func _show() -> void:
 				else:
 					_box.add_child(_label("Sign in to Muse (Muse Account) to play online.", BODY_FONT_SZ, DIM))
 			_say_note()
+			_frenzy()
 			_look()
 	_bottom.text = "Leave Party" if _mode in ["host", "joined", "connecting"] else "Close"
 	load("res://scripts/UIStyle.gd").finger_scroll(_scroll)
@@ -161,7 +162,8 @@ func _players() -> void:
 ## The host's ways to start: up the World Tree (everyone appears beside you, each in their own world), a
 ## new Endless tower for all, or a race up one (PartyRace): the minute race to begin with, and each race
 ## finished unlocks the next, one by one; the locked ones show, greyed, so you know what's coming. And
-## Muse Pro's games (Rising Pond, Frog Tag), for a host with it: their friends play whether they have it or not.
+## Muse Pro's games (Rising Pond, Frog Tag, Frog Frenzy versus or as a team), for a host with it: their
+## friends play whether they have it or not.
 func _starts() -> void:
 	_box.add_child(_button("Climb the World Tree", func() -> void: Party.start("story"), "go"))
 	_box.add_child(_button("Climb Endless", func() -> void: Party.start("endless")))
@@ -187,10 +189,30 @@ func _starts() -> void:
 		var start := _button(race.RACES[id].label, func() -> void: Party.start("endless", id), "gold" if pro else "quiet")
 		start.disabled = not pro or lonely
 		_box.add_child(start)
+	for style in ["vs", "team"]:  # (Frog Frenzy: Frenzy.gd)
+		var start := _button("Frog Frenzy: %s" % ("Versus" if style == "vs" else "Team"),
+			func() -> void: Party.start("frenzy", style), "gold" if pro else "quiet")
+		start.disabled = not pro
+		_box.add_child(start)
 	if not pro:
 		_box.add_child(_label("Hosting these needs Muse Pro. Friends without it can still join and play.", BODY_FONT_SZ, DIM))
 	elif Party.players.size() < 2:
 		_box.add_child(_label("Frog Tag needs a friend or two.", BODY_FONT_SZ, DIM))
+
+
+## Frog Frenzy on your own (Muse Pro's): microgames, faster and faster, and how many you can clear. In a
+## party, its host plays it with everyone (_starts).
+func _frenzy() -> void:
+	_header("Muse Pro")
+	var pro: bool = MuseAccount.has_pro()
+	var play := _button("Frog Frenzy", func() -> void: get_tree().change_scene_to_file("res://scenes/Frenzy.tscn"),
+		"gold" if pro else "quiet")
+	play.disabled = not pro
+	_box.add_child(play)
+	if MusicManager.frenzy_best > 0:
+		_box.add_child(_label("Your best: %d cleared" % MusicManager.frenzy_best, BODY_FONT_SZ, GOLD))
+	_box.add_child(_label("Quick little games, faster and faster. Host a party to play it with friends." if pro
+		else "Frog Frenzy needs Muse Pro. Friends without it can join a Pro friend's party and play.", BODY_FONT_SZ, DIM))
 
 
 ## You, as your friends see you: your froggy (your look: FroggyLook) and, signed in to Muse, your

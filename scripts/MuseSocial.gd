@@ -46,7 +46,7 @@ var incoming: Array = []  # friend requests waiting on you: cards
 var outgoing: Array = []  # ones you sent
 var presence_live := false  # (friends' states come from muse_presence_friends; without it, just the list)
 var rooms_live := false  # Muse's online party rooms answer (muse_game_invites): online parties show then
-var activity := "title"  # what you're doing here: title, story or endless (set by those scenes)
+var activity := "title"  # what you're doing here: title, story, endless or frenzy (set by those scenes)
 var watching := 0  # screens showing your friends right now (they're looked at more often then)
 var last_post := {}  # the last run posted, as the server answered (run_posted)
 

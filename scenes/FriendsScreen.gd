@@ -18,7 +18,8 @@ const DIM := Color(0.78, 0.74, 0.68)
 const DOTS := {"online": Color(0.45, 0.95, 0.45), "away": Color(1.0, 0.8, 0.3), "dnd": Color(1.0, 0.42, 0.38), "offline": Color(0.5, 0.5, 0.5)}
 const STATUS_WORDS := {"online": "Online", "away": "Away", "dnd": "Do Not Disturb", "invisible": "Invisible"}
 const APP_NAMES := {"frog-quest": "Frog Quest", "muse-shelf": "Muse Shelf", "muse-penguin": "Muse Penguin", "muse-jukebox": "Muse Jukebox"}
-const ACTIVITIES := {"title": "In Frog Quest", "story": "Climbing the World Tree", "endless": "Playing Endless"}
+const ACTIVITIES := {"title": "In Frog Quest", "story": "Climbing the World Tree", "endless": "Playing Endless",
+	"frenzy": "Playing Frog Frenzy"}
 
 var _panel: PanelContainer
 var _scroll: ScrollContainer

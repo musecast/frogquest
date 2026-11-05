@@ -31,7 +31,7 @@ const PORT := 47850
 ## What the party says to each other, by number: everyone in a party must be on the same, or they'd fall
 ## out of step (an iPhone's update waits on the App Store; a computer's or the web's doesn't). 1: before it
 ## was told (an old build says nothing); 2: races. Up it whenever what's said changes.
-const PROTOCOL := 2
+const PROTOCOL := 3
 const OUTDATED := "That party's on a different version of Frog Quest. Update the game to play together."
 const MAX_PLAYERS := 16
 const SEND_EVERY := 1.0 / 15.0  # seconds between your frog's updates to the others
@@ -61,8 +61,9 @@ var full_told_on := ""  # (the UTC day he was last told online's full: RoomFullP
 var settings_path := SETTINGS_PATH  # (the tests point it elsewhere)
 var on_start := Callable()  # (what starting does; the tests swap it so the scene stays put)
 
-var mode := "endless"  # what the party climbs: "endless" (one tower, one seed) or "story" (the World Tree)
-var race := ""  # in Endless, what it races (PartyRace.ORDER: minute, sprint, flies, knockout), "" climbing together
+var mode := "endless"  # what the party plays: "endless" (one tower, one seed), "story" (the World Tree) or "frenzy" (Frog Frenzy)
+var race := ""  # in Endless, what it races (PartyRace.ORDER: minute, sprint, flies, knockout), "" climbing together;
+	# in Frog Frenzy, "vs" or "team"
 var online_room := ""  # the Muse room you're in, online ("" on Wi-Fi or alone)
 var everyone := false  # (that room's a public one, everyone online: climb_with_everyone)
 var beside := ""  # whose side you appear at once their frog's seen (a name in players: "@avery"), "" for nobody
@@ -197,12 +198,13 @@ func leave() -> void:
 
 
 ## The host starts everyone climbing: up the World Tree ("story"), or a new Endless tower (a new seed),
-## climbing together or racing up it (`race_kind`: PartyRace.ORDER).
+## climbing together or racing up it (`race_kind`: PartyRace.ORDER); or Frog Frenzy ("frenzy", Muse
+## Pro's), `race_kind` "vs" or "team".
 func start(what := "endless", race_kind := "") -> void:
 	if not is_host():
 		return
 	var the_seed := randi()
-	var r := race_kind if what == "endless" else ""
+	var r := race_kind if what in ["endless", "frenzy"] else ""
 	if _ws != null:
 		_relay({"data": {"t": "start", "seed": the_seed, "ago": 0, "mode": what, "race": r}})
 		_begin(the_seed, 0, what, r)
@@ -282,6 +284,12 @@ func _into_room(fn_name: String, args: Dictionary) -> String:
 ## What a room climbs, from Muse's summary of it: "story" or "endless".
 static func _mode_of(room: Dictionary) -> String:
 	return "story" if str(room.get("mode", "")) == "story" else "endless"
+
+
+## What a start says the party plays: up the World Tree ("story"), Frog Frenzy's microgames ("frenzy",
+## Muse Pro's), or an Endless tower (anything else).
+static func what_of(what: String) -> String:
+	return what if what in ["story", "frenzy"] else "endless"
 
 
 ## A ticket from Muse's relay for the room, then its WebSocket. The welcome that follows seats you.
@@ -385,7 +393,7 @@ func _on_relay(text: String) -> void:
 				if slot > 0 and slot != _seat:
 					players[slot] = _look_of(card, players.get(slot, {}))
 					_relay({"to": slot, "data": {"t": "look", "i": my_info()}})
-					if is_host() and in_run and mode == "endless":
+					if is_host() and in_run and mode in ["endless", "frenzy"]:
 						_relay({"to": slot, "data": {"t": "start", "seed": run_seed, "ago": Time.get_ticks_msec() - run_started_ms, "mode": mode, "race": race}})
 					elif is_host() and in_run and not everyone:
 						_relay({"to": slot, "data": {"t": "start", "seed": 0, "ago": 0, "mode": mode}})  # (up the World Tree with you)
@@ -420,8 +428,7 @@ func _on_relay(text: String) -> void:
 				players_changed.emit()
 		"start":
 			if from == _host_seat:
-				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)), "story" if str(d.get("mode", "")) == "story" else "endless",
-					str(d.get("race", "")))
+				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)), what_of(str(d.get("mode", ""))), str(d.get("race", "")))
 		"r":
 			if d.get("r") is Dictionary:
 				race_said.emit(from, d.r)
@@ -656,7 +663,7 @@ func _roster(all: Dictionary, host_version := 1) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _start(the_seed: int, ago_ms: int, what := "endless", race_kind := "") -> void:
-	_begin(the_seed, ago_ms, "story" if what == "story" else "endless", race_kind)
+	_begin(the_seed, ago_ms, what_of(what), race_kind)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -674,6 +681,8 @@ func _begin(the_seed: int, ago_ms: int, what := "endless", race_kind := "") -> v
 	mode = what
 	var races: GDScript = load("res://scripts/PartyRace.gd")
 	race = race_kind if what == "endless" and (race_kind in races.ORDER or race_kind in races.PRO) else ""
+	if what == "frenzy":
+		race = race_kind if race_kind in ["vs", "team"] else "vs"
 	if what == "story" and beside == "" and not is_host() and not everyone:
 		beside = name_of(_host_seat if _ws != null else 1)
 	started.emit()
@@ -683,6 +692,8 @@ func _begin(the_seed: int, ago_ms: int, what := "endless", race_kind := "") -> v
 		var here := get_tree().current_scene
 		if here == null or here.scene_file_path != "res://scenes/Main.tscn":
 			get_tree().change_scene_to_file("res://scenes/Main.tscn")  # (StoryParty takes it from there)
+	elif what == "frenzy":
+		get_tree().change_scene_to_file("res://scenes/Frenzy.tscn")
 	else:
 		get_tree().change_scene_to_file("res://scenes/EndlessMode.tscn")
 
