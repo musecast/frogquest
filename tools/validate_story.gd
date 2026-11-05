@@ -54,9 +54,11 @@ func _run() -> void:
 	player._on_button_pressed()
 	for _i in 3:
 		await process_frame
-	_expect(main._tv_done and player.waking and player.asleep and not hiss.playing and main._tv_glass.visible
-		and not main._tv_bubble.visible and not how_to.visible and player._zzz != null,
-		"starting at home, he's asleep in his beanbag (z's drifting up), the TV's off, no tutorial yet")
+	var record: CanvasItem = main.get_node("Musecrtquarterview/Record")
+	var screen: ColorRect = main.get_node("Musecrtquarterview/ColorRect")
+	_expect(main._tv_done and player.waking and player.asleep and not hiss.playing and main._tv_song.playing and record.visible
+		and screen.material != main._tv_static_look and not main._tv_bubble.visible and not how_to.visible and player._zzz != null,
+		"starting at home, he's asleep in his beanbag (z's drifting up), fallen asleep to the TV's show (the record, the song from the end), no tutorial yet")
 	_expect(eyes.get_shader_parameter("eyes_shut") == true, "his eyes shut")
 	Input.action_press("ui_mouse")
 	await process_frame
@@ -67,7 +69,10 @@ func _run() -> void:
 	await _game_time(2.6)
 	_expect(player._zzz != null and player._zzz.breaths >= 1 and player._zzz._breath.stream.resource_path.ends_with("sleep_breath.wav"),
 		"asleep, he breathes: a little snore in, a little whistle out")
-	_expect(hiss.playing and player.asleep, "the TV comes on by itself (he's still asleep)")
+	_expect(hiss.playing and player.asleep and not record.visible and screen.material == main._tv_static_look,
+		"the frog god takes the TV over: its static, the record gone (he's still asleep)")
+	await _game_time(0.8)
+	_expect(not main._tv_song.playing, "and the song's died under it")
 	await _game_time(1.3)
 	_expect(not player.asleep and player.waking and eyes.get_shader_parameter("eyes_shut") == false, "and he wakes")
 	await _game_time(1.0)
@@ -85,7 +90,7 @@ func _run() -> void:
 	_tap_screen(pause.get_global_rect().get_center())
 	await process_frame
 	_expect(main._tv_bubble.text == main.TV_LINES[0], "a tap on the pause button isn't one for the TV")
-	for line in [1, 2, 3]:
+	for line in range(1, main.TV_LINES.size()):
 		_tap_screen(Vector2(_view.size) * Vector2(0.5, 0.62))  # (a finger on the screen, as it comes: over its CRT layers)
 		_expect(main._tv_bubble.text == main.TV_LINES[line] and main._tv_typing, "a tap: its next line, typed out (%s)" % main._tv_bubble.text.c_escape())
 		await process_frame
@@ -129,8 +134,8 @@ func _run() -> void:
 	await _game_time(player.SLEEPY * 0.5)
 	_expect(not player.asleep, "not asleep after a little while")
 	_expect(cam.offset.x == 0.0 and not main._tv_leaning, "the TV done, the camera's back on him (%.2f)" % cam.offset.x)
-	_expect(not main._tv_god.visible and main._tv_glass.visible and main._tv_glass.modulate.a > 0.99 and not hiss.playing,
-		"and the frog god's faded away with its static: the TV's dark and quiet (glass %.2f)" % main._tv_glass.modulate.a)
+	_expect(not main._tv_god.visible and hiss.playing and screen.material == main._tv_static_look and not record.visible,
+		"and the frog god's faded back into its static, which stays: till he's won")
 	await _game_time(player.SLEEPY * 0.5 + 1.5)
 	_expect(player.asleep and player._napping and player._zzz != null and eyes.get_shader_parameter("eyes_shut") == true,
 		"left alone a while, standing still, he nods off")

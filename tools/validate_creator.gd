@@ -144,15 +144,17 @@ func _run() -> void:
 	await _until(func() -> bool: return not is_instance_valid(intro), 10.0)  # (a long black, a slow fade)
 	_expect(not is_instance_valid(intro) and not player.get_node("titlescreen").visible and player.get_node("Trajectory").endGame == 0,
 		"and he fades in from it")
-	_expect(player.asleep and player.waking and not tv.playing and main._tv_glass.visible,
-		"asleep in his beanbag, the TV off (its static quiet)")
+	_expect(player.asleep and player.waking and not tv.playing and main._tv_song.playing
+		and main.get_node("Musecrtquarterview/Record").visible,
+		"asleep in his beanbag, fallen asleep to the TV's show (the song from the end, the record turning)")
 	var worn: ShaderMaterial = player.get_node("Sprite2D").material
 	_expect(worn != null and _near(worn.get_shader_parameter("body_colour"), look.colour(made, "body"))
 		and _near(worn.get_shader_parameter("eye_colour"), Color.BLACK) and worn.get_shader_parameter("eyes_shut") == true,
 		"as the froggy he made, his eyes shut")
 	_expect(player.global_position.distance_to(start) < 60.0, "in his bedroom, where a new climb starts")
 	await _until(func() -> bool: return tv.playing, 5.0)
-	_expect(tv.playing and player.asleep, "the TV comes on by itself")
+	_expect(tv.playing and player.asleep and not main.get_node("Musecrtquarterview/Record").visible,
+		"the frog god takes the TV over: static, the record gone")
 	await _until(func() -> bool: return not player.asleep, 4.0)
 	_expect(not player.asleep and player.waking, "he wakes")
 	await _until(func() -> bool: return main._tv_bubble.visible, 4.0)

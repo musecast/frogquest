@@ -24,18 +24,22 @@ const FELL_LINES := {
 		"o ho ho... the ground\nmissed you, i bet"],
 }
 const FELL_BY := 25.0  # (in currentHeight, a tenth of a pixel: 250 px above them, since the game started)
-## The TV at home, through the static, before he's ever won: why he's going.
-const TV_LINES := ["...bzzt...", "...a froggy of fate will\nrise from below...",
-	"...and reach the top of\nthe world tree...", "...bzzzzt..."]
-const WAKE_DOZE := 2.0  # (seconds he's seen asleep before the TV comes on by itself)
+## The TV at home, the frog god come through its static, before he's ever won: his call to the froggy of
+## fate, to go. (Each line's rows no wider than its widest has been, 24 letters: the camera leans for that.)
+const TV_LINES := ["...bzzt...", "...froggy of fate...\ncan you hear me...?", "...the world tree\nis calling you...",
+	"...rise from below...\nclimb to the very top...", "...bzzzzt..."]
+const WAKE_DOZE := 2.0  # (seconds he's seen asleep, the TV's show on, before the frog god takes it over)
+const TV_SHOW_DB := -15.0  # (the song from the end on the TV, as he fell asleep to it: soft, about -28 LUFS by it)
+## The TV's screen, its corners in its own art (top left, top right, bottom right, bottom left), from its
+## picture: it's turned toward his beanbag, so its right side's the nearer, taller one.
+const TV_SCREEN := [Vector2(-378, -346), Vector2(250, -339), Vector2(258, 201), Vector2(-380, 130)]
+const TV_GOD_BOX := Rect2(0.17, 0.09, 0.66, 0.84)  # (the frog god on it: 0 to 1 across and down its face)
 const TV_TYPE_SPEED := 12.0  # (the TV's words, letters a second)
 const TV_LEAN_ROOM := 60.0  # (as near as the camera, leaning toward the TV, lets him come to the screen's edge)
 const TV_LEAN_SPRING := 3.0  # (how quick that lean is: there in about a second and a half)
-const TV_GOD_SIZE := 0.6  # (the frog god in its static: this much of its screen across)
 const TV_GOD_SHOWS := 0.66  # (as much of him as comes through the static, at most: he's in it, not on it)
 const TV_GOD_IN := 1.6  # (seconds he takes to come through, or to fade, each line)
-const TV_OFF := 2.4  # (seconds it takes, done, to fade to dark with him: the TV going off by itself)
-const TV_ON := 0.3  # (seconds from its dot of light to the whole picture: it snaps on)
+const TV_GOD_GONE := 2.0  # (seconds he takes, done, to fade back into the static: it stays, till he's won)
 signal _tv_next  # (a tap, once the TV's line is all there)
 const LOST_FROG_TOP := Vector2(2950, -5626)  # (where the lost frog turns up once the gate's open: the castle hall)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
@@ -50,7 +54,7 @@ var _tv_listening := false  # (its words wait for a tap: wake_up)
 var _tv_lean := false  # (while it talks, the camera leans toward it, if it needs to: _lean_to_tv)
 var _tv_leaning := false  # (the camera's off him, leaning that way or coming back)
 var _tv_lean_speed := 0.0
-var _tv_god: TextureRect  # (the frog god, faint in its static as it speaks: _tv_god_to)
+var _tv_god: Node2D  # (the frog god, faint in its static as it speaks: _tv_god_to, _draw_tv_god)
 var _tv_god_frames: Array[Texture2D] = []
 var _tv_god_frame := 0
 var _tv_god_level := 0.0  # (how much of him's come through: 0 to 1)
@@ -61,8 +65,9 @@ var _tv_static_left := 0.0
 var _tv_static := [0.0, -2.0, 2.0, 1.0]  # (the words' jitter across, each ghost's, the words' flicker)
 var _tv_widest := 0.0  # (the widest of its lines, in its words' own size)
 var _tv_more: Control  # (MoreArrow, under its words once they're all there)
-var _tv_glass: CanvasItem  # (its screen off: dark glass)
-var _tv_flash: CanvasItem  # (coming on: a line of light, opening up)
+var _tv_flash: CanvasItem  # (the frog god taking it over: a flash of white)
+var _tv_song: AudioStreamPlayer2D  # (the song from the end, on its show, as he fell asleep: _tv_show)
+var _tv_static_look: Material  # (its screen's static, as the level has it)
 var _tv_voice: AudioStreamPlayer
 var _tv_crackle: AudioStreamPlayer
 var _lost_frog_up := false
@@ -226,49 +231,41 @@ func _make_tv_bubble() -> void:
 	_tv_voice = _tv_sound_player("res://assets/tv_voice.wav", -20.0)
 	_tv_crackle = _tv_sound_player("res://assets/tv_crackle.wav", -18.0)
 	_tv_db = $Musecrtquarterview/AudioStreamPlayer2D.volume_db
-	# (its screen, off and coming on: over the static, under the TV's frame, as the static is)
+	# (its screen: a flash as the frog god takes it over, over the static, under the TV's frame, as the
+	# static is)
 	var screen: ColorRect = $Musecrtquarterview/ColorRect
-	var glass := TextureRect.new()
-	var shine := GradientTexture2D.new()
-	shine.fill = GradientTexture2D.FILL_RADIAL
-	shine.fill_from = Vector2(0.42, 0.38)
-	shine.fill_to = Vector2(1.05, 1.0)
-	shine.gradient = Gradient.new()
-	shine.gradient.set_color(0, Color(0.22, 0.23, 0.28))
-	shine.gradient.set_color(1, Color(0.09, 0.09, 0.12))
-	glass.texture = shine
-	glass.stretch_mode = TextureRect.STRETCH_SCALE
-	glass.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_tv_static_look = screen.material
 	var flash := ColorRect.new()
 	flash.color = Color(0.92, 0.95, 1.0)
-	for each in [glass, flash]:
-		each.z_index = screen.z_index
-		each.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		each.visible = false
-		$Musecrtquarterview.add_child(each)
-		each.position = screen.position
-		each.size = screen.size
-		each.pivot_offset = screen.size * 0.5
-	_tv_glass = glass
+	flash.z_index = screen.z_index
+	flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flash.visible = false
+	$Musecrtquarterview.add_child(flash)
+	flash.position = screen.position
+	flash.size = screen.size
 	_tv_flash = flash
+	# (the song from the end, on its show as he fell asleep: its own player, so it can die under the static)
+	var hiss: AudioStreamPlayer2D = $Musecrtquarterview/AudioStreamPlayer2D
+	_tv_song = AudioStreamPlayer2D.new()
+	_tv_song.stream = load("res://assets/leafedfiltered.ogg")
+	_tv_song.bus = hiss.bus
+	_tv_song.max_distance = hiss.max_distance
+	_tv_song.attenuation = hiss.attenuation
+	$Musecrtquarterview.add_child(_tv_song)
 	# (and the frog god in its static as it speaks: as the intro shows him, dark, his violet rim breathing,
-	# his eyes aglow, but faint, as if the signal's his; over the static, under its glass when it's off)
+	# his eyes aglow, but faint, as if the signal's his; drawn on the screen's own slanted face, so he's
+	# turned toward Froggy as the TV is: _draw_tv_god)
 	var intro: GDScript = load("res://scenes/CreatorIntro.gd")
 	for path in intro.IDLE:
 		_tv_god_frames.append(load(path))
-	var god := TextureRect.new()
-	god.texture = _tv_god_frames[0]
-	god.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	god.stretch_mode = TextureRect.STRETCH_SCALE
+	var god := Node2D.new()
 	god.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	god.material = load("res://scripts/FroggyLook.gd").material({}, "", 1.0)
 	god.z_index = screen.z_index
-	god.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	god.visible = false
+	god.draw.connect(_draw_tv_god)
 	$Musecrtquarterview.add_child(god)
 	$Musecrtquarterview.move_child(god, screen.get_index() + 1)
-	god.size = Vector2.ONE * screen.size.x * TV_GOD_SIZE
-	god.position = screen.position + (screen.size - god.size) * 0.5
 	_tv_god = god
 
 
@@ -327,12 +324,13 @@ func _lean_to_tv(delta: float) -> void:
 	_tv_leaning = x != 0.0 or _tv_lean_speed != 0.0
 
 
-## A new climb from his bedroom (player._on_button_pressed): he's asleep in his beanbag, the TV off. It
-## comes on by itself (a thunk, a line of light opening up, its static swelling in), he wakes, and it
-## speaks, crackling in the frog god's voice, the frog god himself faint in its static (more of him as the
-## words come through, less in its "bzzt"s): each of its lines stays till a tap (the arrow under it says
-## so). Done, he fades away and the static with him: the TV goes dark by itself, as it came on. Then the
-## tutorial comes up, and off he goes. from_dark: the game's fading in from the frog god's black
+## A new climb from his bedroom (player._on_button_pressed): he's asleep in his beanbag, fallen asleep to
+## the TV's show (the song from the end, the record turning: as it is once he's won). The frog god takes
+## the TV over (a crackle, a flash, the song dying under its static), he wakes, and it speaks, crackling in
+## the frog god's voice, the frog god himself faint in its static (more of him as the words come through,
+## less in its "bzzt"s), calling the froggy of fate to the top: each of its lines stays till a tap (the
+## arrow under it says so). Done, he fades back into the static, and the static stays, till he's won. Then
+## the tutorial comes up, and off he goes. from_dark: the game's fading in from the frog god's black
 ## (CreatorIntro), so he's asleep all through that, and a little while after.
 func wake_up(from_dark: bool) -> void:
 	if _tv_done:
@@ -341,13 +339,13 @@ func wake_up(from_dark: bool) -> void:
 	var player := $Player
 	player.waking = true
 	player.set_asleep(true)
-	_tv_power(false)
+	_tv_show(from_dark)
 	_tutorials(false)
 	var intro: GDScript = load("res://scenes/CreatorIntro.gd")
 	if not await _wait((intro.HOLD + intro.FADE if from_dark else 0.5) + WAKE_DOZE):
 		return
-	_tv_power(true)
-	_tv_lean = true  # (the camera drifts toward it as it comes on)
+	_tv_takeover()
+	_tv_lean = true  # (the camera drifts toward it as it's taken over)
 	if not await _wait(1.1):
 		return
 	player.wake()
@@ -363,7 +361,7 @@ func wake_up(from_dark: bool) -> void:
 	_tv_listening = false
 	_tv_bubble.visible = false
 	_tv_lean = false  # (and back to him)
-	_tv_fade_off()
+	_tv_god_to(0.0, TV_GOD_GONE)  # (back into the static: it stays)
 	_tutorials(true)
 	player.waking = false
 
@@ -434,35 +432,52 @@ func _tv_input(event: InputEvent) -> void:
 	_tv_tap()
 
 
-## The TV off (its screen dark glass, no static) or coming on: a thunk, a line of light opening up into
-## the static, its hiss swelling in.
-func _tv_power(on: bool) -> void:
-	var hiss: AudioStreamPlayer2D = $Musecrtquarterview/AudioStreamPlayer2D
-	if not on:
-		_tv_glass.visible = true
-		_tv_glass.modulate.a = 1.0
-		_tv_flash.visible = false
-		hiss.stop()
-		return
+## He fell asleep to the TV's show, as it is once he's won (player._activate_beaten_crt): its checkered
+## screen, the record turning, the song from the end. Out of the frog god's black, its song comes up softly
+## before the room does.
+func _tv_show(from_dark: bool) -> void:
+	var tv := $Musecrtquarterview
+	tv.get_node("AudioStreamPlayer2D").stop()
+	var show := ShaderMaterial.new()
+	show.shader = load("res://checkerboardendless.gdshader")
+	tv.get_node("ColorRect").material = show
+	for each in ["Record", "Recordshadow"]:
+		tv.get_node(each).visible = true
+	_tv_flash.visible = false
+	_tv_song.pitch_scale = 1.0
+	_tv_song.volume_db = TV_SHOW_DB - 30.0
+	_tv_song.play()
+	var intro: GDScript = load("res://scenes/CreatorIntro.gd")
+	create_tween().tween_property(_tv_song, "volume_db", TV_SHOW_DB, intro.HOLD if from_dark else 1.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## The frog god takes the TV over, suddenly (as a TV's coming on is: the one thing here that doesn't ease
+## in): a thunk and a crackle, a flash, the record gone, the song slowing and dying like a stopped tape under
+## the static that bursts in. And static it stays, till he's won (player._activate_beaten_crt: the show back).
+func _tv_takeover() -> void:
+	var tv := $Musecrtquarterview
+	var hiss: AudioStreamPlayer2D = tv.get_node("AudioStreamPlayer2D")
+	tv.get_node("ColorRect").material = _tv_static_look
+	for each in ["Record", "Recordshadow"]:
+		tv.get_node(each).visible = false
 	var thunk := _tv_sound_player("res://assets/tv_on.wav", -8.0)
 	thunk.play()
 	thunk.finished.connect(thunk.queue_free)
+	_tv_crackle.pitch_scale = 0.8
+	_tv_crackle.play()
 	_tv_flash.visible = true
-	_tv_flash.modulate.a = 1.0
-	_tv_flash.scale = Vector2(0.2, 0.03)
-	# (a dot of light, a line across, the line opening up into the picture: sudden, as an old TV's is; the
-	# one thing here that doesn't ease in: it snaps out, then settles)
-	var light := create_tween().set_ease(Tween.EASE_OUT)
-	light.tween_property(_tv_flash, "scale:x", 0.97, TV_ON * 0.25).set_trans(Tween.TRANS_EXPO)
-	light.tween_property(_tv_flash, "scale", Vector2.ONE, TV_ON * 0.75).set_trans(Tween.TRANS_EXPO)
-	light.parallel().tween_property(_tv_glass, "modulate:a", 0.0, TV_ON * 0.5).set_trans(Tween.TRANS_QUAD)
-	light.tween_property(_tv_flash, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	light.tween_callback(func() -> void:
-		_tv_flash.visible = false
-		_tv_glass.visible = false)
-	hiss.volume_db = _tv_db - 12.0
+	_tv_flash.modulate.a = 0.9
+	var flash := create_tween()
+	flash.tween_property(_tv_flash, "modulate:a", 0.0, 0.4).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	flash.tween_callback(func() -> void: _tv_flash.visible = false)
+	var dies := create_tween().set_parallel()
+	dies.tween_property(_tv_song, "pitch_scale", 0.3, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	dies.tween_property(_tv_song, "volume_db", TV_SHOW_DB - 40.0, 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	dies.chain().tween_callback(_tv_song.stop)
+	hiss.volume_db = _tv_db + 4.0
 	hiss.play()
-	create_tween().tween_property(hiss, "volume_db", _tv_db, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	create_tween().tween_property(hiss, "volume_db", _tv_db, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## The frog god in the TV's static: more of him (`level`, 0 to 1), or less, gliding there over `secs`.
@@ -473,30 +488,46 @@ func _tv_god_to(level: float, secs: float) -> void:
 	_tv_god_tween.tween_property(self, "_tv_god_level", level, secs).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
-## Done talking: the frog god fades away, and its static with him, to the dark glass (its hiss with it).
-func _tv_fade_off() -> void:
-	var hiss: AudioStreamPlayer2D = $Musecrtquarterview/AudioStreamPlayer2D
-	_tv_god_to(0.0, TV_OFF * 0.8)
-	_tv_glass.visible = true
-	_tv_glass.modulate.a = 0.0
-	var off := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	off.tween_property(_tv_glass, "modulate:a", 1.0, TV_OFF)
-	off.parallel().tween_property(hiss, "volume_db", _tv_db - 36.0, TV_OFF)
-	off.tween_callback(hiss.stop)
-
-
 ## Him in the static, breathing (the intro's two frames), wavering softly, as a weak signal does.
 func _tv_god_shows(delta: float) -> void:
-	_tv_god.visible = _tv_god_level > 0.001
-	if not _tv_god.visible:
+	var shows := _tv_god_level > 0.001
+	if shows != _tv_god.visible:
+		_tv_god.visible = shows
+		if shows:
+			_tv_god.queue_redraw()
+	if not shows:
 		return
 	_tv_clock += delta
 	var frame := int(_tv_clock / 0.6) % _tv_god_frames.size()
 	if frame != _tv_god_frame:
 		_tv_god_frame = frame
-		_tv_god.texture = _tv_god_frames[frame]
+		_tv_god.queue_redraw()
 	var waver := 0.88 + 0.12 * sin(_tv_clock * 4.7) * sin(_tv_clock * 1.9 + 1.0)
 	_tv_god.modulate.a = TV_GOD_SHOWS * _tv_god_level * waver
+
+
+## The frog god on the TV's screen, on its own slanted face (TV_SCREEN), so he's turned toward Froggy as
+## the TV is: in little pieces, each one's corners where they'd fall on it (none folds him across).
+func _draw_tv_god() -> void:
+	var tex: Texture2D = _tv_god_frames[_tv_god_frame]
+	var n := 8
+	var white := PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
+	for j in n:
+		for i in n:
+			var a := Vector2(i, j) / n
+			var b := Vector2(i + 1, j + 1) / n
+			var uv := PackedVector2Array([a, Vector2(b.x, a.y), b, Vector2(a.x, b.y)])
+			var at := PackedVector2Array()
+			for p in uv:
+				at.append(on_tv_screen(TV_GOD_BOX.position + p * TV_GOD_BOX.size))
+			_tv_god.draw_polygon(at, white, uv, tex)
+
+
+## A point on the TV's screen (0 to 1 across and down its slanted face), in its own art.
+static func on_tv_screen(p: Vector2) -> Vector2:
+	var top: Vector2 = (TV_SCREEN[0] as Vector2).lerp(TV_SCREEN[1], p.x)
+	var bottom: Vector2 = (TV_SCREEN[3] as Vector2).lerp(TV_SCREEN[2], p.x)
+	return top.lerp(bottom, p.y)
 
 
 ## The TV's words, staticky (not rocking, as the frogs' do): a dozen times a second they twitch a pixel
