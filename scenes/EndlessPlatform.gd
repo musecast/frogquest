@@ -22,6 +22,7 @@ const KINDS := {
 	"satellite": [10, 12, 1, ""],
 }
 const THICKNESS := 10.0  # how deep the solid part is under the walkable top
+const PX := 1.2  # world px for each pixel of its art: the story's tiles' own (its tile map's at 1.2), so they match
 const UNDER_LENGTH := 150.0  # how far a stalk or trunk hangs down before it fades out
 const CRUMBLE_DELAY := 0.6  # seconds from landing to falling
 
@@ -168,12 +169,13 @@ func _sound(path: String, pitch: float, db: float) -> void:
 ## What hangs under it (a stalk, a trunk), fading out downward.
 func _draw_under() -> void:
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
+	_under_node.draw_set_transform(Vector2.ZERO, 0.0, Vector2(PX, PX))  # (in its art's own pixels)
 	var uw: float = _under.get_width()
 	var uh: float = _under.get_height()
 	var ux := -roundf(uw * 0.5)
 	var y: float = -float(art[2]) + _strip.get_height() - 3.0
-	while y < UNDER_LENGTH:
-		_under_node.draw_texture(_under, Vector2(ux, y), Color(1, 1, 1, clampf(1.0 - y / UNDER_LENGTH, 0.0, 1.0)))
+	while y * PX < UNDER_LENGTH:
+		_under_node.draw_texture(_under, Vector2(ux, y), Color(1, 1, 1, clampf(1.0 - y * PX / UNDER_LENGTH, 0.0, 1.0)))
 		y += uh
 
 
@@ -189,24 +191,27 @@ func _draw() -> void:
 	if _crumble_left >= 0.0:  # a wobble while it's about to go
 		var k := 1.0 - _crumble_left / CRUMBLE_DELAY
 		shake = Vector2(sin(Time.get_ticks_msec() * 0.06) * (0.6 + k * 1.6), 0.0).round()
-	var x0 := -roundf(width * 0.5) + shake.x
-	var y0 := -top_row
 	if _under_node:
 		_under_node.queue_redraw()
+	# (in its art's own pixels from here, each PX of the world's: its origin's still the middle of its top)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(PX, PX))
+	var across := width / PX
+	var x0 := -roundf(across * 0.5) + shake.x / PX
+	var y0 := -top_row
 	# The strip: left end, the middle tiled across, right end.
 	draw_texture_rect_region(_strip, Rect2(x0, y0, cap, h), Rect2(0, 0, cap, h))
 	var x := x0 + cap
-	var right := x0 + width - cap
+	var right := x0 + across - cap
 	while x < right:
 		var w := minf(mid, right - x)
 		draw_texture_rect_region(_strip, Rect2(x, y0, w, h), Rect2(cap, 0, w, h))
 		x += mid
 	draw_texture_rect_region(_strip, Rect2(right, y0, cap, h), Rect2(cap + mid, 0, cap, h))
 	if _flower_tex:
-		draw_texture(_flower_tex, Vector2(roundf(width * 0.18), -_flower_tex.get_height() + 1.0))
+		draw_texture(_flower_tex, Vector2(roundf(across * 0.18), -_flower_tex.get_height() + 1.0))
 	if _spring_up:
 		# Its plate level with the top (he stands on it), its coil set down into the platform; pressed
 		# in while he's on it, overshooting a little as it lets go.
 		var tex := _spring_down if _squash > 0.5 else _spring_up
 		var y := 1.0 if _squash > 0.5 else (-4.0 if _spring_kick > 0.12 else -1.0)
-		draw_texture(tex, Vector2(-roundf(tex.get_width() * 0.5) + shake.x, y))
+		draw_texture(tex, Vector2(-roundf(tex.get_width() * 0.5) + shake.x / PX, y))

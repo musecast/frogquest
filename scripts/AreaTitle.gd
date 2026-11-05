@@ -23,6 +23,7 @@ void fragment() {
 }"""
 
 var player: Node2D
+var top_at := Vector2(0.18, 0.2)  # (how far down the room it comes in, upright and sideways: Endless's lower, its score's up there)
 var showing := ""  # (the name up now, or "")
 var _where := ""
 var _named := {}  # (each area: when it was last named, in msec)
@@ -114,6 +115,11 @@ func _process(delta: float) -> void:
 		_name(area)
 
 
+## Name `area` now, whatever he's doing (Endless, as he climbs into each of its zones: the same look).
+func announce(area: String) -> void:
+	_name(area)
+
+
 ## Climbing: not on the title, waking up at home, paused, in the frog god's intro or the ending.
 func _in_play() -> bool:
 	return player.get_node("Trajectory").endGame == 0 and not player.get("waking") and Engine.time_scale > 0.5 \
@@ -196,7 +202,7 @@ func _fit() -> void:
 	var line_h := 2.0 if portrait else 1.0
 	var pad := Vector2(size * 3.0, size * 0.95)  # (room above and below it, the band soft at its edges)
 	var whole := Vector2(text.x + pad.x * 2.0, text.y + line_gap + line_h + pad.y * 2.0)
-	var top := room.position.y + room.size.y * (0.18 if portrait else 0.2)
+	var top := room.position.y + room.size.y * (top_at.x if portrait else top_at.y)
 	_box.position = Vector2(vp.x * 0.5 - whole.x * 0.5, top - _lift).round()
 	_box.size = whole
 	_band.position = Vector2.ZERO

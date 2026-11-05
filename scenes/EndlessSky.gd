@@ -18,6 +18,9 @@ var _planet: Texture2D
 var _earth: Texture2D
 var _moon: Texture2D
 var _stars := []  # [x 0..1, y 0..1, size, layer, phase]
+var _pixels: Node2D  # (over all of it: the sky in the story's sky's own pixels, endless_pixels.gdshader)
+
+const TEXEL := 2.4  # world px for each pixel of the sky (the story's sky's own: Sky.TEXEL)
 
 
 func _ready() -> void:
@@ -34,13 +37,27 @@ func _ready() -> void:
 	rnd.seed = 42
 	for i in 150:
 		_stars.append([rnd.randf(), rnd.randf(), 1.0 + float(rnd.randi() % 3 == 0), i % 3, rnd.randf() * TAU])
+	# (its shapes drawn smooth, then all of it redrawn in square pixels TEXEL of the world's across, as the
+	# story's sky is pixel art at that: just over the sky, under the platforms and him)
+	_pixels = Node2D.new()
+	_pixels.z_index = -49
+	_pixels.z_as_relative = false
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://scenes/endless_pixels.gdshader")
+	_pixels.material = mat
+	_pixels.draw.connect(func() -> void:
+		var half := get_viewport_rect().size / (cam.zoom if cam else Vector2.ONE) * 0.5 + Vector2(8.0, 8.0)
+		_pixels.draw_rect(Rect2(-half, half * 2.0), Color.WHITE))
+	add_child(_pixels)
 
 
 func _process(delta: float) -> void:
 	_t += delta
 	if cam:
 		global_position = cam.get_screen_center_position()
+		(_pixels.material as ShaderMaterial).set_shader_parameter("cell", TEXEL * cam.zoom.x)
 	queue_redraw()
+	_pixels.queue_redraw()
 
 
 ## A cheap repeatable "random" 0..1 for scenery item i of a layer.

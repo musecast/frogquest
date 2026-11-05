@@ -83,8 +83,9 @@ var fade_rect: ColorRect
 var canvas_layer: CanvasLayer
 var score_label: Label
 var _height_label: Label
-var _banner: Label
+var _banner: Label  # (a word that isn't a zone's name: "PARTY OVER"; and, under it, how to play)
 var _banner_sub: Label
+var _titles: CanvasLayer  # (the zones' names: AreaTitle)
 var _sky  # (EndlessSky.gd)
 var _zones: Script
 var _platform_script: Script
@@ -208,7 +209,8 @@ func _ready() -> void:
 		_generate_one_platform_above()
 	fade_rect.color.a = 1.0
 	_fade(1.0, 0.0, 0.6)
-	_show_banner(_zones.ZONES[0]["name"], "Climb as high as you can!")
+	_titles.announce(_zones.ZONES[0]["name"])
+	_show_banner("", "Climb as high as you can!")
 	if Party.in_run:
 		_join_party()
 	set_process(true)
@@ -252,6 +254,11 @@ func _create_ui() -> void:
 	_height_label = _hud_label(font, CREAM)
 	_banner = _hud_label(font, GOLD)
 	_banner_sub = _hud_label(font, CREAM)
+	# (each zone named as he climbs into it in the story's own look: AreaTitle, its capitals, its gold line
+	# and diamonds, its bell; lower down the screen than the story's, under the score)
+	_titles = load("res://scripts/AreaTitle.gd").new()
+	_titles.top_at = Vector2(0.27, 0.3)
+	add_child(_titles)
 	for lbl in [_banner, _banner_sub]:
 		lbl.modulate.a = 0.0
 	fade_rect = ColorRect.new()
@@ -304,7 +311,7 @@ func _fit_to_viewport() -> void:
 	var is_portrait: bool = viewport_size.y > viewport_size.x * 1.3
 	var ratio: float = viewport_size.y / viewport_size.x
 	var t: float = inverse_lerp(0.65, 1.3, clamp(ratio, 0.65, 1.3))
-	var zoom_val: float = lerp(0.42, 0.7, t)  # (closer than it was: he and the art were tiny on a phone)
+	var zoom_val: float = lerp(0.55, 1.0, t)  # (the story's own, player._apply_camera_zoom: he and the art as big as there)
 	# The play area: the screen's width in the world, less room for a platform, kept from getting
 	# silly-wide sideways.
 	var half_world: float = viewport_size.x / zoom_val * 0.5
@@ -319,12 +326,13 @@ func _fit_to_viewport() -> void:
 	var big := 48 if is_portrait else 16
 	var small := 32 if is_portrait else 16
 	score_label.add_theme_font_size_override("font_size", big)
-	if _pause_button:
+	if _pause_button:  # (as the story's: 20 across at 1.5 to 2.5 times, its middle 26 to 42 in from the corner)
 		var room: Rect2 = ui.room(viewport_size)
-		var side := 32.0 if is_portrait else 24.0
+		var side := 20.0 * lerpf(1.5, 2.5, t)
+		var middle := lerpf(26.0, 42.0, t)
 		_pause_button.custom_minimum_size = Vector2(side, side)
 		_pause_button.size = Vector2(side, side)
-		_pause_button.position = (room.position + Vector2(8.0, 8.0)).round()
+		_pause_button.position = (room.position + Vector2(middle, middle) - Vector2(side, side) * 0.5).round()
 	score_label.add_theme_constant_override("outline_size", ui.outline_px(big))
 	if is_portrait:
 		score_label.offset_top = viewport_size.y * 0.1
@@ -335,7 +343,7 @@ func _fit_to_viewport() -> void:
 	_height_label.add_theme_font_size_override("font_size", small)
 	_height_label.add_theme_constant_override("outline_size", ui.outline_px(small))
 	_height_label.offset_top = score_label.offset_top + (52.0 if is_portrait else 20.0)
-	_banner.offset_top = viewport_size.y * (0.3 if is_portrait else 0.32)
+	_banner.offset_top = viewport_size.y * (0.5 if is_portrait else 0.6)  # (under the zone's name: AreaTitle)
 	_fit_banner()  # (and the line under it, just under it)
 
 	var cam := player.get_node_or_null("Camera2D")
@@ -412,8 +420,7 @@ func _climbed() -> void:
 	var zone: int = _zones.index_at(-highest_player_y)
 	if zone > _zone_reached:
 		_zone_reached = zone
-		_show_banner(_zones.ZONES[zone]["name"], "%d m" % int(_zones.ZONES[zone]["from"] / 10.0))
-		_play("res://assets/appear.mp3", 1.0, -6.0)
+		_titles.announce(_zones.ZONES[zone]["name"])  # (with its own bell)
 		if zone == _zones.ZONES.size() - 1 and "starry" not in MusicManager.unlocked_skins:
 			MusicManager.unlocked_skins.append("starry")  # (all the way to space: the Starry skin)
 			MusicManager.save_wardrobe()
@@ -1171,24 +1178,25 @@ func _place_tags() -> void:
 
 ## The pause button, top left of the room the screen has (clear of a notch, and of an iPhone Duo's camera,
 ## top right). Pressing it doesn't start a jump (the slingshot leaves presses on buttons alone).
+## The story's own pause button (player.tscn's TouchScreenButtonPause): a white square, two black bars in
+## it, 6 of its 20 across and 14 down, 3 in; as big and as far in from its corner as there (_fit_to_viewport).
 func _make_pause_button() -> void:
-	var ui: GDScript = load("res://scripts/UIStyle.gd")
 	_pause_button = Button.new()
 	_pause_button.name = "PauseButton"
 	_pause_button.focus_mode = Control.FOCUS_NONE
-	ui.style_button(_pause_button, 16, "quiet")
-	var bars := TextureRect.new()
-	bars.texture = ui.pixel_icon(ui.PAUSE)
-	bars.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	bars.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	bars.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bars.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bars.offset_left = 8.0
-	bars.offset_right = -8.0
-	bars.offset_top = 6.0
-	bars.offset_bottom = -10.0
-	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_pause_button.add_child(bars)
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+		var face := StyleBoxFlat.new()
+		face.bg_color = Color(0.8, 0.8, 0.8) if state.contains("pressed") else Color.WHITE
+		_pause_button.add_theme_stylebox_override(state, face)
+	for left in [3.0, 11.0]:
+		var bar := ColorRect.new()
+		bar.color = Color.BLACK
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.anchor_left = left / 20.0
+		bar.anchor_right = (left + 6.0) / 20.0
+		bar.anchor_top = 3.0 / 20.0
+		bar.anchor_bottom = 17.0 / 20.0
+		_pause_button.add_child(bar)
 	_pause_button.pressed.connect(pause)
 	$CanvasLayer.add_child(_pause_button)
 
