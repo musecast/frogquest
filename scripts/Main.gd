@@ -35,6 +35,7 @@ const TV_GOD_SIZE := 0.6  # (the frog god in its static: this much of its screen
 const TV_GOD_SHOWS := 0.66  # (as much of him as comes through the static, at most: he's in it, not on it)
 const TV_GOD_IN := 1.6  # (seconds he takes to come through, or to fade, each line)
 const TV_OFF := 2.4  # (seconds it takes, done, to fade to dark with him: the TV going off by itself)
+const TV_ON := 0.3  # (seconds from its dot of light to the whole picture: it snaps on)
 signal _tv_next  # (a tap, once the TV's line is all there)
 const LOST_FROG_TOP := Vector2(2950, -5626)  # (where the lost frog turns up once the gate's open: the castle hall)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
@@ -55,6 +56,9 @@ var _tv_god_frame := 0
 var _tv_god_level := 0.0  # (how much of him's come through: 0 to 1)
 var _tv_god_tween: Tween
 var _tv_clock := 0.0
+var _tv_ghosts: Array[Label] = []  # (its words' red and cyan ghosts: _tv_words_static)
+var _tv_static_left := 0.0
+var _tv_static := [0.0, -2.0, 2.0, 1.0]  # (the words' jitter across, each ghost's, the words' flicker)
 var _tv_widest := 0.0  # (the widest of its lines, in its words' own size)
 var _tv_more: Control  # (MoreArrow, under its words once they're all there)
 var _tv_glass: CanvasItem  # (its screen off: dark glass)
@@ -191,6 +195,8 @@ func _catch_up_gifts() -> void:
 func _make_tv_bubble() -> void:
 	var frog_bubble: Label = $frogNPC1/npc1speechbubble
 	_tv_bubble = frog_bubble.duplicate()
+	_tv_bubble.set_script(null)  # (not the frogs' rocking: the TV's words come through as static, _tv_words_static)
+	_tv_bubble.rotation = 0.0
 	_tv_bubble.visible = false
 	add_child(_tv_bubble)
 	_tv_bubble.scale = frog_bubble.get_global_transform().get_scale()
@@ -203,6 +209,17 @@ func _make_tv_bubble() -> void:
 		_tv_bubble.text = line
 		_tv_widest = maxf(_tv_widest, _tv_bubble.get_minimum_size().x)
 	_tv_bubble.text = ""
+	# (and as a weak signal's: a red ghost of its words and a cyan one, adding their light a little off them)
+	for tint in [Color(1.0, 0.22, 0.28, 0.5), Color(0.2, 0.85, 1.0, 0.5)]:
+		var ghost: Label = _tv_bubble.duplicate()
+		ghost.add_theme_constant_override("outline_size", 0)
+		ghost.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
+		ghost.add_theme_color_override("font_color", tint)
+		var glow := CanvasItemMaterial.new()
+		glow.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		ghost.material = glow
+		add_child(ghost)
+		_tv_ghosts.append(ghost)
 	_tv_more = load("res://scripts/MoreArrow.gd").new()
 	_tv_more.z_index = _tv_bubble.z_index
 	add_child(_tv_more)
@@ -433,19 +450,19 @@ func _tv_power(on: bool) -> void:
 	_tv_flash.visible = true
 	_tv_flash.modulate.a = 1.0
 	_tv_flash.scale = Vector2(0.2, 0.03)
-	# (a dot of light, a line across, the line opening up into the picture)
-	var light := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	light.tween_interval(0.05)
-	light.tween_property(_tv_flash, "scale:x", 0.97, 0.16).set_trans(Tween.TRANS_QUAD)
-	light.tween_property(_tv_flash, "scale", Vector2.ONE, 0.46).set_trans(Tween.TRANS_CUBIC)
-	light.parallel().tween_property(_tv_glass, "modulate:a", 0.0, 0.3)
-	light.tween_property(_tv_flash, "modulate:a", 0.0, 0.6)
+	# (a dot of light, a line across, the line opening up into the picture: sudden, as an old TV's is; the
+	# one thing here that doesn't ease in: it snaps out, then settles)
+	var light := create_tween().set_ease(Tween.EASE_OUT)
+	light.tween_property(_tv_flash, "scale:x", 0.97, TV_ON * 0.25).set_trans(Tween.TRANS_EXPO)
+	light.tween_property(_tv_flash, "scale", Vector2.ONE, TV_ON * 0.75).set_trans(Tween.TRANS_EXPO)
+	light.parallel().tween_property(_tv_glass, "modulate:a", 0.0, TV_ON * 0.5).set_trans(Tween.TRANS_QUAD)
+	light.tween_property(_tv_flash, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	light.tween_callback(func() -> void:
 		_tv_flash.visible = false
 		_tv_glass.visible = false)
-	hiss.volume_db = _tv_db - 24.0
+	hiss.volume_db = _tv_db - 12.0
 	hiss.play()
-	create_tween().tween_property(hiss, "volume_db", _tv_db, 1.2).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	create_tween().tween_property(hiss, "volume_db", _tv_db, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## The frog god in the TV's static: more of him (`level`, 0 to 1), or less, gliding there over `secs`.
@@ -480,6 +497,36 @@ func _tv_god_shows(delta: float) -> void:
 		_tv_god.texture = _tv_god_frames[frame]
 	var waver := 0.88 + 0.12 * sin(_tv_clock * 4.7) * sin(_tv_clock * 1.9 + 1.0)
 	_tv_god.modulate.a = TV_GOD_SHOWS * _tv_god_level * waver
+
+
+## The TV's words, staticky (not rocking, as the frogs' do): a dozen times a second they twitch a pixel
+## across or not, flicker a little, and their red and cyan ghosts sit a little off them; now and then the
+## signal tears (a bigger jump) or drops (dimmer for a moment); more so in its "bzzt"s. After the words
+## are kept on the screen and their arrow placed: the arrow stays still.
+func _tv_words_static(delta: float) -> void:
+	var on := _tv_bubble.visible
+	for ghost in _tv_ghosts:
+		ghost.visible = on
+	if not on:
+		return
+	_tv_static_left -= delta
+	if _tv_static_left <= 0.0:
+		_tv_static_left = 1.0 / 12.0
+		var heavy := 1.0 if _tv_bubble.text.contains("bzz") else 0.6
+		var tear := randf() < 0.07 * heavy
+		_tv_static[0] = (randf_range(-3.0, 3.0) if tear else float([-1, 0, 0, 0, 0, 1].pick_random())) * heavy
+		_tv_static[1] = -(1.5 + randf() * (3.0 if tear else 1.0))
+		_tv_static[2] = 1.5 + randf() * (3.0 if tear else 1.0)
+		_tv_static[3] = 0.55 if randf() < 0.04 * heavy else randf_range(0.86, 1.0)
+	_tv_bubble.position.x += _tv_static[0]
+	_tv_bubble.modulate.a = _tv_static[3]
+	for i in _tv_ghosts.size():
+		var ghost := _tv_ghosts[i]
+		if ghost.text != _tv_bubble.text:
+			ghost.text = _tv_bubble.text
+		ghost.visible_characters = _tv_bubble.visible_characters
+		ghost.position = _tv_bubble.position + Vector2(_tv_static[1 + i], 0.0)
+		ghost.modulate.a = _tv_static[3]
 
 
 ## The tutorial's words round the start (how to jump, to pause, that it saves): hidden, or come up softly.
@@ -539,6 +586,7 @@ func _process(delta):
 	if _tv_bubble.visible:
 		_keep_tv_words_in_view()
 		_place_tv_more()
+	_tv_words_static(delta)
 	# The lost frog, let out by the gate he opened, turns up by the castle (while he's well away from both).
 	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > 400.0:
 		_lost_frog_up = true

@@ -65,6 +65,8 @@ func _run() -> void:
 	Input.action_release("ui_mouse")
 	await process_frame
 	await _game_time(2.6)
+	_expect(player._zzz != null and player._zzz.breaths >= 1 and player._zzz._breath.stream.resource_path.ends_with("sleep_breath.wav"),
+		"asleep, he breathes: a little snore in, a little whistle out")
 	_expect(hiss.playing and player.asleep, "the TV comes on by itself (he's still asleep)")
 	await _game_time(1.3)
 	_expect(not player.asleep and player.waking and eyes.get_shader_parameter("eyes_shut") == false, "and he wakes")
@@ -74,6 +76,9 @@ func _run() -> void:
 	_expect(main._tv_bubble.text == main.TV_LINES[0] and not main._tv_typing and main._tv_typed >= main.TV_LINES[0].length(),
 		"all of its line, and it stays: no going on without a tap")
 	_expect(main._tv_more.shown and main._tv_more.modulate.a > 0.5 and main._tv_more.visible, "the arrow under it, for a tap")
+	_expect(main._tv_bubble.get_script() == null and main._tv_bubble.rotation == 0.0
+		and main._tv_ghosts.size() == 2 and main._tv_ghosts.all(func(g: Label) -> bool: return g.visible and g.text == main._tv_bubble.text),
+		"its words staticky, not rocking as the frogs' do: their red and cyan ghosts with them")
 	_expect(_tv_words_seen(main), "its words on the screen (upright)")
 	root.get_node("AdsManager").test_safe_insets = Vector4(0.0, 0.0, PORTRAIT.x * 0.18, 0.0)  # (a closed iPhone Duo: its strip)
 	var pause: Control = player.get_node("CanvasLayer/TouchScreenButtonPause/ColorRect")
