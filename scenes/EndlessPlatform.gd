@@ -1,18 +1,18 @@
 extends StaticBody2D
 ## One of Endless's platforms, built in code: how it looks (KINDS: a 3-slice pixel-art strip from
-## assets/endless, drawn at any width; a mushroom's just its cap, floating as the story's platforms do (a
-## stem in the sky looked like it grew out of a crack in it), and the treetops' leaves have a few vines
-## hanging from them),
+## assets/endless, drawn at any width; a mushroom's a whole one, its stalk all the way down to the pond (as
+## the swamp's big ones are: a stem ending anywhere in the sky looked like it grew out of a crack in it), and
+## the treetops' leaves have a few vines hanging from them),
 ## and what it does. It can stand still, sway side to side, bob up and down or drift in a loop; crumble
 ## a moment after you land on it; or carry a spring that sends your next jump far higher.
 ## Its origin is the middle of its walkable top.
 
 const ART := "res://assets/endless/%s.png"
-# kind: [end piece width, middle piece width, walkable row in the strip, what hangs under it ("vines")]
+# kind: [end piece width, middle piece width, walkable row in the strip, what's under it ("stalk", "vines")]
 const KINDS := {
 	"lilypad": [14, 16, 2, ""],
-	"mushroom": [12, 16, 1, ""],
-	"mushroom_red": [12, 16, 1, ""],
+	"mushroom": [12, 16, 1, "stalk"],
+	"mushroom_red": [12, 16, 1, "stalk"],
 	"canopy": [18, 18, 2, "vines"],
 	"twig": [8, 16, 1, ""],
 	"cloud": [16, 20, 10, ""],
@@ -25,6 +25,7 @@ const KINDS := {
 }
 const THICKNESS := 10.0  # how deep the solid part is under the walkable top
 const PX := 1.2  # world px for each pixel of its art: the story's tiles' own (its tile map's at 1.2), so they match
+const POND_Y := 5.0  # (the pond's top, where a mushroom's stalk goes down into: EndlessMode.WATER_Y)
 const VINE := Color("345551")  # (the treetops' vines: their leaves' own outline green, and their green)
 const LEAF := Color("2eb082")
 const CRUMBLE_DELAY := 0.6  # seconds from landing to falling
@@ -42,6 +43,7 @@ var phase := -1.0  # where a moving one starts its swing (EndlessMode deals it f
 var clock := Callable()  # in a party, the party's clock in seconds (Party.run_seconds): everyone's swing together
 
 var _strip: Texture2D
+var _stalk: Texture2D  # (a mushroom's, tiled from under its cap down into the pond)
 var _vines := []  # ([x across its middle, how long, which side its first leaf's on], in art px)
 var _under_node: Node2D
 var _spring_up: Texture2D
@@ -61,14 +63,18 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
 	_strip = load(ART % kind)
-	if art[3] == "vines":  # (a few, here and there along it, each its own length)
-		var across := width / PX
-		for i in randi_range(2, 4):
-			_vines.append([roundf(randf_range(-across * 0.5 + 5.0, across * 0.5 - 5.0)), randi_range(4, 12), randi() % 2])
-		# (drawn by a child a layer down, so every vine is behind every platform)
+	if art[3] != "":
+		if art[3] == "stalk":
+			_stalk = load(ART % "stalk")
+		else:  # (a few vines, here and there along it, each its own length)
+			var across := width / PX
+			for i in randi_range(2, 4):
+				_vines.append([roundf(randf_range(-across * 0.5 + 5.0, across * 0.5 - 5.0)), randi_range(4, 12), randi() % 2])
+		# (drawn by a child a layer down, so every stalk and vine is behind every platform)
 		_under_node = Node2D.new()
 		_under_node.z_index = -1
 		_under_node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		_under_node.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED  # (the stalk, one piece tiled all the way down)
 		_under_node.draw.connect(_draw_under)
 		add_child(_under_node)
 	if spring:
@@ -171,7 +177,9 @@ func _sound(path: String, pitch: float, db: float) -> void:
 	s.finished.connect(s.queue_free)
 
 
-## What hangs under the treetops' leaves: their vines, a leaf every few pixels, one at the end.
+## What's under it: a mushroom's stalk, tucked up under its cap and on down into the pond however far that
+## is (off the bottom of the screen, up high: never an end in the sky), in one tiled piece; or the
+## treetops' vines, a leaf every few pixels, one at the end.
 func _draw_under() -> void:
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
 	_under_node.draw_set_transform(Vector2.ZERO, 0.0, Vector2(PX, PX))  # (in its art's own pixels)
@@ -186,6 +194,11 @@ func _draw_under() -> void:
 				_under_node.draw_rect(Rect2(x + side, bottom + k, 2.0, 1.0), LEAF)
 		_under_node.draw_rect(Rect2(x - 1.0, bottom + n, 3.0, 1.0), LEAF)
 		_under_node.draw_rect(Rect2(x, bottom + n + 1.0, 1.0, 1.0), LEAF)
+	if _stalk:
+		var top := bottom - 3.0
+		var down := (POND_Y + 4.0 - global_position.y) / PX - top  # (in its art's pixels, to just under the pond's top)
+		if down > 0.0:
+			_under_node.draw_texture_rect(_stalk, Rect2(-roundf(_stalk.get_width() * 0.5), top, _stalk.get_width(), down), true)
 
 
 func _draw() -> void:
