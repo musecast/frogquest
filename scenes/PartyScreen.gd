@@ -142,7 +142,8 @@ func _show() -> void:
 				else:
 					_box.add_child(_label("Sign in to Muse (Muse Account) to play online.", BODY_FONT_SZ, DIM))
 			_say_note()
-			_frenzy()
+			if load("res://scripts/Frenzy.gd").OPEN:  # (when Frog Frenzy's in the build)
+				_frenzy()
 			_look()
 	_bottom.text = "Leave Party" if _mode in ["host", "joined", "connecting"] else "Close"
 	load("res://scripts/UIStyle.gd").finger_scroll(_scroll)
@@ -189,7 +190,7 @@ func _starts() -> void:
 		var start := _button(race.RACES[id].label, func() -> void: Party.start("endless", id), "gold" if pro else "quiet")
 		start.disabled = not pro or lonely
 		_box.add_child(start)
-	for style in ["vs", "team"]:  # (Frog Frenzy: Frenzy.gd)
+	for style in (["vs", "team"] if load("res://scripts/Frenzy.gd").OPEN else []):  # (Frog Frenzy: Frenzy.gd, when it's in the build)
 		var start := _button("Frog Frenzy Beta: %s" % ("Versus" if style == "vs" else "Team"),
 			func() -> void: Party.start("frenzy", style), "gold" if pro else "quiet")
 		start.disabled = not pro

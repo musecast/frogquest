@@ -488,6 +488,25 @@ func _party_screen() -> void:
 	var screen: CanvasLayer = load("res://scenes/PartyScreen.gd").new()
 	root.add_child(screen)
 	await _frames(2)
+	if not load("res://scripts/Frenzy.gd").OPEN:  # (left out of this build: no way in)
+		acct._refresh_token = "test"
+		acct._pro = true
+		acct._pro_checked_at = acct._now()
+		screen._show()
+		await _frames(1)
+		_restart(screen)
+		var none := true
+		for label in _buttons(screen):
+			none = none and not str(label).begins_with("Frog Frenzy")
+		_expect(none and not _words(screen).contains("Frog Frenzy"), "Frog Frenzy's out of this build: no way in from Play Together, even with Pro")
+		screen.queue_free()
+		acct.save_path = real[0]
+		acct._loaded = real[1]
+		acct._refresh_token = real[2]
+		acct._pro = real[3]
+		acct._pro_checked_at = real[4]
+		await _frames(2)
+		return
 	var buttons := _buttons(screen)
 	_expect(buttons.get("Frog Frenzy (Beta)") == false and _words(screen).contains("Frog Frenzy needs Muse Pro."),
 		"without Muse Pro: Frog Frenzy greyed, and why (%s)" % [buttons])

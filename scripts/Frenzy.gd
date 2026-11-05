@@ -12,6 +12,10 @@ extends Node2D
 
 signal said(what: Dictionary)  # (your news, as it goes to the others: the tests listen)
 
+## Is Frog Frenzy in this build? Off: nothing leads to it (Play Together shows no way in). He left it out of
+## the build going out on 11-05 ("leave frog frenzy out of this build"); turn it on when it's ready.
+const OPEN := false
+
 const MICROS := {  # (each: its script, its seconds at the first speed (as it says itself), its stage's colour)
 	"scare": ["res://scripts/frenzy/MicroScare.gd", 5.0, Color(0.80, 0.50, 0.33)],
 	"cake": ["res://scripts/frenzy/MicroCake.gd", 4.0, Color(0.98, 0.88, 0.70)],
