@@ -185,13 +185,13 @@ func _start_scene(packed: PackedScene) -> void:
 	for i in 4:
 		await tree.process_frame
 	var reveal := create_tween()
-	reveal.tween_property(_bg, "modulate:a", 0.0, REVEAL_TIME).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	reveal.tween_property(_bg, "modulate:a", 0.0, REVEAL_TIME).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 	if their_logo and is_instance_valid(their_logo):
 		# (they're in the same spot; if the screen's changed under it, this one glides onto theirs)
 		reveal.parallel().tween_property(_title, "position", their_logo.position, REVEAL_TIME) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+			.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 		reveal.parallel().tween_property(_title, "scale", their_logo.scale, REVEAL_TIME) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+			.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 	await reveal.finished
 	cover.queue_free()
 

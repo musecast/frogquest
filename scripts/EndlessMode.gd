@@ -344,7 +344,7 @@ func _fit_to_viewport() -> void:
 			_zoom_tween.kill()
 		_zoom_tween = create_tween()
 		_zoom_tween.tween_property(cam, "zoom", Vector2(zoom_val, zoom_val), 0.3) \
-			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+			.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 		_zoom_tween.finished.connect(func(): _zoom_tween = null)
 
 	# Match anchored banner size to current viewport/orientation (same logic as Main menu).
@@ -430,9 +430,9 @@ func _show_banner(title: String, sub: String) -> void:
 	_fit_banner()
 	for lbl in [_banner, _banner_sub]:
 		var tw: Tween = lbl.create_tween()
-		tw.tween_property(lbl, "modulate:a", 1.0, 0.35)
+		tw.tween_property(lbl, "modulate:a", 1.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		tw.tween_interval(1.8)
-		tw.tween_property(lbl, "modulate:a", 0.0, 0.6)
+		tw.tween_property(lbl, "modulate:a", 0.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _trigger_reset() -> void:
@@ -454,7 +454,7 @@ func _trigger_reset() -> void:
 		_save_high_score()
 	var label_fade := create_tween()
 	label_fade.tween_property(score_label, "modulate:a", 0.0, 0.5) \
-		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 	# Inline ads: preserve bottom stripe and add top banner via GameOverScreen (no interim hide_banner).
 	AdsManager.on_game_over()
 	$GameOverScreen.show_scores(score, high_score, is_new_record)
@@ -516,7 +516,7 @@ func revive() -> void:
 	airborne_since_landing = false
 	is_resetting = false
 	var label_fade := create_tween()
-	label_fade.tween_property(score_label, "modulate:a", 1.0, 0.3)
+	label_fade.tween_property(score_label, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	AdsManager.show_banner_bottom()
 	await _fade(1.0, 0.0, 0.35)
 
@@ -534,7 +534,7 @@ func _fade(from: float, to: float, duration: float) -> void:
 	var t = 0.0
 	while t < duration:
 		t += get_process_delta_time()
-		fade_rect.color.a = lerp(from, to, t / duration)
+		fade_rect.color.a = lerp(from, to, smoothstep(0.0, 1.0, t / duration))
 		await get_tree().process_frame
 	fade_rect.color.a = to
 

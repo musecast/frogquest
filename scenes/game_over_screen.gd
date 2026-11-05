@@ -150,7 +150,7 @@ func show_scores(score: int, high_score: int, is_new_record: bool) -> void:
 	_apply_layout.call_deferred()
 	var fade := create_tween()
 	fade.tween_property($MarginContainer, "modulate:a", 1.0, 0.5) \
-		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 	await fade.finished
 
 	if is_new_record:

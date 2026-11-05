@@ -92,6 +92,20 @@ func _run() -> void:
 		await process_frame
 		_expect(_tv_words_seen(main), "all of them on the screen, not off its edge: %s" % main._tv_bubble.text.c_escape())
 		_expect(player.waking and not how_to.visible, "still waking up: no tutorial, no jumping")
+	# (upright on a closed Duo the TV's by the strip: the camera leans toward it till its words sit right over
+	# it, as the frogs' words do over them, so they're plainly the TV's; he stays well on the screen)
+	var cam: Camera2D = player.get_node("Camera2D")
+	await _game_time(3.0)
+	var words: Label = main._tv_bubble
+	var words_mid := (words.get_global_transform() * Vector2(words.size.x * 0.5, 0.0)).x
+	var seen: Rect2 = _view.get_canvas_transform().affine_inverse() * load("res://scripts/UIStyle.gd").room(_view.get_visible_rect().size)
+	_expect(cam.offset.x > 1.0 and absf(words_mid - main._tv_over) < 1.5 and _tv_words_seen(main),
+		"upright on a closed Duo, the camera leans toward the TV, its words right over it (theirs at %.1f, the TV at %.1f, leaning %.1f)"
+		% [words_mid, main._tv_over, cam.offset.x])
+	_expect(player.global_position.x - seen.position.x >= main.TV_LEAN_ROOM - 1.0, "and he's well on the screen (%.1f from its edge)"
+		% (player.global_position.x - seen.position.x))
+	_expect(main._tv_god.visible and main._tv_god.modulate.a > 0.1 and main._tv_god.modulate.a <= main.TV_GOD_SHOWS,
+		"the frog god faint in its static as it speaks (%.2f)" % main._tv_god.modulate.a)
 	_tap_screen(Vector2(_view.size) * Vector2(0.5, 0.62))
 	await process_frame
 	root.get_node("AdsManager").test_safe_insets = Vector4(-1.0, -1.0, -1.0, -1.0)
@@ -109,6 +123,9 @@ func _run() -> void:
 	# landing after a long fall: a "!" over him (not after a hop).
 	await _game_time(player.SLEEPY * 0.5)
 	_expect(not player.asleep, "not asleep after a little while")
+	_expect(cam.offset.x == 0.0 and not main._tv_leaning, "the TV done, the camera's back on him (%.2f)" % cam.offset.x)
+	_expect(not main._tv_god.visible and main._tv_glass.visible and main._tv_glass.modulate.a > 0.99 and not hiss.playing,
+		"and the frog god's faded away with its static: the TV's dark and quiet (glass %.2f)" % main._tv_glass.modulate.a)
 	await _game_time(player.SLEEPY * 0.5 + 1.5)
 	_expect(player.asleep and player._napping and player._zzz != null and eyes.get_shader_parameter("eyes_shut") == true,
 		"left alone a while, standing still, he nods off")

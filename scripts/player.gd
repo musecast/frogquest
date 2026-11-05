@@ -414,7 +414,7 @@ func _on_area_2d_body_shape_entered(_body_rid, body, _body_shape_index, local_sh
 
 func fade_lantern(target_alpha):
 	var t := create_tween()
-	t.tween_property($FrogLantern, "modulate:a", target_alpha, fade_duration)
+	t.tween_property($FrogLantern, "modulate:a", target_alpha, fade_duration).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func fade_darkness():
 	if finalTimeBool == 1:
@@ -564,9 +564,9 @@ func wake() -> void:
 	var body: Node2D = $Sprite2D
 	var base := Vector2(0.76, 0.76)  # (his size, as player.tscn has it)
 	var hop := create_tween()
-	hop.tween_property(body, "scale", base * Vector2(1.16, 0.84), 0.07)
-	hop.tween_property(body, "scale", base * Vector2(0.9, 1.14), 0.1)
-	hop.tween_property(body, "scale", base, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	hop.tween_property(body, "scale", base * Vector2(1.16, 0.84), 0.07).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hop.tween_property(body, "scale", base * Vector2(0.9, 1.14), 0.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	hop.tween_property(body, "scale", base, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
 	_exclaim()
 
 
@@ -609,9 +609,11 @@ func _exclaim() -> void:
 	mark.scale = Vector2(0.05, 0.05)
 	holder.add_child(mark)
 	var pop := mark.create_tween()
-	pop.tween_property(mark, "scale", Vector2(3.0, 3.0), 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# (up past its size, and back to it: a pop, eased all the way; a back-curve from nothing would turn it over)
+	pop.tween_property(mark, "scale", Vector2(3.35, 3.35), 0.18).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pop.tween_property(mark, "scale", Vector2(3.0, 3.0), 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pop.tween_interval(1.0)
-	pop.tween_property(mark, "modulate:a", 0.0, 0.5)
+	pop.tween_property(mark, "modulate:a", 0.0, 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pop.tween_callback(holder.queue_free)
 	_sound("res://assets/exclaim.wav", -9.0, randf_range(0.96, 1.04))
 
@@ -641,9 +643,9 @@ func _land_hard(fell: float) -> void:
 	var body: Node2D = $Sprite2D
 	var base := Vector2(0.76, 0.76)
 	var squash := create_tween()
-	squash.tween_property(body, "scale", base * Vector2(1.28, 0.74), 0.06)
-	squash.tween_property(body, "scale", base * Vector2(1.12, 0.9), 0.22)
-	squash.tween_property(body, "scale", base, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	squash.tween_property(body, "scale", base * Vector2(1.28, 0.74), 0.06).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	squash.tween_property(body, "scale", base * Vector2(1.12, 0.9), 0.22).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	squash.tween_property(body, "scale", base, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
 
 
 ## Stuck after a hard landing (stunned): a little shiver side to side, quick and dying away, then still.
@@ -757,7 +759,7 @@ func _meet_the_frog_god(then: Callable, cut_sound := true, fade_in := false) -> 
 			var up := tv.create_tween()
 			up.tween_interval(intro.hold() * 0.8)
 			up.tween_callback(func() -> void: tv.volume_db = -30.0)
-			up.tween_property(tv, "volume_db", tv_db, intro.fade() + 0.4).set_ease(Tween.EASE_OUT))
+			up.tween_property(tv, "volume_db", tv_db, intro.fade() + 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT))
 
 
 func _on_thanksforplaying_timer_timeout():
@@ -1049,12 +1051,12 @@ func _activate_beaten_crt() -> void:
 func _duck_crt_for_goodbye(crt_audio: AudioStreamPlayer2D) -> void:
 	# Duck to ~1/3 amplitude (-9.5 dB) while goodbyefroggy plays, then restore.
 	var tween := create_tween()
-	tween.tween_property(crt_audio, "volume_db", _crt_normal_volume - 9.5, 4.0)
+	tween.tween_property(crt_audio, "volume_db", _crt_normal_volume - 9.5, 4.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await $winscreen/goodbyefroggy.finished
 	if not is_instance_valid(crt_audio):
 		return
 	var restore := create_tween()
-	restore.tween_property(crt_audio, "volume_db", _crt_normal_volume, 4.0)
+	restore.tween_property(crt_audio, "volume_db", _crt_normal_volume, 4.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## His hat sits on his head: it comes down with his head when he breathes and when he crouches to aim
@@ -1781,7 +1783,7 @@ func _apply_camera_zoom() -> void:
 		_zoom_tween.kill()
 	_zoom_tween = create_tween()
 	_zoom_tween.tween_property(cam, "zoom", Vector2(zoom_val, zoom_val), 0.7) \
-		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+		.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 	_zoom_tween.finished.connect(func(): _zoom_tween = null)
 
 
@@ -1912,8 +1914,8 @@ func _on_wiz_area_2d_body_shape_entered(body_rid: RID, body: Node2D, body_shape_
 	if wiz_sprite and _wiz_tween == null:
 		_wiz_sprite_base_y = wiz_sprite.position.y
 		_wiz_tween = create_tween().set_loops()
-		_wiz_tween.tween_property(wiz_sprite, "position:y", _wiz_sprite_base_y - 18.0, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
-		_wiz_tween.tween_property(wiz_sprite, "position:y", _wiz_sprite_base_y, 0.25).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		_wiz_tween.tween_property(wiz_sprite, "position:y", _wiz_sprite_base_y - 18.0, 0.25).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
+		_wiz_tween.tween_property(wiz_sprite, "position:y", _wiz_sprite_base_y, 0.25).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_QUAD)
 		_wiz_tween.tween_interval(0.15)
 	if "wizhat" not in MusicManager.unlocked_skins:
 		MusicManager.unlocked_skins.append("wizhat")
@@ -1937,7 +1939,7 @@ func _on_wiz_area_2d_body_exited(body: Node2D) -> void:
 	var wiz_sprite := get_node_or_null("../WizArea2D/Wiz0Sprite")
 	if wiz_sprite:
 		_wiz_tween = create_tween()
-		_wiz_tween.tween_property(wiz_sprite, "position:y", _wiz_sprite_base_y, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
+		_wiz_tween.tween_property(wiz_sprite, "position:y", _wiz_sprite_base_y, 0.35).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_BACK)
 		_wiz_tween.finished.connect(func(): _wiz_tween = null)
 
 

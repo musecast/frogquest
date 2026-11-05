@@ -633,9 +633,9 @@ func _say(words: String, colour: Color, seconds := 3.5) -> void:
 	if _toast_tween:
 		_toast_tween.kill()  # (the last words' fade would take these with them)
 	_toast_tween = _toast.create_tween()
-	_toast_tween.tween_property(_toast, "modulate:a", 1.0, 0.3)
+	_toast_tween.tween_property(_toast, "modulate:a", 1.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_toast_tween.tween_interval(seconds)
-	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.6)
+	_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## A few words floating up off a spot in the world (a friend pulling you up).

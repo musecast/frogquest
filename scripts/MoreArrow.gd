@@ -12,6 +12,7 @@ var colour := Color(0.97, 0.92, 0.80)
 var edge := Color(0.10, 0.08, 0.12)
 var _clock := 0.0
 var _waited := 0.0
+var _in := 0.0  # (how far it's come in: 0 to 1)
 
 
 func _init() -> void:
@@ -24,10 +25,11 @@ func _process(delta: float) -> void:
 	if shown:
 		_waited += delta
 		if _waited > 0.4:  # (not between quick taps: once the words have had a moment)
-			modulate.a = move_toward(modulate.a, 1.0, delta * 2.5)
+			_in = move_toward(_in, 1.0, delta * 2.5)
 	else:
 		_waited = 0.0
-		modulate.a = 0.0
+		_in = 0.0
+	modulate.a = smoothstep(0.0, 1.0, _in)  # (softly in, and softly to full)
 	custom_minimum_size = Vector2(9, 7) * pixel
 	size = custom_minimum_size
 	queue_redraw()

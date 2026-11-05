@@ -46,7 +46,8 @@ func _ready() -> void:
 		if not clear:
 			continue
 		_bugs.append({"home": at, "at": at, "phase": rng.randf() * TAU, "speed": rng.randf_range(0.5, 1.1),
-			"wander": rng.randf_range(16.0, 34.0), "glow": rng.randf_range(0.35, 0.8), "away": Vector2.ZERO})
+			"wander": rng.randf_range(16.0, 34.0), "glow": rng.randf_range(0.35, 0.8), "away": Vector2.ZERO,
+			"flee": Vector2.ZERO})
 
 
 func count() -> int:
@@ -61,10 +62,10 @@ func _process(delta: float) -> void:
 	for bug in _bugs:
 		var p: float = _t * bug.speed + bug.phase
 		var drift: Vector2 = Vector2(sin(p * 0.7) + 0.5 * sin(p * 1.9), cos(p * 0.5) + 0.4 * sin(p * 1.3)) * bug.wander
-		if bug.at.distance_to(near) < SHY:
-			bug.away += (bug.at - near).normalized() * 40.0 * delta
-		else:
-			bug.away = bug.away.move_toward(Vector2.ZERO, 6.0 * delta)
+		# (off from him if he comes close, home again once he's gone: easing into each and out of it)
+		var want: Vector2 = (bug.at - near).normalized() * 40.0 if bug.at.distance_to(near) < SHY else -bug.away * 0.15
+		bug.flee = bug.flee.lerp(want, minf(1.0, delta * 3.0))
+		bug.away += bug.flee * delta
 		bug.at = bug.home + drift + bug.away
 	queue_redraw()
 

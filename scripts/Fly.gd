@@ -95,8 +95,8 @@ func catch_now() -> void:
 	else:
 		load("res://scripts/FlyHunt.gd").caught(self)
 	var pop := create_tween()
-	pop.tween_property(self, "scale", Vector2(1.8, 1.8), 0.08)
-	pop.tween_property(self, "modulate:a", 0.0, 0.12)
+	pop.tween_property(self, "scale", Vector2(1.8, 1.8), 0.08).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pop.tween_property(self, "modulate:a", 0.0, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	pop.tween_callback(queue_free)
 
 

@@ -253,14 +253,14 @@ func _next_toast() -> void:
 	size *= s
 	panel.position = Vector2((vp.x - size.x) * 0.5, room.position.y - size.y - 16.0)
 	var tween := cl.create_tween()
-	tween.tween_property(panel, "position:y", rest_y, 0.45).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(panel, "position:y", rest_y, 0.45).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_BACK)
 	if icon:
 		icon.pivot_offset = icon.get_combined_minimum_size() / 2.0
-		tween.tween_property(icon, "scale", Vector2.ONE * 1.25, 0.12).set_ease(Tween.EASE_OUT)
-		tween.tween_property(icon, "scale", Vector2.ONE, 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BOUNCE)
+		tween.tween_property(icon, "scale", Vector2.ONE * 1.25, 0.12).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(icon, "scale", Vector2.ONE, 0.25).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_BACK)
 	tween.tween_interval(2.2)
-	tween.tween_property(panel, "position:y", room.position.y - size.y - 16.0, 0.35).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
-	tween.parallel().tween_property(panel, "modulate:a", 0.0, 0.35).set_ease(Tween.EASE_IN)
+	tween.tween_property(panel, "position:y", room.position.y - size.y - 16.0, 0.35).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_BACK)
+	tween.parallel().tween_property(panel, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_callback(_next_toast)
 	tween.tween_callback(cl.queue_free)
 

@@ -52,9 +52,9 @@ func _puff() -> void:
 	var start := (Vector2(0.0, -4.0) - z.pivot_offset).round()  # (from just over his head)
 	z.position = start
 	var go := z.create_tween().set_parallel(true)
-	go.tween_property(z, "position", start + RISE, LIFE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	go.tween_property(z, "modulate:a", 1.0, 0.4)
-	go.tween_property(z, "modulate:a", 0.0, LIFE * 0.45).set_delay(LIFE * 0.55)
+	go.tween_property(z, "position", start + RISE, LIFE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	go.tween_property(z, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	go.tween_property(z, "modulate:a", 0.0, LIFE * 0.45).set_delay(LIFE * 0.55).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	go.chain().tween_callback(z.queue_free)
 
 
@@ -63,7 +63,7 @@ func stop() -> void:
 	_on = false
 	for z in get_children():
 		if z is CanvasItem:
-			z.create_tween().tween_property(z, "modulate:a", 0.0, 0.25)
+			z.create_tween().tween_property(z, "modulate:a", 0.0, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	var bye := create_tween()
 	bye.tween_interval(0.3)
 	bye.tween_callback(queue_free)

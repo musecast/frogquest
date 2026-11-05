@@ -136,22 +136,23 @@ func _name(area: String) -> void:
 	_sound.pitch_scale = randf_range(0.98, 1.02)
 	_sound.play()
 	_tween = create_tween().set_parallel(true)
-	_tween.tween_property(_band, "modulate:a", 1.0, 0.7).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(_band, "modulate:a", 1.0, 0.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	var letters := _letters.get_children()
 	var mid := (letters.size() - 1) * 0.5
 	for i in letters.size():
 		var letter: Label = letters[i]
 		var wait := 0.12 + absf(i - mid) * 0.045  # (from the middle out)
 		letter.modulate.a = 0.0
-		_tween.tween_property(letter, "modulate:a", 1.0, 0.3).set_delay(wait)
+		_tween.tween_property(letter, "modulate:a", 1.0, 0.3).set_delay(wait).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		_tween.tween_property(letter, "position:y", 0.0, 0.5).from(-float(_size) * 0.4).set_delay(wait) \
-			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	_tween.tween_property(_line, "scale:x", 1.0, 0.8).set_delay(0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	for end in _ends:
-		_tween.tween_property(end, "scale", Vector2.ONE, 0.3).set_delay(0.95).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN_OUT)
+	_tween.tween_property(_line, "scale:x", 1.0, 0.8).set_delay(0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	for end in _ends:  # (up past their size and back: a pop, eased all the way, never turned over)
+		_tween.tween_property(end, "scale", Vector2.ONE * 1.25, 0.2).set_delay(0.95).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_tween.tween_property(end, "scale", Vector2.ONE, 0.14).set_delay(1.15).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_tween.chain().tween_interval(HOLD)
-	_tween.chain().tween_property(_box, "modulate:a", 0.0, 1.1).set_ease(Tween.EASE_IN)
-	_tween.parallel().tween_property(self, "_lift", float(_size) * 0.25, 1.1).set_ease(Tween.EASE_IN)
+	_tween.chain().tween_property(_box, "modulate:a", 0.0, 1.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_tween.parallel().tween_property(self, "_lift", float(_size) * 0.25, 1.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_tween.chain().tween_callback(func() -> void: showing = "")
 
 

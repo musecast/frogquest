@@ -207,7 +207,7 @@ func _ready() -> void:
 	_music.volume_db = -50.0
 	add_child(_music)
 	_music.play()
-	_music.create_tween().tween_property(_music, "volume_db", MUSIC_DB, FADE_IN if fade_in else 2.0).set_ease(Tween.EASE_OUT)
+	_music.create_tween().tween_property(_music, "volume_db", MUSIC_DB, FADE_IN if fade_in else 2.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_blip = AudioStreamPlayer.new()
 	_blip.stream = load("res://assets/frogaim.wav")
 	_blip.bus = &"FX"
@@ -263,8 +263,8 @@ func _process(delta: float) -> void:
 		_shown[key] = (_shown[key] as Color).lerp(_looks.colour(_look, key), glide)
 		mat.set_shader_parameter(SHADER_KEYS[key], _shown[key])
 	mat.set_shader_parameter("pattern", int(_look.pattern))
-	mat.set_shader_parameter("shadow_amount", _shadow)
-	_hat_rect.modulate.a = 1.0 - _shadow  # (the frog god's shadow wears no hat: his comes with his colours)
+	mat.set_shader_parameter("shadow_amount", smoothstep(0.0, 1.0, _shadow))
+	_hat_rect.modulate.a = 1.0 - smoothstep(0.0, 1.0, _shadow)  # (the frog god's shadow wears no hat: his comes with his colours)
 	_fly.queue_redraw()
 
 
@@ -378,8 +378,8 @@ func _end() -> void:
 	_tap.visible = false
 	if from_wardrobe:
 		var away := create_tween()
-		away.tween_property(_root, "modulate:a", 0.0, 0.35)
-		away.parallel().tween_property(_music, "volume_db", -50.0, 0.35)
+		away.tween_property(_root, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		away.parallel().tween_property(_music, "volume_db", -50.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		await away.finished
 		done.emit()
 		queue_free()
@@ -485,9 +485,9 @@ func _fit() -> void:
 	var even := _even(_said, words_w - 8.0)  # (in even lines: never one word left alone on the last)
 	if _words.text != even:
 		_words.text = even
-	_choosing.modulate.a = (1.0 - k) * _palette_in
+	_choosing.modulate.a = (1.0 - k) * smoothstep(0.0, 1.0, _palette_in)
 	_choosing.visible = _step == "choose" or _choosing.modulate.a > 0.02
-	_choosing.position.y += roundf((1.0 - _palette_in) * 10.0)  # (each part's palette rises into place)
+	_choosing.position.y += roundf((1.0 - smoothstep(0.0, 1.0, _palette_in)) * 10.0)  # (each part's palette rises into place)
 	_frog.size = frog_size
 	_frog.position = (centre - frog_size * 0.5 + Vector2(0, bob)).round()
 	if _hat_rect.texture:

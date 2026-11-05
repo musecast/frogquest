@@ -80,7 +80,7 @@ func _sit(delta: float) -> void:
 	if _hop > 0.0:
 		_hop += delta
 		var k := minf(1.0, _hop / 0.16)
-		position = Vector2(lerpf(_hop_from, _hop_to, k), perch.y - sin(k * PI) * 3.0)
+		position = Vector2(lerpf(_hop_from, _hop_to, smoothstep(0.0, 1.0, k)), perch.y - sin(k * PI) * 3.0)
 		if k >= 1.0:
 			_hop = 0.0
 		return
