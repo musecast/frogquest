@@ -49,11 +49,12 @@ func _ready() -> void:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(box)
 	box.add_child(_button("Resume", func() -> void: resumed.emit(), "go"))
-	box.add_child(_button("Try Again", func() -> void: try_again.emit(), "wood"))
+	if Party.race == "" or not Party.in_run:  # (in a race it'd start you over, out of step with everyone)
+		box.add_child(_button("Try Again", func() -> void: try_again.emit(), "wood"))
 	box.add_child(_button("Main Menu", func() -> void: main_menu.emit(), "quiet"))
 	if Party.in_run and Party.players.size() > 1:
 		var note := Label.new()
-		note.text = "Your friends keep climbing; your frog waits for you."
+		note.text = "The race goes on without you!" if Party.race != "" else "Your friends keep climbing; your frog waits for you."
 		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		ui.style_label(note, 16, DIM)

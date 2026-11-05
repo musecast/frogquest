@@ -59,6 +59,15 @@ func _run() -> void:
 	await _until(func() -> bool: return _started.size() == 5, 3.0)
 	_expect(host.mode == "story" and friend.mode == "story" and host.beside == "" and friend.beside == str(host.players[1].get("name")),
 		"Climb the World Tree: both up the tree, the friend to appear beside the host (%s)" % friend.beside)
+	host.start("endless", "sprint")
+	await _until(func() -> bool: return _started.size() == 7, 3.0)
+	_expect(host.race == "sprint" and friend.race == "sprint" and friend.mode == "endless",
+		"a race up Endless: both race the same one (%s, %s)" % [host.race, friend.race])
+	var news := [{}]
+	host.race_said.connect(func(_peer: int, what: Dictionary) -> void: news[0] = what)
+	friend.say_race({"k": "won", "s": 12.5})
+	await _until(func() -> bool: return not news[0].is_empty(), 3.0)
+	_expect(str(news[0].get("k", "")) == "won" and float(news[0].get("s", 0.0)) == 12.5, "a racer's news reaches the others (%s)" % [news[0]])
 	host.leave()
 	await _until(func() -> bool: return why[0] != "", 5.0)
 	_expect(why[0] != "" and not friend.is_on(), "the host leaving ends the party for the friend (%s)" % why[0])

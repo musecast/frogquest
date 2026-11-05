@@ -25,6 +25,7 @@ signal started  # the climb starts (EndlessMode reads run_seed and the clock)
 signal ended(why: String)  # the party's over for you: why, in words ("" when you left yourself)
 signal frog_moved(peer: int, state: Array)  # a friend's frog: [x, y, animation, frame, flip, turn, score, metres]
 signal relay_full  # Muse's relay turned a ticket away: its daily allowance is used up (back at 00:00 UTC)
+signal race_said(peer: int, what: Dictionary)  # a racer's news, in a race: out, won, done (PartyRace)
 
 const PORT := 47850
 const MAX_PLAYERS := 16
@@ -56,6 +57,7 @@ var settings_path := SETTINGS_PATH  # (the tests point it elsewhere)
 var on_start := Callable()  # (what starting does; the tests swap it so the scene stays put)
 
 var mode := "endless"  # what the party climbs: "endless" (one tower, one seed) or "story" (the World Tree)
+var race := ""  # in Endless, what it races (PartyRace.ORDER: minute, sprint, flies, knockout), "" climbing together
 var online_room := ""  # the Muse room you're in, online ("" on Wi-Fi or alone)
 var everyone := false  # (that room's a public one, everyone online: climb_with_everyone)
 var beside := ""  # whose side you appear at once their frog's seen (a name in players: "@avery"), "" for nobody
@@ -181,21 +183,34 @@ func leave() -> void:
 	players = {}
 	in_run = false
 	mode = "endless"
+	race = ""
 	everyone = false
 	beside = ""
 	players_changed.emit()
 
 
-## The host starts everyone climbing: up the World Tree ("story"), or a new Endless tower (a new seed).
-func start(what := "endless") -> void:
+## The host starts everyone climbing: up the World Tree ("story"), or a new Endless tower (a new seed),
+## climbing together or racing up it (`race_kind`: PartyRace.ORDER).
+func start(what := "endless", race_kind := "") -> void:
 	if not is_host():
 		return
 	var the_seed := randi()
+	var r := race_kind if what == "endless" else ""
 	if _ws != null:
-		_relay({"data": {"t": "start", "seed": the_seed, "ago": 0, "mode": what}})
-		_begin(the_seed, 0, what)
+		_relay({"data": {"t": "start", "seed": the_seed, "ago": 0, "mode": what, "race": r}})
+		_begin(the_seed, 0, what, r)
 	else:
-		_start.rpc(the_seed, 0, what)
+		_start.rpc(the_seed, 0, what, r)
+
+
+## Your news in a race, to the others (PartyRace): you're out, you've won, you're done.
+func say_race(what: Dictionary) -> void:
+	if not is_on() or players.size() < 2:
+		return
+	if _ws != null:
+		_relay({"data": {"t": "r", "r": what}})
+	else:
+		_race.rpc(what)
 
 
 # ── online ──────────────────────────────────────────────────────────────────────────────────────
@@ -364,7 +379,7 @@ func _on_relay(text: String) -> void:
 					players[slot] = _look_of(card, players.get(slot, {}))
 					_relay({"to": slot, "data": {"t": "look", "i": my_info()}})
 					if is_host() and in_run and mode == "endless":
-						_relay({"to": slot, "data": {"t": "start", "seed": run_seed, "ago": Time.get_ticks_msec() - run_started_ms, "mode": mode}})
+						_relay({"to": slot, "data": {"t": "start", "seed": run_seed, "ago": Time.get_ticks_msec() - run_started_ms, "mode": mode, "race": race}})
 					elif is_host() and in_run and not everyone:
 						_relay({"to": slot, "data": {"t": "start", "seed": 0, "ago": 0, "mode": mode}})  # (up the World Tree with you)
 				players_changed.emit()
@@ -389,7 +404,11 @@ func _on_relay(text: String) -> void:
 				players_changed.emit()
 		"start":
 			if from == _host_seat:
-				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)), "story" if str(d.get("mode", "")) == "story" else "endless")
+				_begin(int(d.get("seed", 0)), int(d.get("ago", 0)), "story" if str(d.get("mode", "")) == "story" else "endless",
+					str(d.get("race", "")))
+		"r":
+			if d.get("r") is Dictionary:
+				race_said.emit(from, d.r)
 
 
 ## A seat's look from the relay's card: their @handle (passed by Muse's filter), keeping any hat and
@@ -586,7 +605,7 @@ func _hello(info: Dictionary) -> void:
 	players[who] = _clean(info)
 	_roster.rpc(players)
 	if new and in_run:
-		_start.rpc_id(who, run_seed, Time.get_ticks_msec() - run_started_ms, mode)
+		_start.rpc_id(who, run_seed, Time.get_ticks_msec() - run_started_ms, mode, race)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -603,18 +622,24 @@ func _roster(all: Dictionary) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _start(the_seed: int, ago_ms: int, what := "endless") -> void:
-	_begin(the_seed, ago_ms, "story" if what == "story" else "endless")
+func _start(the_seed: int, ago_ms: int, what := "endless", race_kind := "") -> void:
+	_begin(the_seed, ago_ms, "story" if what == "story" else "endless", race_kind)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _race(what: Dictionary) -> void:
+	race_said.emit(multiplayer.get_remote_sender_id(), what)
 
 
 ## The climb starts (or a latecomer catches up with it): everyone on the same tower and clock, or up
 ## the World Tree, each in their own world, those who joined appearing beside the host (beside) unless
 ## they came for someone else.
-func _begin(the_seed: int, ago_ms: int, what := "endless") -> void:
+func _begin(the_seed: int, ago_ms: int, what := "endless", race_kind := "") -> void:
 	run_seed = the_seed
 	run_started_ms = Time.get_ticks_msec() - ago_ms
 	in_run = true
 	mode = what
+	race = race_kind if what == "endless" and race_kind in load("res://scripts/PartyRace.gd").ORDER else ""
 	if what == "story" and beside == "" and not is_host() and not everyone:
 		beside = name_of(_host_seat if _ws != null else 1)
 	started.emit()

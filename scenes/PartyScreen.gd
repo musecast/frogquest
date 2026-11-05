@@ -158,11 +158,26 @@ func _players() -> void:
 		_box.add_child(_label(who + (" (you)" if int(id) == Party.me() else ""), BODY_FONT_SZ, GREEN if int(id) == Party.me() else DIM))
 
 
-## The host's two ways to start: up the World Tree (everyone appears beside you, each in their own world)
-## or a new Endless tower for all.
+## The host's ways to start: up the World Tree (everyone appears beside you, each in their own world), a
+## new Endless tower for all, or a race up one (PartyRace): the minute race to begin with, and each race
+## finished unlocks the next, one by one; the locked ones show, greyed, so you know what's coming.
 func _starts() -> void:
 	_box.add_child(_button("Climb the World Tree", func() -> void: Party.start("story"), "go"))
 	_box.add_child(_button("Climb Endless", func() -> void: Party.start("endless")))
+	_header("Race")
+	var race: GDScript = load("res://scripts/PartyRace.gd")
+	var locked := 0
+	for id in race.ORDER:
+		var label: String = race.RACES[id].label
+		if race.has(id):
+			_box.add_child(_button(label, func() -> void: Party.start("endless", id)))
+		else:
+			locked += 1
+			var shut := _button(label, func() -> void: pass, "quiet")
+			shut.disabled = true
+			_box.add_child(shut)
+	if locked > 0:
+		_box.add_child(_label("Finish a race to unlock the next one.", BODY_FONT_SZ, DIM))
 
 
 ## You, as your friends see you: your froggy (your look: FroggyLook) and, signed in to Muse, your

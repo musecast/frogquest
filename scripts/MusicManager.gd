@@ -21,6 +21,7 @@ var sensitivity := SENSITIVITY  # how hard a drag throws him (the slingshots' se
 var og_unlocked := false  # (beaten on Hard: OG mode, the very first aim line)
 var og_seen := false  # (its "OG Mode Unlocked!" has been read)
 var achievements: Array = []  # the ones earned (Achievements.gd)
+var unlocked_modes: Array = []  # races unlocked past the first (PartyRace.ORDER): one more after each race
 
 const WARDROBE_PATH := "user://wardrobe.save"
 var wardrobe_path := WARDROBE_PATH  # (the tests point this somewhere else, so they never touch your save)
@@ -67,6 +68,7 @@ func save_wardrobe() -> void:
 		"og_unlocked": og_unlocked,
 		"og_seen": og_seen,
 		"achievements": achievements,
+		"unlocked_modes": unlocked_modes,
 	})
 	f.close()
 	_trace("MusicManager save_wardrobe end")
@@ -87,6 +89,7 @@ func load_wardrobe() -> void:
 		og_unlocked = false
 		og_seen = false
 		achievements = []
+		unlocked_modes = []
 		_trace("MusicManager load_wardrobe end missing file")
 		return
 	var f = FileAccess.open(wardrobe_path, FileAccess.READ)
@@ -113,6 +116,7 @@ func load_wardrobe() -> void:
 	og_unlocked         = bool(d.get("og_unlocked",     false))
 	og_seen             = bool(d.get("og_seen",         false))
 	achievements        = d.get("achievements", []) if d.get("achievements") is Array else []
+	unlocked_modes      = d.get("unlocked_modes", []) if d.get("unlocked_modes") is Array else []
 	_take_off_unfound()
 	_trace("MusicManager load_wardrobe end")
 

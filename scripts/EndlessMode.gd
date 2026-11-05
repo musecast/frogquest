@@ -86,6 +86,8 @@ var _height_label: Label
 var _banner: Label  # (a word that isn't a zone's name: "PARTY OVER"; and, under it, how to play)
 var _banner_sub: Label
 var _titles: CanvasLayer  # (the zones' names: AreaTitle)
+var _race: Node = null  # (racing your party up it: PartyRace; null climbing)
+const PARTY_MAX_X := 180.0  # (in a party, the tower's as wide as an upright phone's for everyone: the same tower)
 var _sky  # (EndlessSky.gd)
 var _zones: Script
 var _platform_script: Script
@@ -209,8 +211,15 @@ func _ready() -> void:
 		_generate_one_platform_above()
 	fade_rect.color.a = 1.0
 	_fade(1.0, 0.0, 0.6)
-	_titles.announce(_zones.ZONES[0]["name"])
-	_show_banner("", "Climb as high as you can!")
+	if Party.in_run and Party.race != "":
+		_race = load("res://scripts/PartyRace.gd").new()
+		_race.endless = self
+		add_child(_race)
+		_titles.announce(_race.RACES[_race.kind].name)
+		_show_banner("", _race.RACES[_race.kind].how)
+	else:
+		_titles.announce(_zones.ZONES[0]["name"])
+		_show_banner("", "Climb as high as you can!")
 	if Party.in_run:
 		_join_party()
 	set_process(true)
@@ -315,7 +324,7 @@ func _fit_to_viewport() -> void:
 	# The play area: the screen's width in the world, less room for a platform, kept from getting
 	# silly-wide sideways.
 	var half_world: float = viewport_size.x / zoom_val * 0.5
-	max_x = minf(half_world - 60.0, 340.0)
+	max_x = PARTY_MAX_X if Party.in_run else minf(half_world - 60.0, 340.0)
 	min_x = -max_x
 	generation_ahead_distance = viewport_size.y / zoom_val * 1.6
 	cleanup_distance_below_player = maxf(1400.0, viewport_size.y / zoom_val * 1.3)
@@ -389,7 +398,12 @@ func _follow(delta: float) -> void:
 	var cam := player.get_node_or_null("Camera2D") as Camera2D
 	if cam == null:
 		return
-	_cam_y = lerpf(_cam_y, player.global_position.y, 1.0 - exp(-delta * 6.0))
+	var follow := player.global_position.y
+	if _race and _race.out:  # (knocked out of a race: watching the highest frog still in it)
+		var leader = _race.watch_y()
+		if leader != null:
+			follow = leader
+	_cam_y = lerpf(_cam_y, follow, 1.0 - exp(-delta * 6.0))
 	cam.global_position = Vector2(0.0, _cam_y)
 	for wall in _walls:
 		wall.position.y = _cam_y
@@ -417,6 +431,8 @@ func _fit_banner() -> void:
 func _climbed() -> void:
 	var metres := int(-highest_player_y / 10.0)
 	_height_label.text = "%d m" % maxi(metres, 0)
+	if _race:
+		_race.climbed(maxi(metres, 0))
 	var zone: int = _zones.index_at(-highest_player_y)
 	if zone > _zone_reached:
 		_zone_reached = zone
@@ -443,6 +459,8 @@ func _show_banner(title: String, sub: String) -> void:
 
 
 func _trigger_reset() -> void:
+	if _race and _race.fell():
+		return  # (no game over in a race: back on your last platform, or, in a knockout, out)
 	if Party.in_run and _pull_up():
 		return
 	is_resetting = true
@@ -528,6 +546,31 @@ func revive() -> void:
 	await _fade(1.0, 0.0, 0.35)
 
 
+## In a race (PartyRace), a moment after a fall: back on the platform he last stood on (or the highest
+## one still there under his best). No game over: the time it cost is the price.
+func race_respawn() -> void:
+	_revive_platform_id = last_platform_id
+	var platform := _revive_spot()
+	if platform == null:
+		return
+	player.global_position = platform.global_position + Vector2(0.0, -40.0)
+	player.velocity = Vector2.ZERO
+	player.reset_physics_interpolation()
+	player.visible = true  # (out of the pond, if he'd gone in)
+	player.set_physics_process(true)
+	_splashed = false
+	highest_player_y = minf(platform.global_position.y, player.global_position.y)
+	last_platform_id = int(platform.get_meta("platform_id", 0))
+	airborne_since_landing = false
+
+
+## Knocked out of a race: he's gone from it, and the camera watches whoever's highest still in it.
+func race_out() -> void:
+	player.visible = false
+	player.set_physics_process(false)
+	player.velocity = Vector2.ZERO
+
+
 func _find_platform(platform_id: int) -> Node2D:
 	if platform_id <= 0:
 		return null
@@ -597,7 +640,8 @@ func _on_launched(platform: Node) -> void:
 
 
 func _generate_platforms_if_needed() -> void:
-	while highest_generated_y > player.global_position.y - generation_ahead_distance:
+	var top := minf(player.global_position.y, _cam_y)  # (watching from out of a race: as far as the camera goes)
+	while highest_generated_y > top - generation_ahead_distance:
 		_generate_one_platform_above()
 
 
@@ -623,7 +667,8 @@ func _generate_one_platform_above() -> void:
 	var platform = _make_platform(Vector2(next_x, next_y), zone, t, false, {}, reach - gap - _extra_gap)
 	highest_generated_y = next_y
 	last_generated_x = next_x
-	if next_platform_id > 4 and _rng.randf() < float(zone["flies"]):
+	var fly_chance := float(zone["flies"]) if not (Party.in_run and Party.race == "flies") else 0.85  # (PartyRace.FLY_CHANCE)
+	if next_platform_id > 4 and _rng.randf() < fly_chance:
 		_spawn_fly(Vector2(next_x + _rng.randf_range(-40.0, 40.0), next_y - _rng.randf_range(34.0, 80.0)))
 	if platform.motion == "bob":
 		_extra_gap = platform.motion_range * 0.35
@@ -713,6 +758,8 @@ func _spawn_fly(at: Vector2) -> void:
 
 
 func _on_fly_caught(fly) -> void:
+	if _race:
+		_race.caught_fly()
 	var points := GOLDEN_FLY_POINTS if fly.golden else FLY_POINTS
 	score += points
 	_log_flies.append([int(_run_ms), int(fly.golden)])
@@ -799,6 +846,8 @@ func _check_score_unlocks() -> void:
 
 
 func _update_score_label() -> void:
+	if _race:
+		return  # (a race's clock is up there: PartyRace)
 	score_label.text = "Score: %d" % score
 
 
@@ -872,9 +921,10 @@ func _party_frame(delta: float) -> void:
 	var sprite: AnimatedSprite2D = player.sprite
 	Party.send_frog([snappedf(player.global_position.x, 0.1), snappedf(player.global_position.y, 0.1), str(sprite.animation),
 		sprite.frame, sprite.flip_h, snappedf(sprite.rotation, 0.01), score, maxi(0, int(-highest_player_y / 10.0)),
-		_tether_peer if Party.tethers else 0], delta)
-	_tether(delta)
-	_step_ropes(delta)
+		_tether_peer if Party.tethers and _race == null else 0, _race.flies if _race else 0, int(_race.out) if _race else 0], delta)
+	if _race == null:  # (no bands in a race: everyone for themselves)
+		_tether(delta)
+		_step_ropes(delta)
 	_place_tags()
 	_bands.queue_redraw()
 
@@ -1088,6 +1138,8 @@ func _draw_bands() -> void:
 func _on_frog_moved(peer: int, state: Array) -> void:
 	if not Party.players.has(peer):
 		return
+	if _race:
+		_race.saw(peer, state)
 	MusicManager.unlock("partyhat")  # (climbing with a friend: the Party Hat)
 	if Party.players.size() >= 4:
 		MusicManager.unlock("holo")  # (with 3 friends at once: the Holo skin)

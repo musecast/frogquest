@@ -173,6 +173,14 @@ func _run() -> void:
 	_expect(await friend.join_room("R1") == "", "and they can come back")
 	await _until(func() -> bool: return _started.size() == 3, 5.0)
 	_expect(_started.size() == 3 and friend.run_seed == host.run_seed, "coming back mid-climb catches them up with it")
+	host.start("endless", "knockout")
+	await _until(func() -> bool: return _started.size() == 5, 3.0)
+	_expect(host.race == "knockout" and friend.race == "knockout", "a race online: both race the same one (%s, %s)" % [host.race, friend.race])
+	var news := [{}]
+	host.race_said.connect(func(_peer: int, what: Dictionary) -> void: news[0] = what)
+	friend.say_race({"k": "out", "m": 7, "s": 3.5})
+	await _until(func() -> bool: return not news[0].is_empty(), 3.0)
+	_expect(str(news[0].get("k", "")) == "out" and int(news[0].get("m", 0)) == 7, "a racer's news goes through the relay (%s)" % [news[0]])
 
 	host.leave()
 	await _until(func() -> bool: return friend.players.size() == 1 and friend.is_host(), 5.0)
