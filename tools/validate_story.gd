@@ -196,6 +196,8 @@ func _run() -> void:
 	# tree, each of its parts.
 	var titles: Node = main.get_node("AreaTitle")
 	_expect(titles.area_at(player.global_position) == "" and titles.showing == "", "at home: no name")
+	_expect(titles.area_at(Vector2(1720, -480)) == "" and titles.area_at(Vector2(3900, -480)) == "", "on the ground on the way to the tree (by its signs), and the far side: no name yet")
+	_expect(titles.area_at(Vector2(2700, -480)) == "THE WORLD TREE", "at its foot: THE WORLD TREE")
 	_expect(titles.area_at(Vector2(250, -150)) == "" and titles.area_at(Vector2(2797, -1240)) == "THE WORLD TREE"
 		and titles.area_at(Vector2(2831, -2950)) == "THE DARK" and titles.area_at(Vector2(1150, -2700)) == ""
 		and titles.area_at(Vector2(2787, -4400)) == "THE MUSHROOMS"

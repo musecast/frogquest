@@ -17,6 +17,7 @@ const BOUNCES := 2  # (off walls)
 const BELOW := 40.0  # px under where he started: far enough (he's falling away by then)
 const NORMAL_SHARE := 0.6  # (normal: the first this much of the flight)
 const HARD_LENGTH := 95.0  # (hard: this many px of it)
+const OG_SENSITIVITY := 2.0  # (the first game's: a jump was twice the pull)
 const GAP := 11.0  # px between dots, along the arc
 const FIRST := 15.0  # (the first dot's this far along: clear of him)
 const DRIFT := 18.0  # px a second the dots drift out along it
@@ -90,11 +91,11 @@ static func heat(power: float) -> Color:
 
 
 ## Draws it on `canvas` (the slingshot, on him) for `frog` leaving with `velocity`. power: 0 to 1. drag:
-## the pull itself, in the slingshot's own px (OG's line points along it).
+## the pull itself, in the slingshot's own px, and the slingshot's sensitivity (OG's line is along it).
 static func draw(canvas: CanvasItem, frog: CharacterBody2D, velocity: Vector2, power: float, mode: String,
-		drag: Vector2, spring := false) -> void:
+		drag: Vector2, sensitivity: float, spring := false) -> void:
 	if mode == "og":
-		_og(canvas, drag)
+		_og(canvas, drag * sensitivity / OG_SENSITIVITY)
 		return
 	var points := shown(path(frog, velocity), mode)
 	var along := PackedFloat32Array([0.0])
@@ -123,7 +124,9 @@ static func draw(canvas: CanvasItem, frog: CharacterBody2D, velocity: Vector2, p
 
 
 ## OG: the first Frog Quest's line, exactly (2024): from him straight out the way he'll go, a fifth as long
-## as the pull (up to 300 each way), two pixels thick; white-pink turning red the harder you pull.
+## as the pull (up to 300 each way), two pixels thick; white-pink turning red the harder you pull. Its pull
+## is the one the first game would have needed for the same jump (it threw him twice the pull: half what
+## today's slingshot does), so the line's as long as it was for the same jump.
 static func _og(canvas: CanvasItem, drag: Vector2) -> void:
 	var pull := drag.clamp(Vector2(-300, -300), Vector2(300, 300))
 	var length := pull.length()

@@ -163,6 +163,9 @@ func _ready():
 	if MusicManager.game_beaten:
 		_activate_beaten_crt()
 	add_to_group("banner_reserve_ui")
+	# (notifications come down to just under these: MusicManager's toasts)
+	$CanvasLayer/TouchScreenButtonPause/ColorRect.add_to_group("corner_hud")
+	$CanvasLayer/MarginContainer/VBoxContainer.add_to_group("corner_hud")
 	# Hide title screen immediately so buttons never appear at their .tscn default sizes.
 	# _initial_title_layout() fires before the first rendered frame and shows the
 	# title screen only after layout is already correct.

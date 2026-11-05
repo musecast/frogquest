@@ -307,6 +307,36 @@ func _check_corners(player: Node, vp: Vector2, shape: String) -> void:
 		var pr: Rect2 = (player.get_node("CanvasLayer/TouchScreenButtonPause/ColorRect") as Control).get_global_rect()
 		if pr.position.x < room.position.x - 0.5 or pr.position.y < room.position.y - 0.5:
 			_failures.append("%s, %s: the pause button's out of the safe area (%s, the room %s)" % [shape, case, pr, room])
+		# An achievement coming down: in the safe area, under the pause button and the clock, not on them.
+		var mm := root.get_node("MusicManager")
+		mm.toast_host = player.get_parent()
+		mm.show_toast("Achievement!", load("res://scripts/Achievements.gd").trophy(),
+			"Top of the Tree\nClimb the World Tree all the way to the top.")
+		await create_timer(0.75).timeout
+		var card: Control = null
+		for layer in player.get_parent().get_children():
+			if layer is CanvasLayer and layer.layer == 100:
+				for c in layer.get_children():
+					if c is PanelContainer:
+						card = c
+		if card == null:
+			_failures.append("%s, %s: no achievement card came down" % [shape, case])
+		else:
+			var cr := card.get_global_rect()
+			if not room.grow(1.0).encloses(cr):
+				_failures.append("%s, %s: the achievement at %s is out of the safe area %s" % [shape, case, cr, room])
+			if cr.intersects(pr.grow(-1.0)):
+				_failures.append("%s, %s: the achievement at %s is over the pause button %s" % [shape, case, cr, pr])
+			for each in labels:
+				var lr: Rect2 = _words_rect(each[0])
+				if cr.intersects(lr.grow(-1.0)):
+					_failures.append("%s, %s: the achievement at %s is over the clock's %s %s" % [shape, case, cr, each[0].name, lr])
+		for layer in player.get_parent().get_children():
+			if layer is CanvasLayer and layer.layer == 100:
+				layer.queue_free()
+		mm.toast_host = null
+		mm._toasts.clear()
+		mm._toast_up = false
 	for each in labels:
 		each[0].visible = each[1]
 	ads.test_safe_insets = real_insets
@@ -434,6 +464,21 @@ func _check_toast(what: String, vp: Vector2, upright: bool) -> void:
 	for layer in view.get_children():
 		if layer is CanvasLayer:
 			_expect_centred(layer, vp, "%s: notification" % what)
+	# An achievement's (its name up top, a trophy, the longest line there is, in two).
+	for layer in view.get_children():
+		if layer is CanvasLayer:
+			layer.queue_free()
+	mm._toasts.clear()
+	mm._toast_up = false
+	await process_frame
+	var achievements: Dictionary = load("res://scripts/Achievements.gd").LIST
+	var longest := ""
+	for id in achievements:
+		if achievements[id].about.length() > longest.length():
+			longest = achievements[id].about
+	mm.show_toast("Achievement!", load("res://scripts/Achievements.gd").trophy(), "Top of the Tree\n" + longest)
+	await create_timer(0.75).timeout
+	_check_inside(view, room, "%s: an achievement" % what)
 	view.queue_free()
 	mm.toast_host = null
 	mm._toasts.clear()

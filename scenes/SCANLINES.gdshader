@@ -9,13 +9,15 @@ uniform float edge_opacity : hint_range(0.0, 1.0) = 1.0; // how opaque the edges
 uniform float gradient_radius : hint_range(0.0, 2.0) = 1.0; // size of the gradient falloff
 uniform sampler2D SCREEN_TEXTURE: hint_screen_texture, filter_nearest;  // (crisp pixels, and no mipmaps of the screen every frame)
 
-vec2 uv_curve(vec2 uv)
+// k: how much the curve bends things up and down (1 on the 480x180 screen it was made for). A screen held
+// upright is ~6x taller, and a whole bend there pulled a faint copy of the clock ~13 px under it.
+vec2 uv_curve(vec2 uv, float k)
 {
 	uv = (uv - 0.5) * 2.0;
 	
 	//You can modify the numbers and try different values
 	uv.x *= 1.0 + pow(abs(uv.y) / 3.0, 3.0);
-	uv.y *= 1.0 + pow(abs(uv.x) / 3.0, 3.0);
+	uv.y *= 1.0 + pow(abs(uv.x) / 3.0, 3.0) * k;
 	
 	//The scale part (you can delete it when you want)
 	uv /= 1.0;
@@ -28,19 +30,21 @@ vec2 uv_curve(vec2 uv)
 void fragment()
 {	
 	
+	// (the screen's copy bends up and down by as many pixels as it did on the 480x180 screen, upright or not)
+	float k = min(1.0, (SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x) / (480.0 / 180.0));
 	//You can modify the *3.0, *-3.0 for a bigger or smaller 
-	float r = texture(SCREEN_TEXTURE, uv_curve(SCREEN_UV) + vec2(SCREEN_PIXEL_SIZE.x*0.0), 0.0).r;
-	float g = texture(SCREEN_TEXTURE, uv_curve(SCREEN_UV) + vec2(SCREEN_PIXEL_SIZE.x*0.0), 0.0).g;
-	float b = texture(SCREEN_TEXTURE, uv_curve(SCREEN_UV) + vec2(SCREEN_PIXEL_SIZE.x*-0.0), 0.0).b;
+	float r = texture(SCREEN_TEXTURE, uv_curve(SCREEN_UV, k) + vec2(SCREEN_PIXEL_SIZE.x*0.0), 0.0).r;
+	float g = texture(SCREEN_TEXTURE, uv_curve(SCREEN_UV, k) + vec2(SCREEN_PIXEL_SIZE.x*0.0), 0.0).g;
+	float b = texture(SCREEN_TEXTURE, uv_curve(SCREEN_UV, k) + vec2(SCREEN_PIXEL_SIZE.x*-0.0), 0.0).b;
 	
 	
 	//If you dont want scanlines you can just delete this part
-	float s = sin(uv_curve(SCREEN_UV).y * scanline_count * PI * 2.0);
+	float s = sin(uv_curve(SCREEN_UV, 1.0).y * scanline_count * PI * 2.0);
 	s = (s * 0.5 + 0.5) * 0.9 + 0.1;
 	vec4 scan_line = vec4(vec3(pow(s, 0.25)), 0.3);
 	
 	
-	float dist = length((uv_curve(SCREEN_UV) - 0.5) * 2.0) / gradient_radius;
+	float dist = length((uv_curve(SCREEN_UV, 1.0) - 0.5) * 2.0) / gradient_radius;
 	float radial_opacity = mix(1.0 - center_transparency, edge_opacity, clamp(dist, 0.0, 1.0));
 	COLOR = vec4(r, g, b, opacity * radial_opacity) * scan_line;
 }

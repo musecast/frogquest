@@ -20,9 +20,24 @@ static func earn(id: String) -> bool:
 		return false
 	MusicManager.achievements.append(id)
 	MusicManager.save_wardrobe()
-	MusicManager.show_toast("Achievement!", null, "%s: %s" % [LIST[id].name, LIST[id].about])
+	MusicManager.show_toast("Achievement!", trophy(), LIST[id].name + "\n" + LIST[id].about)
 	_tell(id)
 	return true
+
+
+## A little gold trophy (pixel art, for the toast).
+static func trophy() -> Control:
+	var rows := ["##.###.##", "#########", "##.###.##", ".#######.", "..#####..", "...###...", "....#....",
+		"...###...", "..#####.."]
+	var pic := TextureRect.new()
+	pic.texture = load("res://scripts/UIStyle.gd").pixel_icon(rows)
+	pic.modulate = Color(1.0, 0.82, 0.3)
+	pic.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.custom_minimum_size = Vector2(18, 18)
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return pic
 
 
 static func has(id: String) -> bool:

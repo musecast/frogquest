@@ -120,7 +120,7 @@ func _draw():
 		var power := clampf(launch_velocity(mousePath).length() / boost / Vector2(800, 450).length(), 0.0, 1.0)
 		var mode: String = load("res://scripts/Difficulty.gd").current()
 		# (as much of the jump as the difficulty shows, as the story's: AimLine; on a spring, gold all along)
-		load("res://scripts/AimLine.gd").draw(self, get_parent(), launch, power, mode, mousePath, boost > 1.0)
+		load("res://scripts/AimLine.gd").draw(self, get_parent(), launch, power, mode, mousePath, sensitivity, boost > 1.0)
 
 
 func _on_cursor_lock_button_pressed():

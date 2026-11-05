@@ -210,8 +210,9 @@ func _next_toast() -> void:
 	title.text = toast[0]
 	ui.style_label(title, title_size, ui.GOLD)
 	words.add_child(title)
+	var detail: Label = null
 	if toast[2] != "":
-		var detail := Label.new()
+		detail = Label.new()
 		detail.text = toast[2]
 		ui.style_label(detail, maxi(16, roundi(title_size * 0.72)), ui.CREAM)
 		words.add_child(detail)
@@ -224,9 +225,28 @@ func _next_toast() -> void:
 	var span: float = ui.across(vp, room, room.size.x * 0.96).y
 	var rest_y := room.position.y + (room.size.y * 0.05 if portrait else 6.0)
 	var corner: Rect2 = ui.camera_corner(vp, room)
+	# Too wide: its longest line in two (and again, if need be), not its words shrunk.
+	var tries := 0
+	while size.x > span and detail and tries < 4:
+		var lines := detail.text.split("\n")
+		var longest := 0
+		for i in lines.size():
+			if lines[i].length() > lines[longest].length():
+				longest = i
+		if not lines[longest].contains(" "):
+			break
+		lines[longest] = _in_two(lines[longest])
+		detail.text = "\n".join(lines)
+		size = panel.get_combined_minimum_size()
+		tries += 1
 	if size.x > span and corner.has_area():
 		span = vp.x * 0.96
 		rest_y = maxf(rest_y, corner.end.y + 4.0)
+	# Clear of what's up in the corners (the pause button, the clock): it comes down to just under them.
+	for hud in get_tree().get_nodes_in_group("corner_hud"):
+		var c := hud as Control
+		if c and c.is_visible_in_tree() and c.get_viewport() == host.get_viewport() and c.get_global_rect().has_area():
+			rest_y = maxf(rest_y, c.get_global_rect().end.y + 6.0)
 	var s := minf(1.0, span / size.x)
 	panel.size = size
 	panel.scale = Vector2(s, s)
@@ -243,6 +263,16 @@ func _next_toast() -> void:
 	tween.parallel().tween_property(panel, "modulate:a", 0.0, 0.35).set_ease(Tween.EASE_IN)
 	tween.tween_callback(_next_toast)
 	tween.tween_callback(cl.queue_free)
+
+
+## Words in two lines, broken at the space nearest their middle.
+static func _in_two(words: String) -> String:
+	var middle := words.length() / 2
+	var best := -1
+	for i in words.length():
+		if words[i] == " " and (best < 0 or absi(i - middle) < absi(best - middle)):
+			best = i
+	return words if best < 0 else words.substr(0, best) + "\n" + words.substr(best + 1)
 
 
 func _ready():

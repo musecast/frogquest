@@ -169,7 +169,7 @@ func _draw():
 		var launch := shown_velocity(mousePath)
 		var power := clampf(launch_velocity(mousePath).length() / Vector2(800, 450).length(), 0.0, 1.0)
 		var mode: String = load("res://scripts/Difficulty.gd").current()
-		load("res://scripts/AimLine.gd").draw(self, get_parent(), launch, power, mode, mousePath)
+		load("res://scripts/AimLine.gd").draw(self, get_parent(), launch, power, mode, mousePath, sensitivity)
 
 
 func _on_cursor_lock_button_pressed():
