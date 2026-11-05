@@ -53,13 +53,14 @@ func _run() -> void:
 		await _finish(real, main)
 		return
 	_expect(intro._black.color.a > 0.2 and intro._words.text == "", "fading in out of the dark, before it speaks (%.2f)" % intro._black.color.a)
-	_expect(intro._hum.playing and intro._hum.stream is AudioStreamWAV and (intro._hum.stream as AudioStreamWAV).loop_mode != AudioStreamWAV.LOOP_DISABLED,
-		"a low hum under it, looping (not the frog god's song)")
+	var music := intro._music.stream as AudioStreamOggVorbis
+	_expect(intro._music.playing and music != null and music.loop and music.loop_offset > 1.0,
+		"music under it, looping (from a little way in: its end runs into that)")
 	_expect(tv.volume_db < -70.0, "the TV's static quiet while it's there")
 	await _until(func() -> bool: return intro._words.text != "", 4.0)
 	_expect(intro._words.text == "...LITTLE ONE..." and intro._shadow > 0.9 and intro._black.color.a < 0.5, "he's the frog god's shadow, and it speaks")
-	_expect(intro._hum.stream.resource_path == "res://assets/froggod_hum.wav" and (intro._hum.stream as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_FORWARD,
-		"its hum deep, with a bass and a rush through it (froggod_hum.wav, looping)")
+	_expect(intro._music.stream.resource_path == "res://assets/froggod_intro.ogg" and intro._music.stream.get_length() > 200.0,
+		"the ending's song slowed right down, with brown noise under it (froggod_intro.ogg, the whole song: %.0f s)" % intro._music.stream.get_length())
 	await _until(func() -> bool: return intro._typed >= intro._words.text.length(), 4.0)
 	await _wait(2.0)
 	_expect(intro._words.text == "...LITTLE ONE..." and intro._more.shown and intro._more.modulate.a > 0.5,
@@ -129,8 +130,8 @@ func _run() -> void:
 		bands[look.random_band()] = true
 	_expect(bright.any(func(c: Color) -> bool: return _near(c, rolled)) and bands.size() >= 8,
 		"and gives him a band of a colour all his own, at random (%s; %d different in 60 froggies)" % [rolled.to_html(false), bands.size()])
-	_expect(intro._black.color.a > 0.99 and not intro._root.visible and not intro._hum.playing and player.get_node("Trajectory").endGame == 0,
-		"it cuts to black, the hum cut off, and the climb's begun behind it")
+	_expect(intro._black.color.a > 0.99 and not intro._root.visible and not intro._music.playing and player.get_node("Trajectory").endGame == 0,
+		"it cuts to black, the music cut off, and the climb's begun behind it")
 	_expect(intro.slow_end and intro.hold() >= 2.0 and intro.fade() >= 3.0, "into his bedroom: a long black, then a slow fade")
 	await _wait(2.0)
 	_expect(is_instance_valid(intro) and intro._black.color.a > 0.99, "still black two seconds on, its sound ringing out")

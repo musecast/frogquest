@@ -1,9 +1,9 @@
 extends CanvasLayer
 ## How the game starts, the first time: out of the dark, slowly, a place between the stars and the frog
-## god's voice, a low hum under it. He's a shadow, the frog god's own; it asks what he looks like, and he
+## god's voice, the ending's song under it, slowed right down. He's a shadow, the frog god's own; it asks what he looks like, and he
 ## chooses, one thing at a time (his skin, then his belly), each from a palette of
 ## colours to tap or slide a finger across, his colours gliding to each as he fills in. "Is this you?"
-## Yes: it cuts to black (the hum cut off, with the sound the finale makes as it closes in), the TV's
+## Yes: it cuts to black (the music cut off, with the sound the finale makes as it closes in), the TV's
 ## static comes up, and he fades into his bedroom as that froggy. Nothing else is asked, not even a name
 ## (he's lil froggy, as everyone is; friends know you by your Muse @handle): hats, patterns and skins are
 ## earned by playing. His look is kept (MusicManager.look) and goes online with him (Party), with a band
@@ -24,7 +24,7 @@ const HOLD := 2.5  # (seconds of black after the cut, its sound ringing out, bef
 const FADE := 3.5  # (and the slow fade into his bedroom: he's asleep in it)
 const QUICK_HOLD := 1.1  # (into Endless, or Play Together's menu: on with it)
 const QUICK_FADE := 1.8
-const HUM_DB := -12.0  # (its file's loud: as loud as the old one was)
+const MUSIC_DB := -9.0  # (its file's at -16 LUFS: this puts it at about -25, as loud as the hum before it)
 const IDLE := ["res://assets/frog.png", "res://assets/frog2.png"]
 const TYPE_SPEED := 10.0  # letters a second (slow: the frog god is old, and big)
 const VOICE_PITCH := Vector2(0.28, 0.34)  # (its voice, a blip every other letter: deep, a little different each time)
@@ -84,7 +84,7 @@ var _sure: HBoxContainer
 var _fly: Control
 var _spaced: FontVariation
 var _black: ColorRect
-var _hum: AudioStreamPlayer
+var _music: AudioStreamPlayer
 var _more: Control  # (MoreArrow: under its words once they're all there, for a tap)
 var _blip: AudioStreamPlayer
 
@@ -198,13 +198,16 @@ func _ready() -> void:
 	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_black)
 
-	_hum = AudioStreamPlayer.new()  # (a low hum with a deep bass and a soft rush through it: it comes in, and it's cut off at the end)
-	_hum.stream = load("res://assets/froggod_hum.wav")
-	_hum.bus = &"Music"
-	_hum.volume_db = -50.0
-	add_child(_hum)
-	_hum.play()
-	_hum.create_tween().tween_property(_hum, "volume_db", HUM_DB, FADE_IN if fade_in else 2.0).set_ease(Tween.EASE_OUT)
+	# (goodbyefroggy, the ending's song, at half speed: an octave down, in a big dark room, smooth brown
+	# noise under it; the whole song, looping (from 8 s: its end runs into it). It comes in, and it's cut
+	# off at the end. So the game's first music is the last, as if from far away.)
+	_music = AudioStreamPlayer.new()
+	_music.stream = load("res://assets/froggod_intro.ogg")
+	_music.bus = &"Music"
+	_music.volume_db = -50.0
+	add_child(_music)
+	_music.play()
+	_music.create_tween().tween_property(_music, "volume_db", MUSIC_DB, FADE_IN if fade_in else 2.0).set_ease(Tween.EASE_OUT)
 	_blip = AudioStreamPlayer.new()
 	_blip.stream = load("res://assets/frogaim.wav")
 	_blip.bus = &"FX"
@@ -364,7 +367,7 @@ func _keep() -> void:
 	MusicManager.save_wardrobe()
 
 
-## The end of it. The first time: it cuts to black, the hum cut off (with the finale's closing-in sound),
+## The end of it. The first time: it cuts to black, the music cut off (with the finale's closing-in sound),
 ## the game takes over behind it (done), and it fades in from the black. From the wardrobe: it just
 ## fades back to it.
 func _end() -> void:
@@ -376,14 +379,14 @@ func _end() -> void:
 	if from_wardrobe:
 		var away := create_tween()
 		away.tween_property(_root, "modulate:a", 0.0, 0.35)
-		away.parallel().tween_property(_hum, "volume_db", -50.0, 0.35)
+		away.parallel().tween_property(_music, "volume_db", -50.0, 0.35)
 		await away.finished
 		done.emit()
 		queue_free()
 		return
 	_black.color = Color(0, 0, 0, 1)
 	_root.visible = false
-	_hum.stop()
+	_music.stop()
 	if cut_sound:
 		var boom := AudioStreamPlayer.new()
 		boom.stream = load("res://assets/appear.mp3")
