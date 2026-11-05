@@ -95,6 +95,21 @@ func _run() -> void:
 		guest.leave()
 	await process_frame
 
+	# Another version (an iPhone not yet updated, a computer that is): told to update, and not let in.
+	var newer := _phone("PhoneV")
+	_expect(newer.host() == "", "a party for the versions")
+	var older := _phone("PhoneW")
+	older.version = newer.version - 1
+	var why_old := [""]
+	older.ended.connect(func(w: String) -> void: why_old[0] = w)
+	older.join("127.0.0.1")
+	await _until(func() -> bool: return why_old[0] != "", 8.0)
+	_expect(why_old[0] == older.OUTDATED and newer.players.size() == 1,
+		"a phone on another version is told to update, and isn't let in (%s)" % why_old[0])
+	newer.leave()
+	older.leave()
+	await process_frame
+
 	# Codes: the last two numbers of the host's address, back to the same address.
 	var party: Node = root.get_node("Party")
 	var mine: String = party.local_ip()

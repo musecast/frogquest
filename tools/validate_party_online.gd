@@ -248,6 +248,15 @@ func _run() -> void:
 		_press(again, "OK")
 	_ticket_code = 200
 
+	# Another version: a guest whose host is on another one is told to update, and goes.
+	var odd := _phone("OnOdd")
+	var odd_why := [""]
+	odd.ended.connect(func(w: String) -> void: odd_why[0] = w)
+	odd._host_seat = 1
+	odd._seat = 2
+	odd._on_relay(JSON.stringify({"from": 1, "data": {"t": "look", "i": {"name": "@hosty", "v": odd.version + 1}}}))
+	_expect(odd_why[0] == odd.OUTDATED, "a guest whose host is on another version is told to update, and goes (%s)" % odd_why[0])
+
 	process_frame.disconnect(_process_relay)
 	_relay.server.stop()
 	acct.transport = Callable()

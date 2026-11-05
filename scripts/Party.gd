@@ -28,6 +28,11 @@ signal relay_full  # Muse's relay turned a ticket away: its daily allowance is u
 signal race_said(peer: int, what: Dictionary)  # a racer's news, in a race: out, won, done (PartyRace)
 
 const PORT := 47850
+## What the party says to each other, by number: everyone in a party must be on the same, or they'd fall
+## out of step (an iPhone's update waits on the App Store; a computer's or the web's doesn't). 1: before it
+## was told (an old build says nothing); 2: races. Up it whenever what's said changes.
+const PROTOCOL := 2
+const OUTDATED := "That party's on a different version of Frog Quest. Update the game to play together."
 const MAX_PLAYERS := 16
 const SEND_EVERY := 1.0 / 15.0  # seconds between your frog's updates to the others
 const STILL_EVERY := 1.0  # (on the World Tree, a frog that hasn't moved is only sent this often, and a
@@ -61,6 +66,7 @@ var race := ""  # in Endless, what it races (PartyRace.ORDER: minute, sprint, fl
 var online_room := ""  # the Muse room you're in, online ("" on Wi-Fi or alone)
 var everyone := false  # (that room's a public one, everyone online: climb_with_everyone)
 var beside := ""  # whose side you appear at once their frog's seen (a name in players: "@avery"), "" for nobody
+var version := PROTOCOL  # (yours: the tests make an old one)
 var ws_ticket_path := "/api/rooms/ticket"  # (on MuseAccount.MUSE_API)
 
 var _send_left := 0.0
@@ -134,7 +140,8 @@ func display_name() -> String:
 
 func my_info() -> Dictionary:
 	return {"name": display_name(), "hat": str(MusicManager.equipped_hat), "skin": str(MusicManager.equipped_skin), "color": color,
-		"look": load("res://scripts/FroggyLook.gd").clean(MusicManager.look)}  # (your froggy as you made him, band and all)
+		"look": load("res://scripts/FroggyLook.gd").clean(MusicManager.look),  # (your froggy as you made him, band and all)
+		"v": version}
 
 
 ## Starts a party here. "" when it's up (code() is what the others type), else what went wrong.
@@ -398,6 +405,15 @@ func _on_relay(text: String) -> void:
 				frog_moved.emit(from, d.s)
 		"look":
 			if d.get("i") is Dictionary:
+				if int(d.i.get("v", 1)) != version:  # (another version: the guest goes, and the host doesn't count them)
+					if from == _host_seat and not is_host():
+						_end(OUTDATED)
+						return
+					if is_host():
+						players.erase(from)
+						_relay({"to": from, "data": {"t": "old"}})
+						players_changed.emit()
+						return
 				var look := _clean(d.i)
 				look.name = str(players.get(from, {}).get("name", NAME))  # (the room's own @handle, not a typed name)
 				players[from] = look
@@ -409,6 +425,9 @@ func _on_relay(text: String) -> void:
 		"r":
 			if d.get("r") is Dictionary:
 				race_said.emit(from, d.r)
+		"old":
+			if from == _host_seat:
+				_end(OUTDATED)
 
 
 ## A seat's look from the relay's card: their @handle (passed by Muse's filter), keeping any hat and
@@ -462,7 +481,7 @@ func share_look() -> void:
 		return
 	if is_host():
 		players[1] = my_info()
-		_roster.rpc(players)
+		_roster.rpc(players, version)
 	else:
 		_hello.rpc_id(1, my_info())
 
@@ -585,7 +604,7 @@ func _on_peer_connected(_id: int) -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if is_host() and players.has(id):
 		players.erase(id)
-		_roster.rpc(players)
+		_roster.rpc(players, version)
 
 
 ## Someone says who they are (joining, or a new look). The host keeps the list, and catches latecomers
@@ -596,6 +615,12 @@ func _hello(info: Dictionary) -> void:
 		return
 	var who := multiplayer.get_remote_sender_id()
 	var new := not players.has(who)
+	if int(info.get("v", 1)) != version:  # (another version: told so, and let go)
+		_outdated.rpc_id(who)
+		get_tree().create_timer(0.5).timeout.connect(func() -> void:
+			if is_host():
+				multiplayer.multiplayer_peer.disconnect_peer(who))
+		return
 	if new and players.size() >= MAX_PLAYERS:
 		_full.rpc_id(who)
 		get_tree().create_timer(0.5).timeout.connect(func() -> void:
@@ -603,7 +628,7 @@ func _hello(info: Dictionary) -> void:
 				multiplayer.multiplayer_peer.disconnect_peer(who))
 		return
 	players[who] = _clean(info)
-	_roster.rpc(players)
+	_roster.rpc(players, version)
 	if new and in_run:
 		_start.rpc_id(who, run_seed, Time.get_ticks_msec() - run_started_ms, mode, race)
 
@@ -613,8 +638,16 @@ func _full() -> void:
 	_end("That party's full: %d frogs is the most." % MAX_PLAYERS)
 
 
+@rpc("authority", "call_remote", "reliable")
+func _outdated() -> void:
+	_end(OUTDATED)
+
+
 @rpc("authority", "call_local", "reliable")
-func _roster(all: Dictionary) -> void:
+func _roster(all: Dictionary, host_version := 1) -> void:
+	if host_version != version and not is_host():  # (an old host says nothing of its version)
+		_end(OUTDATED)
+		return
 	players = {}
 	for id in all:
 		players[int(id)] = _clean(all[id])
