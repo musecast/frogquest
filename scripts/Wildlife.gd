@@ -1,6 +1,6 @@
 extends Node2D
 ## The world's little life round the World Tree, put into the story level by Main: flowers, grass, rocks
-## and stepping stones on the ground (GroundDecor), stones, bones and roots in the dirt (DirtDecor), leaves falling past the tree (Leaves), fireflies in the
+## and stepping stones on the ground (GroundDecor), the frog fossil and stones in the dirt (DirtDecor), leaves falling past the tree (Leaves), fireflies in the
 ## dark (Fireflies), butterflies about the flowers (Butterfly), and little birds sitting about that fly off
 ## when the frog comes near (Bird). None of it's solid; none of it's in the way.
 

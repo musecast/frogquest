@@ -126,16 +126,15 @@ func _run() -> void:
 	_expect(off == 0, "everything on the ground sits in the grass (%d not)" % off)
 	_expect(_solid_bits(life) == 0 and _solid_bits(sky) == 0, "nothing of the sky or the little life is solid")
 	_expect(decor.z_index < 0, "the ground's things behind Froggy and the ground's own tiles")
-	# What's in the dirt: a few big, quiet things (the frog fossil, the tree's roots, stones), every one of
-	# them down, all over plain dirt (the roots from just under the grass), none up in the air.
+	# What's in the dirt: a few big, quiet things (the frog fossil, stones), every one of them down, all over
+	# plain dirt, none up in the air; no roots (scrapped).
 	var dirt: Node2D = life.get_node("DirtDecor")
 	_expect(dirt.count() == dirt.THINGS.size(), "everything in the dirt put down (%d of %d)" % [dirt.count(), dirt.THINGS.size()])
 	var names: Array = dirt.things.map(func(t: Array) -> String: return t[0])
-	_expect("frog_fossil" in names and "roots" in names, "the frog fossil and the World Tree's roots")
+	_expect("frog_fossil" in names and "roots" not in names, "the frog fossil, and no roots")
 	var astray := 0
 	for t in dirt.things:
-		var roots: bool = t[0] == "roots"
-		if not dirt.fits(t[1], roots) or t[1].position.y < dirt.SURFACE + (dirt.UNDER_GRASS - 1.0 if roots else 12.0):
+		if not dirt.fits(t[1]) or t[1].position.y < dirt.SURFACE + 12.0:
 			astray += 1
 	_expect(astray == 0, "every one of them in the dirt (%d not)" % astray)
 	var art: Script = load("res://scripts/CritterArt.gd")
