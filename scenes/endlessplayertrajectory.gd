@@ -13,7 +13,7 @@ var mousePosition = Vector2()
 var mousePath = Vector2()
 var cursorLock = false
 var endGame = 0
-var sensitivity = 3.5
+var sensitivity = 4.0  # (the settings' Sensitivity: MusicManager.sensitivity, from _ready)
 var infinijump = 0
 
 var _floor_ms := -100000  # when he was last on a platform
@@ -33,6 +33,7 @@ func _set_custom_cursor(texture: Texture2D) -> void:
 
 
 func _ready():
+	sensitivity = MusicManager.sensitivity
 	if _supports_desktop_mouse():
 		_cursor_closed = load("res://assets/cursorclosed.png")
 		_cursor_open = load("res://assets/cursoropen.png")

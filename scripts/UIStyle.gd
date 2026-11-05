@@ -231,6 +231,46 @@ static func style_scrollbar(bar: ScrollBar) -> void:
 		bar.add_theme_stylebox_override(state[0], grab)
 
 
+## Dresses a slider in the menus' style: a dark groove with a gold rim, the part up to the knob filled in
+## gold, a round wooden knob (pixel-crisp: the menus are drawn twice as big upright), cream ticks.
+static func style_slider(slider: Slider) -> void:
+	var groove := StyleBoxFlat.new()
+	groove.bg_color = Color(0.0, 0.0, 0.0, 0.42)
+	groove.border_color = Color(EDGE, 0.7)
+	groove.set_border_width_all(2)
+	groove.set_corner_radius_all(4)
+	groove.content_margin_top = 4.0
+	groove.content_margin_bottom = 4.0
+	slider.add_theme_stylebox_override("slider", groove)
+	for state in [["grabber_area", 0.85], ["grabber_area_highlight", 1.0]]:
+		var filled := StyleBoxFlat.new()
+		filled.bg_color = Color(GOLD.darkened(0.15), state[1])
+		filled.set_corner_radius_all(4)
+		filled.content_margin_top = 4.0
+		filled.content_margin_bottom = 4.0
+		slider.add_theme_stylebox_override(state[0], filled)
+	slider.add_theme_icon_override("grabber", _knob(KINDS["wood"][0], EDGE))
+	slider.add_theme_icon_override("grabber_highlight", _knob(KINDS["wood"][1], GOLD))
+	slider.add_theme_icon_override("grabber_disabled", _knob(KINDS["quiet"][0], EDGE.darkened(0.4)))
+	var tick := Image.create_empty(2, 6, false, Image.FORMAT_RGBA8)
+	tick.fill(Color(CREAM, 0.8))
+	slider.add_theme_icon_override("tick", ImageTexture.create_from_image(tick))
+	slider.add_theme_constant_override("center_grabber", 1)
+	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+
+## A round knob, 16 px: fill, a rim, an ink outline (no soft edges).
+static func _knob(fill: Color, rim: Color) -> ImageTexture:
+	var n := 16
+	var img := Image.create_empty(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var d := Vector2(x + 0.5 - n * 0.5, y + 0.5 - n * 0.5).length()
+			if d <= n * 0.5 - 0.5:
+				img.set_pixel(x, y, INK if d > n * 0.5 - 1.8 else (rim if d > n * 0.5 - 3.6 else fill))
+	return ImageTexture.create_from_image(img)
+
+
 ## A thin gold line, for between sections.
 static func rule() -> HSeparator:
 	var line := HSeparator.new()

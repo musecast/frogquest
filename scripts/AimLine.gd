@@ -47,13 +47,17 @@ static func path(frog: CharacterBody2D, velocity: Vector2) -> PackedVector2Array
 		var step := v * TICK
 		if frog.test_move(at, step, hit):
 			at.origin += hit.get_travel()
-			points.append(at.origin)
 			var normal := hit.get_normal()
+			var rest := hit.get_remainder().slide(normal)  # (the rest of the tick, along what he hit: as he does)
 			if absf(normal.x) > 0.7 and bounces < BOUNCES:
+				at.origin += rest
+				points.append(at.origin)
 				v.x = -v.x / 2.5  # (off a wall: back the other way, two fifths as fast)
-				at.origin += normal * 0.5
 				bounces += 1
 				continue
+			if normal.y < -0.7:
+				at.origin += rest  # (landing: he slides out the tick along the ground)
+			points.append(at.origin)
 			break  # (he lands, or bumps his head)
 		at.origin += step
 		points.append(at.origin)

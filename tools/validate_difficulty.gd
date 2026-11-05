@@ -23,8 +23,9 @@ func _run() -> void:
 		_failures.append("timed out")
 		_finish())
 	var mm := root.get_node("MusicManager")
-	var real := [mm.wardrobe_path, mm.look_made, mm.difficulty, mm.og_unlocked, mm.og_seen, mm.achievements.duplicate(), mm.game_beaten]
+	var real := [mm.wardrobe_path, mm.look_made, mm.difficulty, mm.og_unlocked, mm.og_seen, mm.achievements.duplicate(), mm.game_beaten, mm.sensitivity]
 	mm.wardrobe_path = WARDROBE
+	mm.sensitivity = mm.SENSITIVITY
 	mm.look_made = true
 	mm.difficulty = "normal"
 	mm.og_unlocked = false
@@ -65,6 +66,27 @@ func _run() -> void:
 	_expect(not "og" in difficulty.choices(), "and it's not in the settings")
 	player.set_difficulty("hard")
 	_expect(player.easiest_rank == difficulty.rank("hard") and mm.difficulty == "hard", "Hard chosen before the first jump: the climb's Hard")
+
+	# Sensitivity: a slider in the settings, 3 to 5, the middle (4) by default; moving it changes the
+	# slingshot there and then, and it's kept with the wardrobe once it's let go.
+	_expect(is_equal_approx(player.get_node("Trajectory").sensitivity, mm.SENSITIVITY) and is_equal_approx(mm.SENSITIVITY, 4.0),
+		"the slingshot's sensitivity is the middle, 4, by default (%s)" % player.get_node("Trajectory").sensitivity)
+	var settings: CanvasLayer = player._open_settings()
+	await process_frame
+	var slider: HSlider = settings._aim_slider
+	_expect(slider != null and is_equal_approx(slider.min_value, 3.0) and is_equal_approx(slider.max_value, 5.0)
+		and is_equal_approx(slider.value, 4.0), "Sensitivity's a slider, 3 to 5, at the middle")
+	slider.value = 4.6
+	_expect(is_equal_approx(player.get_node("Trajectory").sensitivity, 4.6) and settings._aim_value.text == "4.6", "moving it changes the slingshot there and then")
+	slider.drag_ended.emit(true)
+	mm.sensitivity = 0.0
+	mm.load_wardrobe()
+	_expect(is_equal_approx(mm.sensitivity, 4.6), "kept when it's let go (%s)" % mm.sensitivity)
+	slider.value = 4.0
+	settings.closed.emit()
+	await process_frame
+	mm.load_wardrobe()
+	_expect(is_equal_approx(mm.sensitivity, 4.0), "and kept on closing the settings too (%s)" % mm.sensitivity)
 
 	# The arc is where he really flies.
 	main._tv_done = true
@@ -153,6 +175,7 @@ func _run() -> void:
 	mm.og_seen = real[4]
 	mm.achievements = real[5]
 	mm.game_beaten = real[6]
+	mm.sensitivity = real[7]
 	_finish()
 
 

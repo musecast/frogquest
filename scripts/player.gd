@@ -806,8 +806,10 @@ func _on_resume_button_pressed():
 	$PauseScreen.visible=false
 	Engine.time_scale = 1.0
 
-## How hard a drag throws him: the aim's L, M and H in the settings (3.5, 4 and 4.5).
+## How hard a drag throws him: the settings' Sensitivity slider (3 to 5; 4, the middle, by default). Kept
+## with the wardrobe when the slider's let go (SettingsScreen).
 func set_aim(sensitivity: float) -> void:
+	MusicManager.sensitivity = sensitivity
 	$Trajectory.sensitivity = sensitivity
 
 
@@ -878,6 +880,7 @@ func reset_progress(kind: String) -> void:
 		MusicManager.game_beaten = false
 		MusicManager.desktop_frog_unlocked = false
 		MusicManager.difficulty = "normal"
+		MusicManager.sensitivity = MusicManager.SENSITIVITY
 		MusicManager.og_unlocked = false
 		MusicManager.og_seen = false
 		MusicManager.achievements = []

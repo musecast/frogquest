@@ -56,6 +56,8 @@ func _run() -> void:
 	var story := _slingshot("res://scripts/Trajectory.gd", CharacterBody2D.new())
 	var springy := Springy.new()
 	var endless := _slingshot("res://scenes/endlessplayertrajectory.gd", springy)
+	story.sensitivity = 3.5  # (checked against the original at its own aim: the settings' slider moves it)
+	endless.sensitivity = 3.5
 
 	# The same jump where the original ran smoothly; upward speed always; the mushroom's "moving sideways".
 	var drags := 0

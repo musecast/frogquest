@@ -16,6 +16,8 @@ var look: Dictionary = {}  # your froggy, as you made him (FroggyLook: colours, 
 var look_made := false  # (you've made him: the intro, CreatorIntro, doesn't come again)
 var mushroom_bounces := 0  # (bounces off the World Tree's mushrooms: the Mushroom hat at 25)
 var difficulty := "normal"  # how much of the jump the aim line shows (Difficulty.gd)
+const SENSITIVITY := 4.0  # (the middle of the settings' slider: the default)
+var sensitivity := SENSITIVITY  # how hard a drag throws him (the slingshots' sensitivity)
 var og_unlocked := false  # (beaten on Hard: OG mode, the very first aim line)
 var og_seen := false  # (its "OG Mode Unlocked!" has been read)
 var achievements: Array = []  # the ones earned (Achievements.gd)
@@ -61,6 +63,7 @@ func save_wardrobe() -> void:
 		"look_made": look_made,
 		"mushroom_bounces": mushroom_bounces,
 		"difficulty": difficulty,
+		"sensitivity": sensitivity,
 		"og_unlocked": og_unlocked,
 		"og_seen": og_seen,
 		"achievements": achievements,
@@ -80,6 +83,7 @@ func load_wardrobe() -> void:
 		look = {}
 		look_made = false
 		difficulty = "normal"
+		sensitivity = SENSITIVITY
 		og_unlocked = false
 		og_seen = false
 		achievements = []
@@ -105,6 +109,7 @@ func load_wardrobe() -> void:
 	look_made           = bool(d.get("look_made",       false))
 	mushroom_bounces    = int(d.get("mushroom_bounces", 0))
 	difficulty          = str(d.get("difficulty",       "normal"))
+	sensitivity         = clampf(float(d.get("sensitivity", SENSITIVITY)), 3.0, 5.0)
 	og_unlocked         = bool(d.get("og_unlocked",     false))
 	og_seen             = bool(d.get("og_seen",         false))
 	achievements        = d.get("achievements", []) if d.get("achievements") is Array else []

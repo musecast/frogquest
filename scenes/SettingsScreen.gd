@@ -9,7 +9,7 @@ signal closed
 
 const MUSIC_BUS := 1
 const SOUND_BUS := 2
-const AIMS := [["L", 3.5], ["M", 4.0], ["H", 4.5]]  # (what the old L/M/H buttons set)
+const AIM_RANGE := Vector2(3.0, 5.0)  # (the Sensitivity slider's ends: the middle, 4, is the default)
 const FONT_SZ := 16
 const BTN_HEIGHT := 28
 
@@ -28,7 +28,9 @@ var _ask_yes: Button
 var _close: Button
 var _pending := ""  # what YES does: "climb" or "all"
 var _toggles := {}  # "music", "sound", "timer" -> its ON/OFF button
-var _aims: Array[Button] = []
+var _aim_slider: HSlider
+var _aim_value: Label
+var _aim_moved := false  # (to be kept with the wardrobe: on letting go, or closing)
 var _difficulties := {}  # "easy", "normal", "hard" (and "og", once it's unlocked) -> its button
 var _difficulty_about: Label  # (what the one chosen shows)
 
@@ -91,11 +93,24 @@ func _build() -> void:
 	_toggles["sound"] = _toggle_row("Sound", func() -> void: _set_bus(SOUND_BUS))
 	_toggles["timer"] = _toggle_row("Speedrun timer", _toggle_timer)
 	var aim_row := _row("Sensitivity")
-	for aim in AIMS:
-		var b := _button(aim[0], _set_aim.bind(aim[1]))
-		b.custom_minimum_size.x = roundf(BTN_HEIGHT * 1.3)  # (whole pixels: the words land dead in the middle)
-		aim_row.add_child(b)
-		_aims.append(b)
+	_aim_value = Label.new()
+	_aim_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ui.style_label(_aim_value, FONT_SZ, ui.GOLD)
+	aim_row.add_child(_aim_value)
+	_aim_slider = HSlider.new()
+	_aim_slider.min_value = AIM_RANGE.x
+	_aim_slider.max_value = AIM_RANGE.y
+	_aim_slider.step = 0.1
+	_aim_slider.tick_count = 5  # (3, 3.5, 4: the middle, 4.5 and 5)
+	_aim_slider.ticks_on_borders = true
+	_aim_slider.focus_mode = Control.FOCUS_NONE
+	_aim_slider.custom_minimum_size = Vector2(120, BTN_HEIGHT)
+	_aim_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	ui.style_slider(_aim_slider)
+	_aim_slider.set_value_no_signal(MusicManager.sensitivity)
+	_aim_slider.value_changed.connect(_set_aim)
+	_aim_slider.drag_ended.connect(func(_changed: bool) -> void: _keep_aim())
+	_left.add_child(_aim_slider)
 	_row("Difficulty")
 	var levels := HBoxContainer.new()
 	levels.add_theme_constant_override("separation", 6)
@@ -180,9 +195,8 @@ func _refresh() -> void:
 		var b: Button = _toggles[key]
 		b.text = "ON" if on[key] else "OFF"
 		ui.style_button(b, FONT_SZ, "go" if on[key] else "wood")
-	var aim := _current_aim()
-	for i in _aims.size():
-		ui.style_button(_aims[i], FONT_SZ, "go" if is_equal_approx(AIMS[i][1], aim) else "wood")
+	_aim_slider.set_value_no_signal(MusicManager.sensitivity)
+	_aim_value.text = "%.1f" % MusicManager.sensitivity
 	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
 	var chosen: String = difficulty.current()
 	for mode in _difficulties:
@@ -192,11 +206,6 @@ func _refresh() -> void:
 		about += " " + difficulty.HARD_FROM_START
 	_difficulty_about.text = about
 	_toggles["timer"].disabled = player == null
-
-
-func _current_aim() -> float:
-	var trajectory: Node = player.get_node_or_null("Trajectory") if player else null
-	return float(trajectory.get("sensitivity")) if trajectory else 3.5
 
 
 func _set_bus(bus: int) -> void:
@@ -220,9 +229,23 @@ func _set_difficulty(mode: String) -> void:
 
 
 func _set_aim(sensitivity: float) -> void:
-	if player:
+	if player and player.has_method("set_aim"):
 		player.set_aim(sensitivity)
-	_refresh()
+	else:
+		MusicManager.sensitivity = sensitivity
+	_aim_moved = true
+	_aim_value.text = "%.1f" % sensitivity
+
+
+## The slider let go (or the settings closed): kept with the wardrobe, once.
+func _keep_aim() -> void:
+	if _aim_moved:
+		_aim_moved = false
+		MusicManager.save_wardrobe()
+
+
+func _exit_tree() -> void:
+	_keep_aim()
 
 
 func _ask_first(what: String) -> void:
