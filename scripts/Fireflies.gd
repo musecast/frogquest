@@ -4,7 +4,6 @@ extends Node2D
 ## away from where the little flies hide (whose glint is paler), and drift off if the frog comes close.
 
 const ART := "res://assets/critters.png"
-const GLOW := Rect2(0, 0, 16, 16)
 const COUNT := 22
 const COLOUR := Color(0.78, 1.0, 0.42)
 ## Where: inside the trunk, through the dark (heights 148-313).
@@ -18,12 +17,14 @@ var flies: Array = []  # (FlyHunt's spots: they keep clear of them)
 var tree: TileMap = null  # (Main's tile map: they stay where the trunk's back wall is, inside the tree)
 var frog: Node2D = null
 var _art: Texture2D
+var _glow := Rect2()
 var _bugs: Array[Dictionary] = []
 var _t := 0.0
 
 
 func _ready() -> void:
 	_art = load(ART)
+	_glow = load("res://scripts/CritterArt.gd").RECTS.glow
 	z_index = 2
 	var glow := CanvasItemMaterial.new()
 	glow.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -79,8 +80,8 @@ func _draw() -> void:
 		var b := brightness(bug)
 		if b < 0.1:
 			continue
-		draw_texture_rect_region(_art, Rect2(bug.at - Vector2(22, 22), Vector2(44, 44)), GLOW, Color(COLOUR, b * 0.55))
-		draw_texture_rect_region(_art, Rect2(bug.at - Vector2(9, 9), Vector2(18, 18)), GLOW, Color(COLOUR, b))
+		draw_texture_rect_region(_art, Rect2(bug.at - Vector2(22, 22), Vector2(44, 44)), _glow, Color(COLOUR, b * 0.55))
+		draw_texture_rect_region(_art, Rect2(bug.at - Vector2(9, 9), Vector2(18, 18)), _glow, Color(COLOUR, b))
 		draw_rect(Rect2(bug.at.round() - Vector2(1, 1), Vector2(3, 3)), Color(1.0, 1.0, 0.85, b))
 
 

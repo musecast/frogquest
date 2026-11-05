@@ -4,10 +4,7 @@ extends Node2D
 ## he's gone a good way off. Wildlife.gd puts them out.
 
 const ART := "res://assets/critters.png"
-const SIT := Rect2(17, 0, 10, 9)
-const PECK := Rect2(28, 0, 10, 9)
-const FLY := [Rect2(39, 0, 10, 9), Rect2(50, 0, 10, 9)]
-const SCALE := 1.2  # (the tiles')
+## (its frames: CritterArt's bird_sit, bird_peck, bird_fly1 and bird_fly2, at its pixel size)
 const NEAR := 80.0  # the frog this near and it's off
 const STARTLED := 170.0  # this near and him moving fast (a jump, a landing), off too
 const FAST := 140.0
@@ -21,6 +18,7 @@ var perch := Vector2.ZERO  # (where its feet go)
 var frog: Node2D = null
 var state := SITTING
 var _art: Texture2D
+var _frames := {}
 var _t := 0.0
 var _next := 1.0  # seconds to its next little move
 var _peck := 0.0
@@ -35,8 +33,11 @@ var _sound: AudioStreamPlayer2D
 
 func _ready() -> void:
 	_art = load(ART)
+	var art: Script = load("res://scripts/CritterArt.gd")
+	for f in ["sit", "peck", "fly1", "fly2"]:
+		_frames[f] = art.RECTS["bird_" + f]
 	z_index = 1
-	scale = Vector2(SCALE, SCALE)
+	scale = Vector2(art.PIXEL, art.PIXEL)
 	position = perch
 	_left = randf() < 0.5
 	_next = randf_range(0.5, 2.5)
@@ -132,11 +133,11 @@ func _far_off() -> bool:
 
 
 func _draw() -> void:
-	var frame: Rect2 = SIT
+	var frame: Rect2 = _frames.sit
 	if state == FLYING:
-		frame = FLY[int(_t * 16.0) % 2]
+		frame = _frames.fly1 if int(_t * 16.0) % 2 == 0 else _frames.fly2
 	elif _peck > 0.0:
-		frame = PECK
+		frame = _frames.peck
 	var size := frame.size
 	var rect := Rect2(Vector2(-size.x * 0.5, -size.y), size)
 	if not _left:

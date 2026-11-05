@@ -29,6 +29,8 @@ var _close: Button
 var _pending := ""  # what YES does: "climb" or "all"
 var _toggles := {}  # "music", "sound", "timer" -> its ON/OFF button
 var _aims: Array[Button] = []
+var _difficulties := {}  # "easy", "normal", "hard" (and "og", once it's unlocked) -> its button
+var _difficulty_about: Label  # (what the one chosen shows)
 
 
 func _ready() -> void:
@@ -94,6 +96,21 @@ func _build() -> void:
 		b.custom_minimum_size.x = roundf(BTN_HEIGHT * 1.3)  # (whole pixels: the words land dead in the middle)
 		aim_row.add_child(b)
 		_aims.append(b)
+	_row("Difficulty")
+	var levels := HBoxContainer.new()
+	levels.add_theme_constant_override("separation", 6)
+	_left.add_child(levels)
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	for mode in difficulty.choices():
+		var b := _button(difficulty.NAMES[mode], _set_difficulty.bind(mode))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		levels.add_child(b)
+		_difficulties[mode] = b
+	_difficulty_about = Label.new()
+	_difficulty_about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_difficulty_about.custom_minimum_size.x = 120
+	ui.style_label(_difficulty_about, FONT_SZ, Color(0.78, 0.74, 0.68))
+	_left.add_child(_difficulty_about)
 	_upright_rule = ui.rule()
 	_right.add_child(_upright_rule)
 	_right.add_child(_button("Privacy Policy", ComplianceConfig.open_privacy_policy, "quiet"))
@@ -166,6 +183,14 @@ func _refresh() -> void:
 	var aim := _current_aim()
 	for i in _aims.size():
 		ui.style_button(_aims[i], FONT_SZ, "go" if is_equal_approx(AIMS[i][1], aim) else "wood")
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	var chosen: String = difficulty.current()
+	for mode in _difficulties:
+		ui.style_button(_difficulties[mode], FONT_SZ, "go" if mode == chosen else "wood")
+	var about: String = difficulty.ABOUT[chosen]
+	if chosen in ["hard", "og"] and player and player.has_method("climb_is_hard") and not player.climb_is_hard():
+		about += " " + difficulty.HARD_FROM_START
+	_difficulty_about.text = about
 	_toggles["timer"].disabled = player == null
 
 
@@ -182,6 +207,15 @@ func _set_bus(bus: int) -> void:
 func _toggle_timer() -> void:
 	if player:
 		player.set_speedrun(not bool(player.get("SpeedrunMode")))
+	_refresh()
+
+
+func _set_difficulty(mode: String) -> void:
+	if player and player.has_method("set_difficulty"):
+		player.set_difficulty(mode)
+	else:  # (no climb here: just the choice, for next time)
+		MusicManager.difficulty = mode
+		MusicManager.save_wardrobe()
 	_refresh()
 
 

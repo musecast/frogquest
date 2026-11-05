@@ -1,6 +1,6 @@
 extends Node2D
 ## The world's little life round the World Tree, put into the story level by Main: flowers, grass, rocks
-## and stepping stones on the ground (GroundDecor), leaves falling past the tree (Leaves), fireflies in the
+## and stepping stones on the ground (GroundDecor), stones, bones and roots in the dirt (DirtDecor), leaves falling past the tree (Leaves), fireflies in the
 ## dark (Fireflies), butterflies about the flowers (Butterfly), and little birds sitting about that fly off
 ## when the frog comes near (Bird). None of it's solid; none of it's in the way.
 
@@ -39,6 +39,10 @@ func _ready() -> void:
 	decor.name = "GroundDecor"
 	decor.ground = tiles
 	add_child(decor)
+	var dirt: Node2D = load("res://scripts/DirtDecor.gd").new()
+	dirt.name = "DirtDecor"
+	dirt.ground = tiles
+	add_child(dirt)
 	var leaves: Node2D = load("res://scripts/Leaves.gd").new()
 	leaves.name = "Leaves"
 	add_child(leaves)

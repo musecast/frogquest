@@ -126,6 +126,24 @@ func _run() -> void:
 	_expect(off == 0, "everything on the ground sits in the grass (%d not)" % off)
 	_expect(_solid_bits(life) == 0 and _solid_bits(sky) == 0, "nothing of the sky or the little life is solid")
 	_expect(decor.z_index < 0, "the ground's things behind Froggy and the ground's own tiles")
+	# The things in the dirt: plenty, all in plain dirt (roots from just under the grass), none in the air.
+	var dirt: Node2D = life.get_node("DirtDecor")
+	_expect(dirt.count() >= 30 and dirt.things.size() > dirt.count(), "things in the dirt, and specks all through it (%d, %d)" % [dirt.count(), dirt.things.size()])
+	var astray := 0
+	for t in dirt.things:
+		var hangs: bool = t[0].begins_with("root")
+		if not dirt._fits(t[1], hangs) or t[1].position.y < dirt.SURFACE + (dirt.UNDER_GRASS - 1.0 if hangs else 12.0):
+			astray += 1
+	_expect(astray == 0, "every one of them in the dirt (%d not)" % astray)
+	var art: Script = load("res://scripts/CritterArt.gd")
+	var off_grid := 0
+	for s in decor.get_children():
+		var sprite := s as Sprite2D
+		var region: Rect2 = (sprite.texture as AtlasTexture).region
+		var is_tile: bool = region.size == Vector2(18, 18)
+		if not is_equal_approx(sprite.scale.x, 1.2 if is_tile else art.PIXEL):
+			off_grid += 1
+	_expect(off_grid == 0, "the flowers and stones drawn at the tiles' own pixel (%d not)" % off_grid)
 
 	# The birds: each on something solid, none where a hidden fly is.
 	var flies: Array = load("res://scripts/FlyHunt.gd").SPOTS

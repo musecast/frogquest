@@ -4,9 +4,7 @@ extends Node2D
 ## not over the top); behind Froggy and the platforms.
 
 const ART := "res://assets/critters.png"
-const KINDS := [Rect2(158, 0, 4, 5), Rect2(163, 0, 4, 5)]  # a green leaf, two ways up
-const GOLD := Rect2(168, 0, 4, 5)
-const SCALE := 2.0
+## (CritterArt's leaf0 and leaf1, a green leaf two ways up, and leaf_gold, at its pixel size)
 const MOST := 9  # on screen at once, at the most
 const EVERY := Vector2(0.7, 1.6)  # seconds between new ones
 ## Where they fall: across the tree (and a little either side), from the ground to the clouds, but not in
@@ -16,12 +14,19 @@ const HEIGHTS := [Vector2(-60.0, 145.0), Vector2(318.0, 610.0)]
 const GROUND := -472.0
 
 var _art: Texture2D
+var _kinds := []
+var _gold := Rect2()
+var _scale := 2.4
 var _leaves: Array[Dictionary] = []
 var _wait := 0.0
 
 
 func _ready() -> void:
 	_art = load(ART)
+	var art: Script = load("res://scripts/CritterArt.gd")
+	_kinds = [art.RECTS.leaf0, art.RECTS.leaf1]
+	_gold = art.RECTS.leaf_gold
+	_scale = art.PIXEL
 	z_index = -1
 
 
@@ -62,8 +67,8 @@ func _draw() -> void:
 	for leaf in _leaves:
 		# Turning over as it sways: one way up, then the other.
 		var turn := cos(leaf.t * leaf.sway + leaf.phase)
-		var frame: Rect2 = GOLD if leaf.gold else KINDS[0 if turn > 0.0 else 1]
-		var size := frame.size * SCALE
+		var frame: Rect2 = _gold if leaf.gold else _kinds[0 if turn > 0.0 else 1]
+		var size := frame.size * _scale
 		var at := Vector2(roundf(leaf.x - size.x * 0.5), roundf(leaf.y - size.y * 0.5))
 		var flip: bool = leaf.flip != (turn < -0.6)
 		var rect := Rect2(at, size)

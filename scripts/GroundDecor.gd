@@ -12,7 +12,7 @@ const ART := {
 	"farm": "res://assets/farm_tilemap_packed.png",
 	"critters": "res://assets/critters.png",
 }
-## Each kind: its sheet, and either the tile (or tiles, top first) it is or its rect in the sheet.
+## Each kind: its sheet, and either the tile (or tiles, top first) it is, or its name in CritterArt.
 const KINDS := {
 	"sprout": ["tiles", Vector2i(4, 6)],
 	"sprout_tall": ["tiles", Vector2i(5, 6)],
@@ -24,15 +24,15 @@ const KINDS := {
 	"shrub": ["farm", Vector2i(6, 3)],
 	"berries": ["farm", Vector2i(9, 3)],
 	"sunflower": ["farm", Vector2i(4, 1), Vector2i(4, 2)],
-	"red": ["critters", Rect2(69, 0, 7, 8)],
-	"yellow": ["critters", Rect2(77, 0, 7, 8)],
-	"blue": ["critters", Rect2(85, 0, 7, 7)],
-	"pink": ["critters", Rect2(61, 0, 7, 9)],
-	"bud": ["critters", Rect2(93, 0, 5, 7)],
-	"pebble": ["critters", Rect2(173, 0, 6, 4)],
-	"rock": ["critters", Rect2(147, 0, 10, 6)],
-	"stone": ["critters", Rect2(180, 0, 11, 3)],
-	"stone_small": ["critters", Rect2(192, 0, 9, 3)],
+	"red": ["critters", "flower_red"],
+	"yellow": ["critters", "flower_yellow"],
+	"blue": ["critters", "flower_blue"],
+	"pink": ["critters", "flower_pink"],
+	"bud": ["critters", "flower_bud"],
+	"pebble": ["critters", "pebble"],
+	"rock": ["critters", "rock"],
+	"stone": ["critters", "stone_flat"],
+	"stone_small": ["critters", "stone_flat2"],
 }
 ## Where: [kind, x in the world, flipped]. Each stands on whatever's solid under it there (the ground).
 const PLACES := [
@@ -87,7 +87,9 @@ func _put(sheet: Texture2D, kind: Array, at: Vector2, flip: bool) -> void:
 	var parts: Array = kind.slice(1)
 	var y := at.y + SCALE
 	for i in range(parts.size() - 1, -1, -1):  # (bottom up)
-		var region: Rect2 = parts[i] if parts[i] is Rect2 else Rect2(Vector2(parts[i]) * TILE, Vector2(TILE, TILE))
+		var tile: bool = parts[i] is Vector2i
+		var region: Rect2 = Rect2(Vector2(parts[i]) * TILE, Vector2(TILE, TILE)) if tile else _art().RECTS[parts[i]]
+		var scale_k: float = SCALE if tile else _art().PIXEL  # (the tiles' art is two pixels a pixel already)
 		var sprite := Sprite2D.new()
 		var tex := AtlasTexture.new()
 		tex.atlas = sheet
@@ -95,10 +97,14 @@ func _put(sheet: Texture2D, kind: Array, at: Vector2, flip: bool) -> void:
 		sprite.texture = tex
 		sprite.centered = false
 		sprite.flip_h = flip
-		sprite.scale = Vector2(SCALE, SCALE)
-		sprite.position = Vector2(roundf(at.x - region.size.x * SCALE * 0.5), roundf(y - region.size.y * SCALE))
+		sprite.scale = Vector2(scale_k, scale_k)
+		sprite.position = Vector2(roundf(at.x - region.size.x * scale_k * 0.5), roundf(y - region.size.y * scale_k))
 		add_child(sprite)
-		y -= region.size.y * SCALE
+		y -= region.size.y * scale_k
+
+
+static func _art() -> Script:
+	return load("res://scripts/CritterArt.gd")
 
 
 ## The y of the top of the first solid tile's art at x, going down from `from_y` (NAN if there's none in

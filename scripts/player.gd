@@ -39,6 +39,7 @@ var songTrigger = 70
 @export var has_key = false
 var music_bus = AudioServer.get_bus_index("Master")
 var SpeedrunMode = false
+var easiest_rank := -1  # the easiest difficulty this climb's been played on (Difficulty.gd's MODES)
 var finalTime
 var finalTimeBool = 0
 var finalbuttonBool = 0
@@ -105,6 +106,9 @@ func _ready():
 	time_start = Time.get_unix_time_from_system()
 
 	load_game()
+	if easiest_rank < 0:  # (a new climb: the difficulty chosen now)
+		var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+		easiest_rank = difficulty.rank(difficulty.current())
 	_just_loaded = true
 	_trace("Player ready after load_game")
 	get_tree().create_timer(2.5, true, false, true).timeout.connect(func(): _just_loaded = false)
@@ -807,6 +811,53 @@ func set_aim(sensitivity: float) -> void:
 	$Trajectory.sensitivity = sensitivity
 
 
+## Easy, Normal, Hard (or OG): kept for every climb from now on. Before this climb's first jump it's the
+## climb's own; after, the climb only remembers the easiest it's been played on (Hard has to be the whole
+## climb, for OG mode).
+func set_difficulty(mode: String) -> void:
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	if not mode in difficulty.MODES or (mode == "og" and not MusicManager.og_unlocked):
+		return
+	MusicManager.difficulty = mode
+	MusicManager.save_wardrobe()
+	if jumpCount == 0 or easiest_rank < 0:
+		easiest_rank = difficulty.rank(mode)
+	else:
+		easiest_rank = mini(easiest_rank, difficulty.rank(mode))
+	if FileAccess.file_exists(save_path):
+		save_game()
+
+
+## Beaten on Hard and OG mode's news not read yet: "OG Mode Unlocked!" over the title (OgNews.gd).
+func _maybe_og_news() -> void:
+	if not MusicManager.og_unlocked or MusicManager.og_seen or not $titlescreen.visible:
+		return
+	var news: CanvasLayer = load("res://scripts/OgNews.gd").new()
+	news.player = self
+	get_parent().add_child(news)
+
+
+## Whether this climb still counts as Hard (or OG) all the way.
+func climb_is_hard() -> bool:
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	return easiest_rank >= difficulty.rank("hard")
+
+
+## At the top: the achievements, and (beaten on Hard) OG mode, its news waiting at the title.
+func _record_win() -> void:
+	var achievements: GDScript = load("res://scripts/Achievements.gd")
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	achievements.earn("beat_game")
+	if easiest_rank >= difficulty.rank("hard"):
+		achievements.earn("beat_hard")
+		if not MusicManager.og_unlocked:
+			MusicManager.og_unlocked = true
+			MusicManager.og_seen = false
+			MusicManager.save_wardrobe()
+	if easiest_rank >= difficulty.rank("og"):
+		achievements.earn("beat_og")
+
+
 ## Starts over, once the settings have asked: "climb" deletes the save (back to the bottom), "all" the
 ## wardrobe and Endless's best scores too. Then the game starts again, at the title.
 func reset_progress(kind: String) -> void:
@@ -826,6 +877,10 @@ func reset_progress(kind: String) -> void:
 		MusicManager.seen_cosmetics = []
 		MusicManager.game_beaten = false
 		MusicManager.desktop_frog_unlocked = false
+		MusicManager.difficulty = "normal"
+		MusicManager.og_unlocked = false
+		MusicManager.og_seen = false
+		MusicManager.achievements = []
 	Engine.time_scale = 1.0
 	get_tree().reload_current_scene()
 
@@ -865,6 +920,7 @@ func save_game():
 		"minutes": minutes,
 		"seconds": seconds,
 		"SpeedrunMode": SpeedrunMode,
+		"easiest": easiest_rank,
 		"froggyCrown": MusicManager.froggyCrown,
 		"jumpCount": jumpCount,
 		"bangersCount": bangersCount,
@@ -915,6 +971,7 @@ func load_game():
 	seconds = save_data.get("seconds", 0)
 	time_start = Time.get_unix_time_from_system() - seconds
 	SpeedrunMode = save_data.get("SpeedrunMode", false)
+	easiest_rank = int(save_data.get("easiest", 1))  # (a climb from before difficulties: Normal)
 	MusicManager.froggyCrown = save_data.get("froggyCrown", MusicManager.froggyCrown)
 	jumpCount = save_data.get("jumpCount", 0)
 	bangersCount = save_data.get("bangersCount", 0)
@@ -1370,6 +1427,7 @@ func _on_end_animation_finished() -> void:
 		$winscreen/thanksforplayingButton.visible = false
 		$winscreen/thanksforplayingTimer.start()
 		finalbuttonBool = 1
+		_record_win()
 		$Camera2D.position = END_IN_BEDROOM
 		_apply_win_layout()
 		_maybe_let_desktop_frog_out()
@@ -1569,6 +1627,7 @@ func _initial_title_layout() -> void:
 		_meet_the_frog_god(_on_button_pressed, false, true)
 		return
 	$titlescreen.visible = true
+	_maybe_og_news()
 
 
 func _apply_ui_layout() -> void:

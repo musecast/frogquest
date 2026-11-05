@@ -15,6 +15,10 @@ var flies_caught: Array = []  # the hidden flies you've caught (FlyHunt.gd): ids
 var look: Dictionary = {}  # your froggy, as you made him (FroggyLook: colours, pattern, eyes, band)
 var look_made := false  # (you've made him: the intro, CreatorIntro, doesn't come again)
 var mushroom_bounces := 0  # (bounces off the World Tree's mushrooms: the Mushroom hat at 25)
+var difficulty := "normal"  # how much of the jump the aim line shows (Difficulty.gd)
+var og_unlocked := false  # (beaten on Hard: OG mode, the very first aim line)
+var og_seen := false  # (its "OG Mode Unlocked!" has been read)
+var achievements: Array = []  # the ones earned (Achievements.gd)
 
 const WARDROBE_PATH := "user://wardrobe.save"
 var wardrobe_path := WARDROBE_PATH  # (the tests point this somewhere else, so they never touch your save)
@@ -56,6 +60,10 @@ func save_wardrobe() -> void:
 		"look": look,
 		"look_made": look_made,
 		"mushroom_bounces": mushroom_bounces,
+		"difficulty": difficulty,
+		"og_unlocked": og_unlocked,
+		"og_seen": og_seen,
+		"achievements": achievements,
 	})
 	f.close()
 	_trace("MusicManager save_wardrobe end")
@@ -71,6 +79,10 @@ func load_wardrobe() -> void:
 		flies_caught   = []
 		look = {}
 		look_made = false
+		difficulty = "normal"
+		og_unlocked = false
+		og_seen = false
+		achievements = []
 		_trace("MusicManager load_wardrobe end missing file")
 		return
 	var f = FileAccess.open(wardrobe_path, FileAccess.READ)
@@ -92,6 +104,10 @@ func load_wardrobe() -> void:
 	look                = d.get("look",                 {}) if d.get("look") is Dictionary else {}
 	look_made           = bool(d.get("look_made",       false))
 	mushroom_bounces    = int(d.get("mushroom_bounces", 0))
+	difficulty          = str(d.get("difficulty",       "normal"))
+	og_unlocked         = bool(d.get("og_unlocked",     false))
+	og_seen             = bool(d.get("og_seen",         false))
+	achievements        = d.get("achievements", []) if d.get("achievements") is Array else []
 	_take_off_unfound()
 	_trace("MusicManager load_wardrobe end")
 
@@ -230,8 +246,16 @@ func _ready():
 	if not has_launched_before:
 		has_launched_before = true
 		save_wardrobe()
+	_tell_achievements()
 	_trace("MusicManager ready end")
 	print("StartupTrace: MusicManager ready at %d ms" % Time.get_ticks_msec())
 
 func _process(_delta):
 	pass
+
+
+## Game Center signed into, and it and Muse told every achievement already earned (a moment after the
+## start: Muse's own sign-in is back by then).
+func _tell_achievements() -> void:
+	await get_tree().create_timer(3.0).timeout
+	load("res://scripts/Achievements.gd").start()

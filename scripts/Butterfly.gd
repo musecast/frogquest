@@ -3,12 +3,7 @@ extends Node2D
 ## one a while, and flutters off up out of the way if the frog comes near. Wildlife.gd puts them out.
 
 const ART := "res://assets/critters.png"
-const WINGS := [  # each colour: wings open, shut
-	[Rect2(99, 0, 7, 6), Rect2(107, 0, 7, 6)],
-	[Rect2(115, 0, 7, 6), Rect2(123, 0, 7, 6)],
-	[Rect2(131, 0, 7, 6), Rect2(139, 0, 7, 6)],
-]
-const SCALE := 1.2  # (the tiles')
+const COLOURS := 3  # (CritterArt's butterfly0..2, each _open and _shut, at its pixel size)
 const ROAM := Vector2(46.0, 30.0)  # how far it wanders from its flowers
 const SPEED := 30.0
 const SHY := 70.0  # the frog this near and it's off
@@ -18,6 +13,7 @@ var home := Vector2.ZERO  # (its flowers, on the ground)
 var colour := 0
 var frog: Node2D = null
 var _art: Texture2D
+var _wings := []  # (open, shut)
 var _target := Vector2.ZERO
 var _vel := Vector2.ZERO
 var _t := 0.0
@@ -29,8 +25,11 @@ var _scared := 0.0
 
 func _ready() -> void:
 	_art = load(ART)
+	var art: Script = load("res://scripts/CritterArt.gd")
+	var called := "butterfly%d_" % (colour % COLOURS)
+	_wings = [art.RECTS[called + "open"], art.RECTS[called + "shut"]]
 	z_index = 1
-	scale = Vector2(SCALE, SCALE)
+	scale = Vector2(art.PIXEL, art.PIXEL)
 	_t = randf() * 10.0
 	position = home + Vector2(randf_range(-ROAM.x, ROAM.x), -randf_range(10.0, ROAM.y))
 	_pick()
@@ -85,7 +84,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var frame: Rect2 = WINGS[colour % WINGS.size()][0 if _open else 1]
+	var frame: Rect2 = _wings[0 if _open else 1]
 	draw_texture_rect_region(_art, Rect2(-frame.size * 0.5, frame.size), frame)
 
 
