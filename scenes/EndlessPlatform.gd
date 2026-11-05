@@ -1,17 +1,19 @@
 extends StaticBody2D
 ## One of Endless's platforms, built in code: how it looks (KINDS: a 3-slice pixel-art strip from
-## assets/endless, drawn at any width, with a stalk or trunk hanging under it for the ones that grow),
+## assets/endless, drawn at any width; a mushroom's on a short stem that ends in its foot, and the treetops'
+## leaves have a few vines hanging from them: no line hanging on down into the sky),
 ## and what it does. It can stand still, sway side to side, bob up and down or drift in a loop; crumble
 ## a moment after you land on it; or carry a spring that sends your next jump far higher.
 ## Its origin is the middle of its walkable top.
 
 const ART := "res://assets/endless/%s.png"
-# kind: [end piece width, middle piece width, walkable row in the strip, what hangs under it]
+# kind: [end piece width, middle piece width, walkable row in the strip, what hangs under it ("stalk": a
+# stem and its foot; "vines")]
 const KINDS := {
 	"lilypad": [14, 16, 2, ""],
 	"mushroom": [12, 16, 1, "stalk"],
 	"mushroom_red": [12, 16, 1, "stalk"],
-	"canopy": [18, 18, 2, "trunk"],
+	"canopy": [18, 18, 2, "vines"],
 	"twig": [8, 16, 1, ""],
 	"cloud": [16, 20, 10, ""],
 	"puff": [16, 20, 10, ""],
@@ -23,7 +25,8 @@ const KINDS := {
 }
 const THICKNESS := 10.0  # how deep the solid part is under the walkable top
 const PX := 1.2  # world px for each pixel of its art: the story's tiles' own (its tile map's at 1.2), so they match
-const UNDER_LENGTH := 150.0  # how far a stalk or trunk hangs down before it fades out
+const VINE := Color("345551")  # (the treetops' vines: their leaves' own outline green, and their green)
+const LEAF := Color("2eb082")
 const CRUMBLE_DELAY := 0.6  # seconds from landing to falling
 
 var kind := "mushroom"
@@ -39,7 +42,10 @@ var phase := -1.0  # where a moving one starts its swing (EndlessMode deals it f
 var clock := Callable()  # in a party, the party's clock in seconds (Party.run_seconds): everyone's swing together
 
 var _strip: Texture2D
-var _under: Texture2D
+var _under: Texture2D  # (a mushroom's stem; _foot, where it ends)
+var _foot: Texture2D
+var _stem_extra := 0.0  # (art px more of its stem than one length: no two quite alike)
+var _vines := []  # ([x across its middle, how long, which side its first leaf's on], in art px)
 var _under_node: Node2D
 var _spring_up: Texture2D
 var _spring_down: Texture2D
@@ -59,8 +65,15 @@ func _ready() -> void:
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
 	_strip = load(ART % kind)
 	if art[3] != "":
-		_under = load(ART % art[3])
-		# (drawn by a child a layer down, so every stalk and trunk is behind every platform)
+		if art[3] == "stalk":
+			_under = load(ART % "stalk")
+			_foot = load(ART % "stalk_foot")
+			_stem_extra = float(randi_range(0, 8))
+		else:  # (a few vines, here and there along it, each its own length)
+			var across := width / PX
+			for i in randi_range(2, 4):
+				_vines.append([roundf(randf_range(-across * 0.5 + 5.0, across * 0.5 - 5.0)), randi_range(4, 12), randi() % 2])
+		# (drawn by a child a layer down, so every stem and vine is behind every platform)
 		_under_node = Node2D.new()
 		_under_node.z_index = -1
 		_under_node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -166,17 +179,32 @@ func _sound(path: String, pitch: float, db: float) -> void:
 	s.finished.connect(s.queue_free)
 
 
-## What hangs under it (a stalk, a trunk), fading out downward.
+## What hangs under it: a mushroom's short stem, ending in its foot (a little bulb, a few root hairs);
+## or the treetops' vines, a leaf every few pixels, one at the end. Nothing goes on into the sky.
 func _draw_under() -> void:
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
 	_under_node.draw_set_transform(Vector2.ZERO, 0.0, Vector2(PX, PX))  # (in its art's own pixels)
+	var bottom: float = -float(art[2]) + _strip.get_height()  # (its strip's bottom edge)
+	for v in _vines:
+		var x: float = v[0]
+		var n: int = v[1]
+		for k in n:
+			_under_node.draw_rect(Rect2(x, bottom + k, 1.0, 1.0), VINE)
+			if k % 3 == 1:
+				var side := 1.0 if (k / 3 + int(v[2])) % 2 == 0 else -2.0
+				_under_node.draw_rect(Rect2(x + side, bottom + k, 2.0, 1.0), LEAF)
+		_under_node.draw_rect(Rect2(x - 1.0, bottom + n, 3.0, 1.0), LEAF)
+		_under_node.draw_rect(Rect2(x, bottom + n + 1.0, 1.0, 1.0), LEAF)
+	if _under == null:
+		return
 	var uw: float = _under.get_width()
-	var uh: float = _under.get_height()
-	var ux := -roundf(uw * 0.5)
-	var y: float = -float(art[2]) + _strip.get_height() - 3.0
-	while y * PX < UNDER_LENGTH:
-		_under_node.draw_texture(_under, Vector2(ux, y), Color(1, 1, 1, clampf(1.0 - y * PX / UNDER_LENGTH, 0.0, 1.0)))
-		y += uh
+	var y := bottom - 3.0  # (tucked up under the cap)
+	_under_node.draw_texture(_under, Vector2(-roundf(uw * 0.5), y))
+	y += _under.get_height()
+	if _stem_extra > 0.0:
+		_under_node.draw_texture_rect_region(_under, Rect2(-roundf(uw * 0.5), y, uw, _stem_extra), Rect2(0, 0, uw, _stem_extra))
+		y += _stem_extra
+	_under_node.draw_texture(_foot, Vector2(-roundf(_foot.get_width() * 0.5), y))
 
 
 func _draw() -> void:
