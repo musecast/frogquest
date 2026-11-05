@@ -88,6 +88,8 @@ var _banner_sub: Label
 var _titles: CanvasLayer  # (the zones' names: AreaTitle)
 var _race: Node = null  # (racing your party up it: PartyRace; null climbing)
 const ROOT_REACH := 320.0  # (as far below a mushroom as its stalk goes looking for a cap to grow out of)
+const BOUGH_ACROSS := Vector2(30.0, 120.0)  # (how far across a bough reaches to another's stem)
+const BOUGH_ODDS := 65  # (in a hundred: a bough, when there's a cap below in reach too)
 const PARTY_MAX_X := 180.0  # (in a party, the tower's as wide as an upright phone's for everyone: the same tower)
 var _sky  # (EndlessSky.gd)
 var _zones: Script
@@ -732,9 +734,72 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 	platform.set_meta("platform_id", next_platform_id)
 	next_platform_id += 1
 	if platform.kind.begins_with("mushroom"):
-		platform.stalk_root = _root_under(at)  # (its stalk grows out of a cap below it, not on down to the pond)
+		_plant(platform, at)  # (its stalk grows out of a cap below it, or another's stem, not on down to the pond)
 	platforms.add_child(platform)
 	return platform
+
+
+## Where a mushroom at `at` grows from: a cap below it (_root_under), or now and then (BOUGH_ODDS; always,
+## with no cap in reach) out of the side of another's stem, like a bough (_bough_from). The same for
+## everyone in a party: it's all worked out from where the platforms are, nothing left to chance.
+func _plant(platform: Node2D, at: Vector2) -> void:
+	var cap := _root_under(at)
+	var bough: Array = _bough_from(at)
+	var k := int(round(at.x)) * 73856093 ^ int(round(at.y)) * 19349663
+	var coin := absi((k ^ (k >> 13)) * 1274126177) % 100
+	if not bough.is_empty() and (cap == Vector2.INF or coin < BOUGH_ODDS):
+		platform.stalk_root = bough[0]
+		platform.stalk_lean = bough[1]
+		platform.stalk_branch = true
+	else:
+		platform.stalk_root = cap
+
+
+## A spot on the side of a mushroom's stem below (the straight part of it, clear of both its ends) that a
+## stalk from `at` can reach going down and then bending across to it, BOUGH_ACROSS across, without running
+## into a cap or another stem on the way: the nearest such, [where, that stem's lean]; [] if there's none.
+func _bough_from(at: Vector2) -> Array:
+	var best := []
+	var shortest := INF
+	for p in platforms.get_children():
+		if p.is_queued_for_deletion() or not str(p.kind).begins_with("mushroom") or p.stalk_root == Vector2.INF:
+			continue
+		var a: Vector2 = p.stalk_top()
+		var b: Vector2 = p.stalk_low()
+		for i in 7:
+			var j := a.lerp(b, 0.3 + i * 0.08)
+			var across := absf(j.x - at.x)
+			var drop := j.y - at.y
+			if across < BOUGH_ACROSS.x or across > BOUGH_ACROSS.y or drop < 56.0 or drop > ROOT_REACH:
+				continue
+			if j.y < p.position.y + 28.0 or across + drop >= shortest or not _bough_clear(at, j, p):
+				continue
+			shortest = across + drop
+			best = [j, (b.x - a.x) / maxf(1.0, b.y - a.y)]
+	return best
+
+
+## A bough from `at` down and across to `j` on `into`'s stem: clear of every cap, and of every other stem?
+func _bough_clear(at: Vector2, j: Vector2, into: Node2D) -> bool:
+	var down := Rect2(at.x - 10.0, at.y + 8.0, 20.0, j.y - at.y)
+	var across := Rect2(minf(at.x, j.x), j.y - 10.0, absf(j.x - at.x), 20.0)
+	for q in platforms.get_children():
+		if q.is_queued_for_deletion():
+			continue
+		var cap := Rect2(q.position.x - float(q.width) * 0.5, q.position.y - 8.0, float(q.width), 24.0)
+		if cap.intersects(down) or cap.intersects(across):
+			return false
+		if q == into or not str(q.kind).begins_with("mushroom") or q.stalk_root == Vector2.INF:
+			continue
+		var legs: Array = [[q.stalk_top(), q.stalk_low()]]
+		if q.stalk_branch:
+			legs.append([q.stalk_low(), q.stalk_root])
+		for leg in legs:
+			for s in 9:  # (along that stem: anywhere near the way?)
+				var spot: Vector2 = leg[0].lerp(leg[1], s / 8.0)
+				if down.grow(8.0).has_point(spot) or across.grow(8.0).has_point(spot):
+					return false
+	return true
 
 
 ## Where a mushroom at `at` grows from: the nearest spot on top of a cap below it that its stalk can reach

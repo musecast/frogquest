@@ -1,8 +1,9 @@
 extends StaticBody2D
 ## One of Endless's platforms, built in code: how it looks (KINDS: a 3-slice pixel-art strip from
 ## assets/endless, drawn at any width; a mushroom grows out of a cap below it, its stalk leaning to it if it
-## must (or out of the pond, near the bottom; with neither close, it's just its cap: a stem ending in the sky
-## looked like it grew out of a crack in it, and every one down to the pond was a forest of stems), and the
+## must, or now and then out of the side of another's stem, bending across into it like a bough (or out of
+## the pond, near the bottom; with none of those close, it's just its cap: a stem ending in the sky looked
+## like it grew out of a crack in it, and every one down to the pond was a forest of stems), and the
 ## treetops' leaves have a few vines hanging from them),
 ## and what it does. It can stand still, sway side to side, bob up and down or drift in a loop; crumble
 ## a moment after you land on it; or carry a spring that sends your next jump far higher.
@@ -29,6 +30,12 @@ const PX := 1.2  # world px for each pixel of its art: the story's tiles' own (i
 const POND_Y := 5.0  # (the pond's top, where a mushroom's stalk goes down into: EndlessMode.WATER_Y)
 const VINE := Color("345551")  # (the treetops' vines: their leaves' own outline green, and their green)
 const LEAF := Color("2eb082")
+## The stalk's own colours across it (stalk.png's columns, its left edge first), for its bends.
+const STALK := [Color("7e644e"), Color("d6c4a6"), Color("d6c4a6"), Color("f0e4cc"), Color("f0e4cc"), Color("f0e4cc"),
+	Color("f0e4cc"), Color("f0e4cc"), Color("f0e4cc"), Color("f0e4cc"), Color("d6c4a6"), Color("d6c4a6"), Color("d6c4a6"),
+	Color("7e644e")]
+const SHINE := Color("fcf4e4")  # (the glint down its light side)
+const ELBOW := 10.0  # (a bough's bend: how far round its middle goes, in its art's pixels)
 const CRUMBLE_DELAY := 0.6  # seconds from landing to falling
 
 var kind := "mushroom"
@@ -45,7 +52,10 @@ var clock := Callable()  # in a party, the party's clock in seconds (Party.run_s
 
 var _strip: Texture2D
 var _stalk: Texture2D  # (a mushroom's: from under its cap down to where it grows from)
-var stalk_root := Vector2.INF  # (where it grows from, in the world: a spot on a cap below, or the pond; INF, none)
+var stalk_root := Vector2.INF  # (where it grows from, in the world: a spot on a cap below, the pond, or another's stem; INF, none)
+var stalk_branch := false  # (it grows out of the side of another's stem, at stalk_root: down, round a bend, across into it)
+var stalk_lean := 0.0  # (that stem's lean, across for each down, so a bough meets it flush)
+static var _elbows := {}  # (a bough's bend, turning each way: drawn once)
 var _vines := []  # ([x across its middle, how long, which side its first leaf's on], in art px)
 var _under_node: Node2D
 var _spring_up: Texture2D
@@ -198,6 +208,9 @@ func _draw_under() -> void:
 		_under_node.draw_rect(Rect2(x, bottom + n + 1.0, 1.0, 1.0), LEAF)
 	if _stalk:
 		var top := bottom - 3.0
+		if stalk_branch:
+			_draw_bough(top, (stalk_root - global_position) / PX)
+			return
 		var root := (stalk_root + Vector2(0.0, 4.0) - global_position) / PX  # (just into what it grows from, in its art's pixels)
 		var length := root.y - top
 		var w := float(_stalk.get_width())
@@ -213,6 +226,68 @@ func _draw_under() -> void:
 			var x := roundf(root.x * (row + band * 0.5) / length) - roundf(w * 0.5)
 			_under_node.draw_texture_rect_region(_stalk, Rect2(x, top + row, w, band), Rect2(0.0, fmod(row, h), w, band))
 			row += band
+
+
+## Where its stalk starts, under its cap, in the world (EndlessMode finds stems to grow out of by these).
+func stalk_top() -> Vector2:
+	var art: Array = KINDS.get(kind, KINDS["mushroom"])
+	var strip: Texture2D = _strip if _strip else load(ART % kind)
+	return position + Vector2(0.0, (-float(art[2]) + float(strip.get_height()) - 3.0) * PX)
+
+
+## Where its stalk's straight part ends: where it grows from, or a bough's bend.
+func stalk_low() -> Vector2:
+	if stalk_branch:
+		return Vector2(position.x, stalk_root.y - ELBOW * PX)
+	return stalk_root
+
+
+## A bough: its stalk down from under its cap to `j`'s height less ELBOW, round the bend, and across into the
+## stem it grows out of, ending a pixel into its edge, so the two are one (in its art's pixels, from its
+## middle; `j` is the middle of that stem where it joins).
+func _draw_bough(top: float, j: Vector2) -> void:
+	var side := 1.0 if j.x > 0.0 else -1.0
+	var y := roundf(j.y)
+	var knee := y - ELBOW
+	var w := float(_stalk.get_width())
+	if knee > top:
+		_under_node.draw_texture_rect(_stalk, Rect2(-roundf(w * 0.5), top, w, knee - top), true)
+	_under_node.draw_texture(_elbow(side), Vector2(-7.0 if side > 0.0 else -ELBOW, knee))
+	var from := side * ELBOW
+	for r in 14:  # (each row of the stalk's colours along it, its outer edge at the bottom, ending a pixel into that stem's edge on its row)
+		var row := y - 7.0 + r
+		var to := roundf(j.x + stalk_lean * (row + 0.5 - j.y)) - side * 6.0
+		var length := (to - from) * side
+		if length <= 0.0:
+			continue
+		var x0 := minf(from, to)
+		var s := 13 - r if side > 0.0 else r
+		_under_node.draw_rect(Rect2(x0, row, length, 1.0), STALK[s])
+		if s == 3:
+			var dash := 0.0
+			while dash < length:
+				_under_node.draw_rect(Rect2(x0 + (dash if side > 0.0 else length - dash - minf(3.0, length - dash)), row, minf(3.0, length - dash), 1.0), SHINE)
+				dash += 8.0
+
+
+## The bend, turning right (side 1) or left: a quarter ring of the stalk's colours, ELBOW round its middle,
+## its outer edge the stem's outer side all the way round.
+static func _elbow(side: float) -> Texture2D:
+	if _elbows.has(side):
+		return _elbows[side]
+	var size := int(ELBOW) + 7
+	var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var middle := Vector2(size, 0.0) if side > 0.0 else Vector2.ZERO  # (what it bends round)
+	for by in size:
+		for bx in size:
+			var d := middle.distance_to(Vector2(bx + 0.5, by + 0.5))
+			if d < ELBOW - 7.0 or d >= ELBOW + 7.0:
+				continue
+			var s := int(floor(ELBOW + 7.0 - d)) if side > 0.0 else int(floor(d - (ELBOW - 7.0)))
+			img.set_pixel(bx, by, STALK[clampi(s, 0, 13)])
+	var tex := ImageTexture.create_from_image(img)
+	_elbows[side] = tex
+	return tex
 
 
 func _draw() -> void:

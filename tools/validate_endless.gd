@@ -70,8 +70,10 @@ func _run() -> void:
 	var crumble_went := false
 	var max_platforms := 0
 	var last_id := 1
+	var boughs := {}
 	for step in 170:
 		_check_gaps(endless, zones, checked_gaps)
+		_check_boughs(endless, boughs)
 		var next = _next_platform(endless, last_id)
 		if next == null:
 			_failures.append("no platform above #%d to climb to" % last_id)
@@ -96,6 +98,7 @@ func _run() -> void:
 		if zone == 4 and -player.global_position.y > zones.ZONES[4]["from"] + 600.0:
 			break
 	_expect(zones_seen == [0, 1, 2, 3, 4], "the zones came in order, swamp to space (saw %s)" % str(zones_seen))
+	_expect(boughs.size() >= 1, "now and then a mushroom grows out of another's stem (%d of them)" % boughs.size())
 	_expect(endless.score > 50, "the score climbed (%d)" % endless.score)
 	var by_log: int = endless.score_of_log(endless.run_log())
 	_expect(by_log == endless.score, "the run's log gives the score the game gave (%d by the log, %d in the game)" % [by_log, endless.score])
@@ -104,6 +107,7 @@ func _run() -> void:
 	_expect(crumble_went, "a crumbling platform gave way after he landed on it")
 	_expect(max_platforms < 80, "old platforms are cleaned up below him (at most %d)" % max_platforms)
 	_expect(endless._zone_reached == 4, "each zone's banner showed as he reached it")
+	await _bough_cases(endless)
 
 	# Fall, then keep going.
 	player.global_position.y += 1400.0
@@ -158,6 +162,59 @@ func _check_scorer_vectors(endless: Node) -> void:
 
 
 ## The next platform up from the one with this id (by id: they're made in order, bottom to top).
+## Mushrooms growing out of the side of another's stem (boughs), as they're made: each joins a stem that's
+## there, on its straight part, across within reach, its bend under its own cap.
+func _check_boughs(endless: Node, seen: Dictionary) -> void:
+	for p in endless.platforms.get_children():
+		if not str(p.kind).begins_with("mushroom") or not p.stalk_branch or seen.has(p.get_instance_id()):
+			continue
+		seen[p.get_instance_id()] = true
+		var j: Vector2 = p.stalk_root
+		var on := false
+		for q in endless.platforms.get_children():
+			if q != p and str(q.kind).begins_with("mushroom") and q.stalk_root != Vector2.INF:
+				on = on or Geometry2D.get_closest_point_to_segment(j, q.stalk_top(), q.stalk_low()).distance_to(j) < 1.5
+		var across := absf(j.x - p.position.x)
+		_expect(on, "bough #%d grows out of a stem that's there" % p.get_meta("platform_id"))
+		_expect(across >= endless.BOUGH_ACROSS.x and across <= endless.BOUGH_ACROSS.y and p.stalk_low().y > p.stalk_top().y + 20.0,
+			"bough #%d reaches %.0f across, its bend well under its cap" % [p.get_meta("platform_id"), across])
+
+
+## A bough, made to order far up out of the way: a mushroom with a stem, and one above and beside it
+## grows out of that stem (straight down, round the bend, across); with a cap in the way, it doesn't; and
+## one drawn as a bough, no trouble.
+func _bough_cases(endless: Node) -> void:
+	var made: Array = []
+	var stem: Node2D = _mushroom(endless, Vector2(100.0, -20000.0), Vector2(100.0, -19700.0))
+	made.append(stem)
+	var got: Array = endless._bough_from(Vector2(30.0, -20160.0))
+	_expect(got.size() == 2 and is_equal_approx(got[0].x, 100.0) and got[0].y > stem.position.y + 28.0 and got[0].y - (-20160.0) <= endless.ROOT_REACH,
+		"a mushroom beside and above another grows out of its stem (%s)" % [got])
+	var bough: Node2D = _mushroom(endless, Vector2(30.0, -20160.0), got[0] if got.size() == 2 else Vector2.INF, true)
+	made.append(bough)
+	made.append(_mushroom(endless, Vector2(-400.0, -20000.0), Vector2(-400.0, -19700.0)))
+	made.append(_mushroom(endless, Vector2(-460.0, -19960.0), Vector2.INF))  # (a cap right under where the next would go down)
+	got = endless._bough_from(Vector2(-460.0, -20160.0))
+	_expect(got.is_empty(), "never down through a cap in the way (%s)" % [got])
+	await _frames(3)
+	for m in made:
+		m.queue_free()
+	await _frames(1)
+
+
+func _mushroom(endless: Node, at: Vector2, root: Vector2, bough := false) -> Node2D:
+	var p: Node2D = StaticBody2D.new()
+	p.set_script(load("res://scenes/EndlessPlatform.gd"))
+	p.kind = "mushroom"
+	p.width = 90.0
+	p.position = at
+	p.stalk_root = root
+	p.stalk_branch = bough
+	p.set_meta("platform_id", -1)
+	endless.platforms.add_child(p)
+	return p
+
+
 func _next_platform(endless: Node, after_id: int):
 	var best = null
 	for p in endless.platforms.get_children():
