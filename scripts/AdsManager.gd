@@ -378,6 +378,12 @@ func is_ad_free() -> bool:
 	return MusicManager.ads_removed or MuseAccount.has_pro() or not platform_has_ads()
 
 
+## Ads that aren't on now, but will be from the game's next launch (they start with it, never partway
+## through): Muse Pro ended, or you're seeing the game as free players do (MuseAccount.see_as_free).
+func ads_wait_for_next_launch() -> bool:
+	return not _ads_active and _ads_runtime_enabled() and not MusicManager.ads_removed and not MuseAccount.has_pro()
+
+
 ## Viewport pixels hidden behind the bottom of the screen (iPhone home indicator); 0 off mobile.
 func get_viewport_bottom_safe_inset() -> float:
 	return _viewport_safe_insets().w

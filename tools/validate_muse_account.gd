@@ -1,7 +1,7 @@
 extends SceneTree
-## Headless test for the Muse account (MuseAccount.gd): sending and checking the code, Pro, the session
-## refresh, being signed out from Muse's side, staying Pro offline for a while (and no longer), and
-## signing out. The network is a fake and the session file a scratch one, so it never talks to Muse and
+## Headless test for the Muse account (MuseAccount.gd): sending and checking the code, Pro, seeing the
+## game as free players do (and back), the session refresh, being signed out from Muse's side, staying
+## Pro offline for a while (and no longer), and signing out. The network is a fake and the session file a scratch one, so it never talks to Muse and
 ## never touches a real sign-in.
 ##   Godot --headless --path . --script res://tools/validate_muse_account.gd
 
@@ -65,6 +65,35 @@ func _run() -> void:
 	_expect(acct.is_signed_in() and acct.has_pro() and acct.email == "jay@example.com", "the sign-in survives a restart")
 	_expect(acct.member_since == "2025-06-14T18:02:11.123456Z", "its signup date too")
 
+	# With Pro, seeing the game as free players do, and back again.
+	var race: GDScript = load("res://scripts/PartyRace.gd")
+	changes[0] = 0
+	acct.see_as_free(true)
+	_expect(not acct.has_pro() and acct.owns_pro() and acct.is_seeing_as_free() and changes[0] == 1,
+		"with Pro, you can see the game as free players do")
+	_expect(acct.logo_path() == acct.LOGO and not link.has_muse_pro() and not race.has(race.PRO[0]),
+		"just as they see it: no +, no Lil Froggy, no Pro races to host")
+	_forget(acct)
+	_expect(acct.is_seeing_as_free() and not acct.has_pro(), "it stays that way over a restart")
+	_reply("/rest/v1/rpc/muse_has_pro", 200, true)
+	_expect(await acct.check_pro() and acct.is_seeing_as_free() and not acct.has_pro(), "and a Pro check doesn't switch it back")
+	changes[0] = 0
+	acct.see_as_free(false)
+	_expect(acct.has_pro() and not acct.is_seeing_as_free() and acct.logo_path() == acct.LOGO_PLUS and race.has(race.PRO[0]) and changes[0] == 1,
+		"switching back brings Pro back")
+	var screen: CanvasLayer = load("res://scenes/MuseAccountScreen.gd").new()
+	root.add_child(screen)
+	await process_frame
+	_expect(screen._free_view.visible and screen._free_view.text == "View as Free Player", "the account screen has the switch, with Pro")
+	screen._free_view.pressed.emit()
+	_expect(acct.is_seeing_as_free() and screen._free_view.text == "Back to Frog Quest+" and screen._pro_note.text.contains("free players"),
+		"it switches there, and says what you're seeing")
+	screen._free_view.pressed.emit()
+	_expect(acct.has_pro() and screen._free_view.text == "View as Free Player" and screen._pro_note.text.contains("Frog Quest+"),
+		"and back")
+	screen.queue_free()
+	await process_frame
+
 	# Offline, Pro lasts a while, then doesn't.
 	acct._pro_checked_at = acct._now() - 29.0 * DAY
 	_expect(acct.has_pro(), "Pro stays on offline for a few weeks")
@@ -72,7 +101,8 @@ func _run() -> void:
 	_expect(not acct.has_pro(), "but not forever")
 	acct._pro_checked_at = acct._now()
 
-	# A stale session gets refreshed first; Pro can go away.
+	# A stale session gets refreshed first; Pro can go away (seen as free or not).
+	acct.see_as_free(true)
 	acct._access_expires_at = acct._now() - 10.0
 	changes[0] = 0
 	_reply("/auth/v1/token", 200, _session("access-2", "refresh-2"))
@@ -82,6 +112,13 @@ func _run() -> void:
 		"an old session is refreshed first")
 	_expect(acct._refresh_token == "refresh-2" and _calls[-1].bearer == "access-2", "with the new tokens kept and used")
 	_expect(not acct.has_pro() and acct.is_signed_in() and changes[0] == 1, "Pro ending takes the + away (still signed in)")
+	_expect(not acct._as_free and not acct.is_seeing_as_free(), "and switches seeing it as free off (Pro comes back as Pro)")
+	screen = load("res://scenes/MuseAccountScreen.gd").new()
+	root.add_child(screen)
+	await process_frame
+	_expect(not screen._free_view.visible, "no switch on the account screen without Pro")
+	screen.queue_free()
+	await process_frame
 
 	# Turned down mid-session: refresh once and ask again.
 	_reply("/rest/v1/rpc/muse_has_pro", 401, {"message": "JWT expired"})
@@ -122,13 +159,14 @@ func _run() -> void:
 	_reply("/auth/v1/verify", 200, _session("access-4", "refresh-4"))
 	_reply("/rest/v1/rpc/muse_has_pro", 200, true)
 	await acct.verify_code("jay@example.com", "654321")
+	acct.see_as_free(true)
 	_calls.clear()
 	_reply("/auth/v1/logout", 204, null)
 	acct.sign_out()
 	for _i in 3:
 		await process_frame
-	_expect(not acct.is_signed_in() and not FileAccess.file_exists(SCRATCH) and acct.member_since == "",
-		"signing out forgets the session")
+	_expect(not acct.is_signed_in() and not FileAccess.file_exists(SCRATCH) and acct.member_since == "" and not acct._as_free,
+		"signing out forgets the session (and seeing it as free)")
 	_expect(_calls.size() == 1 and _calls[0].path == "/auth/v1/logout?scope=local" and _calls[0].bearer == "access-4",
 		"and ends it on Muse's side, for this device only (the Muse apps stay signed in)")
 
@@ -195,6 +233,7 @@ func _forget(acct: Node) -> void:
 	acct._access_expires_at = 0.0
 	acct._pro = false
 	acct._pro_checked_at = 0.0
+	acct._as_free = false
 	acct._loaded = false
 	acct._ensure_loaded()
 

@@ -12,6 +12,9 @@ extends Node
 ## knows, gets a one-time sign-in to trade with Supabase for a session of its own.
 ## The session lives in user://, encrypted to this device. A Pro that's been seen stays on offline for
 ## PRO_OFFLINE_DAYS, so a flight doesn't take the + away.
+## With Pro, you can see the game the way free players do (see_as_free) and switch back any time.
+## Testers get Pro from Muse itself (an "internal-test" grant, which can end on a set day), never from
+## a switch in here: the App Store's copy is the very same build.
 ##
 ## Only the game refreshes the session; Lil Froggy's copy (--desktop-frog) just reads it. Supabase
 ## refresh tokens are single use, so two copies refreshing at once would sign you out.
@@ -39,6 +42,7 @@ var transport := Callable()  # (and swap the network for a fake: (path, body, be
 
 var _pro := false
 var _pro_checked_at := 0.0
+var _as_free := false  # (you've got Pro, and you're seeing the game as free players do: see_as_free)
 var _refresh_token := ""
 var _access_token := ""
 var _access_expires_at := 0.0
@@ -72,10 +76,33 @@ func is_signed_in() -> bool:
 	return _refresh_token != ""
 
 
-## Muse Pro, as last checked (and recent enough to trust offline).
+## Muse Pro, as last checked (and recent enough to trust offline): what the game goes by. Not while
+## you're seeing it as free players do (see_as_free).
 func has_pro() -> bool:
+	return owns_pro() and not _as_free
+
+
+## The account's own Muse Pro, whichever way you're seeing the game.
+func owns_pro() -> bool:
 	_ensure_loaded()
 	return _refresh_token != "" and _pro and _now() - _pro_checked_at < PRO_OFFLINE_DAYS * 86400.0
+
+
+## You've got Muse Pro, and you're seeing the game just as free players do: no +, no Pro modes, and
+## the ads from its next launch (Remove Ads still counts, as it does for them).
+func is_seeing_as_free() -> bool:
+	return owns_pro() and _as_free
+
+
+## Sees the game as free players do (on), or with your Pro again (off). Kept till you switch back,
+## sign out, or Pro ends (when it comes back, it comes back as Pro).
+func see_as_free(on: bool) -> void:
+	_ensure_loaded()
+	if _as_free == on:
+		return
+	_as_free = on
+	_save()
+	changed.emit()
 
 
 ## The FROG QUEST logo, with its + when you've got Muse Pro.
@@ -215,6 +242,7 @@ func _signed_in(address: String, d: Dictionary) -> void:
 	_take_session(d)
 	_pro = false
 	_pro_checked_at = 0.0
+	_as_free = false
 	_save()
 	changed.emit()
 
@@ -346,11 +374,13 @@ func member_since_text() -> String:
 
 
 func _set_pro(on: bool) -> void:
-	var before := has_pro()
+	var before := [has_pro(), owns_pro()]
 	_pro = on
 	_pro_checked_at = _now()
+	if not on:
+		_as_free = false
 	_save()
-	if has_pro() != before:
+	if [has_pro(), owns_pro()] != before:
 		changed.emit()
 
 
@@ -414,6 +444,7 @@ func _ensure_loaded() -> void:
 	_access_expires_at = float(d.get("access_expires_at", 0.0))
 	_pro = bool(d.get("pro", false))
 	_pro_checked_at = float(d.get("pro_checked_at", 0.0))
+	_as_free = bool(d.get("as_free", false))
 
 
 func _save() -> void:
@@ -429,6 +460,7 @@ func _save() -> void:
 		"access_expires_at": _access_expires_at,
 		"pro": _pro,
 		"pro_checked_at": _pro_checked_at,
+		"as_free": _as_free,
 	})
 
 
@@ -440,6 +472,7 @@ func _clear() -> void:
 	_access_expires_at = 0.0
 	_pro = false
 	_pro_checked_at = 0.0
+	_as_free = false
 	if FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(save_path)
 

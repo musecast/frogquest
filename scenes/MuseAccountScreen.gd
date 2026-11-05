@@ -21,6 +21,7 @@ var _panel: PanelContainer
 var _scroll: ScrollContainer  # (scrolls only if the panel's too tall for the room at 1:1: _fit)
 var _body: Label
 var _pro_note: Label
+var _free_view: Button  # (with Muse Pro: see the game as free players do, and back again)
 var _input: LineEdit
 var _primary: Button
 var _secondary: Button
@@ -88,6 +89,8 @@ func _build_ui() -> void:
 	box.add_child(_body)
 	_pro_note = _label("", BODY_FONT_SZ, GREEN, 4)
 	box.add_child(_pro_note)
+	_free_view = _button("", func() -> void: MuseAccount.see_as_free(not MuseAccount.is_seeing_as_free()))
+	box.add_child(_free_view)
 	_code = _label("", 32, load("res://scripts/UIStyle.gd").GOLD, 8)
 	_code.autowrap_mode = TextServer.AUTOWRAP_OFF  # (one line: split, it read as two codes)
 	_code.visible = false
@@ -124,6 +127,7 @@ func _build_ui() -> void:
 ## emailed code, waiting on Muse Shelf, or signed in.
 func _show_state() -> void:
 	_pro_note.visible = false
+	_free_view.visible = false
 	_code.visible = false
 	_friends.visible = MuseAccount.is_signed_in() and MuseSocial.available
 	_leaderboard.visible = _friends.visible
@@ -136,9 +140,16 @@ func _show_state() -> void:
 		if MuseAccount.has_pro():
 			_pro_note.text = "You have Muse Pro, so this is Frog Quest+: %s!" % _perks()
 			_pro_note.add_theme_color_override("font_color", GREEN)
+		elif MuseAccount.is_seeing_as_free():
+			_pro_note.text = "You have Muse Pro, but right now you're seeing Frog Quest the way free players do."
+			if AdsManager.ads_wait_for_next_launch():
+				_pro_note.text += " The ads start the next time you open it."
+			_pro_note.add_theme_color_override("font_color", GOLD)
 		else:
 			_pro_note.text = "This account doesn't have Muse Pro."
 			_pro_note.add_theme_color_override("font_color", GOLD)
+		_free_view.visible = MuseAccount.owns_pro()
+		_free_view.text = "Back to Frog Quest+" if MuseAccount.is_seeing_as_free() else "View as Free Player"
 		_input.visible = false
 		_primary.text = "Check Again"
 		_secondary.text = "Sign Out"
