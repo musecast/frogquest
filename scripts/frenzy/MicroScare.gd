@@ -43,6 +43,13 @@ func begin() -> void:
 	var k: float = _tv.scale.x
 	_screen = Rect2(_tv.position + Vector2(glass.offset_left, glass.offset_top) * k,
 		Vector2(glass.offset_right - glass.offset_left, glass.offset_bottom - glass.offset_top) * k)
+	# (In the story the TV fills a nook of solid wall: the room's end. Here he's in it: the wall's gone from
+	# behind the glass, where the TV hides it anyway.)
+	var map: TileMap = _room.get_node("TileMap")
+	for layer in map.get_layers_count():
+		for cell in map.get_used_cells(layer):
+			if _screen.has_point(map.position + map.map_to_local(cell) * map.scale):
+				map.erase_cell(layer, cell)
 	var ledge := floor_at(Vector2(_screen.get_center().x, _screen.end.y - 6.0), _screen.size.x - 8.0)  # (the bottom of the picture)
 	ledge.name = "InTheTV"
 	froggy_at = Vector2(_screen.get_center().x + 6.0, _screen.end.y - 6.0 - FEET)

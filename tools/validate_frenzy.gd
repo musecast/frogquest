@@ -158,6 +158,17 @@ func _microgames() -> void:
 	m.step(DT)
 	_expect(m.lost and not m.won, "SCARE!: out too soon, while she's sat back: she watches him come")
 	await _done(m)
+	m = _micro("scare")  # (and a real jump does get him out of the TV: in the story there's wall behind it)
+	for _i in 10:
+		await physics_frame
+	_froggy.velocity = _froggy.get_node("Trajectory").launch_velocity(Vector2(-50.0, -40.0))
+	for _i in 90:
+		await physics_frame
+		m.step(DT)
+		if m._out >= 0.0:
+			break
+	_expect(m._out >= 0.0, "SCARE!: a real jump gets him out of the TV (at %s)" % _froggy.global_position.round())
+	await _done(m)
 	# CATCH!: into the fly. Or not.
 	m = _micro("fly")
 	_froggy.global_position = m._fly.position + Vector2(6.0, 4.0)
