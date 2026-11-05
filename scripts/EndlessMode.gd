@@ -87,6 +87,7 @@ var _banner: Label  # (a word that isn't a zone's name: "PARTY OVER"; and, under
 var _banner_sub: Label
 var _titles: CanvasLayer  # (the zones' names: AreaTitle)
 var _race: Node = null  # (racing your party up it: PartyRace; null climbing)
+const ROOT_REACH := 320.0  # (as far below a mushroom as its stalk goes looking for a cap to grow out of)
 const PARTY_MAX_X := 180.0  # (in a party, the tower's as wide as an upright phone's for everyone: the same tower)
 var _sky  # (EndlessSky.gd)
 var _zones: Script
@@ -730,8 +731,36 @@ func _make_platform(at: Vector2, zone: Dictionary, t: float, plain: bool, overri
 	platform.position = at
 	platform.set_meta("platform_id", next_platform_id)
 	next_platform_id += 1
+	if platform.kind.begins_with("mushroom"):
+		platform.stalk_root = _root_under(at)  # (its stalk grows out of a cap below it, not on down to the pond)
 	platforms.add_child(platform)
 	return platform
+
+
+## Where a mushroom at `at` grows from: the nearest spot on top of a cap below it that its stalk can reach
+## leaning no more than about 40 degrees off upright; or the pond, if that's close below; or nowhere
+## (Vector2.INF: just its cap), so no stalk runs on down through the sky.
+func _root_under(at: Vector2) -> Vector2:
+	var best := Vector2.INF
+	var shortest := INF
+	for p in platforms.get_children():
+		if p.is_queued_for_deletion():
+			continue
+		var top: float = p.global_position.y
+		var dy := top - at.y
+		if dy < 20.0 or dy > ROOT_REACH:
+			continue
+		var half := float(p.width) * 0.5 - 10.0
+		var x := clampf(at.x, p.global_position.x - half, p.global_position.x + half)
+		if absf(x - at.x) > dy * 0.84:
+			continue
+		var length := Vector2(x - at.x, dy).length()
+		if length < shortest:
+			shortest = length
+			best = Vector2(x, top)
+	if best == Vector2.INF and WATER_Y - at.y <= ROOT_REACH:
+		best = Vector2(at.x, WATER_Y)
+	return best
 
 
 static func _pick_kind(kinds: Array, rng: RandomNumberGenerator) -> String:

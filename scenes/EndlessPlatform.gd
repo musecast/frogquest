@@ -1,8 +1,9 @@
 extends StaticBody2D
 ## One of Endless's platforms, built in code: how it looks (KINDS: a 3-slice pixel-art strip from
-## assets/endless, drawn at any width; a mushroom's a whole one, its stalk all the way down to the pond (as
-## the swamp's big ones are: a stem ending anywhere in the sky looked like it grew out of a crack in it), and
-## the treetops' leaves have a few vines hanging from them),
+## assets/endless, drawn at any width; a mushroom grows out of a cap below it, its stalk leaning to it if it
+## must (or out of the pond, near the bottom; with neither close, it's just its cap: a stem ending in the sky
+## looked like it grew out of a crack in it, and every one down to the pond was a forest of stems), and the
+## treetops' leaves have a few vines hanging from them),
 ## and what it does. It can stand still, sway side to side, bob up and down or drift in a loop; crumble
 ## a moment after you land on it; or carry a spring that sends your next jump far higher.
 ## Its origin is the middle of its walkable top.
@@ -43,7 +44,8 @@ var phase := -1.0  # where a moving one starts its swing (EndlessMode deals it f
 var clock := Callable()  # in a party, the party's clock in seconds (Party.run_seconds): everyone's swing together
 
 var _strip: Texture2D
-var _stalk: Texture2D  # (a mushroom's, tiled from under its cap down into the pond)
+var _stalk: Texture2D  # (a mushroom's: from under its cap down to where it grows from)
+var stalk_root := Vector2.INF  # (where it grows from, in the world: a spot on a cap below, or the pond; INF, none)
 var _vines := []  # ([x across its middle, how long, which side its first leaf's on], in art px)
 var _under_node: Node2D
 var _spring_up: Texture2D
@@ -65,7 +67,7 @@ func _ready() -> void:
 	_strip = load(ART % kind)
 	if art[3] != "":
 		if art[3] == "stalk":
-			_stalk = load(ART % "stalk")
+			_stalk = load(ART % "stalk") if stalk_root != Vector2.INF else null
 		else:  # (a few vines, here and there along it, each its own length)
 			var across := width / PX
 			for i in randi_range(2, 4):
@@ -177,9 +179,9 @@ func _sound(path: String, pitch: float, db: float) -> void:
 	s.finished.connect(s.queue_free)
 
 
-## What's under it: a mushroom's stalk, tucked up under its cap and on down into the pond however far that
-## is (off the bottom of the screen, up high: never an end in the sky), in one tiled piece; or the
-## treetops' vines, a leaf every few pixels, one at the end.
+## What's under it: a mushroom's stalk, tucked up under its cap and down to where it grows from (its end
+## tucked behind that cap's top, or under the pond's), leaning in whole-pixel steps if it must, so its
+## pixels stay square; or the treetops' vines, a leaf every few pixels, one at the end.
 func _draw_under() -> void:
 	var art: Array = KINDS.get(kind, KINDS["mushroom"])
 	_under_node.draw_set_transform(Vector2.ZERO, 0.0, Vector2(PX, PX))  # (in its art's own pixels)
@@ -196,9 +198,21 @@ func _draw_under() -> void:
 		_under_node.draw_rect(Rect2(x, bottom + n + 1.0, 1.0, 1.0), LEAF)
 	if _stalk:
 		var top := bottom - 3.0
-		var down := (POND_Y + 4.0 - global_position.y) / PX - top  # (in its art's pixels, to just under the pond's top)
-		if down > 0.0:
-			_under_node.draw_texture_rect(_stalk, Rect2(-roundf(_stalk.get_width() * 0.5), top, _stalk.get_width(), down), true)
+		var root := (stalk_root + Vector2(0.0, 4.0) - global_position) / PX  # (just into what it grows from, in its art's pixels)
+		var length := root.y - top
+		var w := float(_stalk.get_width())
+		if length <= 0.0:
+			return
+		if absf(root.x) < 1.0:  # (straight down: one tiled piece)
+			_under_node.draw_texture_rect(_stalk, Rect2(-roundf(w * 0.5), top, w, length), true)
+			return
+		var h := float(_stalk.get_height())
+		var row := 0.0
+		while row < length:  # (leaning: two rows at a time, each a whole pixel further over)
+			var band := minf(2.0, length - row)
+			var x := roundf(root.x * (row + band * 0.5) / length) - roundf(w * 0.5)
+			_under_node.draw_texture_rect_region(_stalk, Rect2(x, top + row, w, band), Rect2(0.0, fmod(row, h), w, band))
+			row += band
 
 
 func _draw() -> void:
