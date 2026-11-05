@@ -101,6 +101,11 @@ func _ready():
 	var titles: CanvasLayer = load("res://scripts/AreaTitle.gd").new()  # (where he is, named as he gets there)
 	titles.player = $Player
 	add_child(titles)
+	var sky: Node2D = load("res://scripts/Sky.gd").new()  # (clouds, more the higher he climbs; hills far off)
+	sky.name = "Sky"
+	sky.wall = $TileMap
+	$"World Sprites".add_child(sky)
+	$"World Sprites".move_child(sky, $"World Sprites/BlueSkySkybox".get_index() + 1)  # (just over the skybox)
 	_frog_gods()
 
 	$frogNPC1.play("farmer")
@@ -110,6 +115,7 @@ func _ready():
 		MusicManager.MusicPosition = 0
 
 	load("res://scripts/FlyHunt.gd").spawn_into(self)  # the little flies hiding around the tree (catch them all: the Golden Frog)
+	load("res://scripts/Wildlife.gd").spawn_into(self)  # flowers on the ground, leaves, fireflies, butterflies, birds
 	var together: Node2D = load("res://scripts/StoryParty.gd").new()  # (climbing with friends, and everyone online)
 	together.name = "StoryParty"
 	add_child(together)
