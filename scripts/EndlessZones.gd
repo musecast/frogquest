@@ -50,7 +50,7 @@ const ZONES := [
 	},
 	{
 		"name": "OUTER SPACE", "from": 8400.0,
-		"sky": [Color(0.02, 0.015, 0.06), Color(0.11, 0.07, 0.24)],
+		"sky": [Color(0.004, 0.02, 0.06), Color(0.03, 0.06, 0.17)],  # (the Muse Jukebox's night: SparkleSky)
 		"kinds": [["asteroid", 0.7], ["satellite", 0.3]],
 		"spring_kind": "", "crumble_kind": "asteroid_crack",
 		"spring": [0.08, 0.10], "crumble": [0.15, 0.25], "moving": [0.30, 0.45], "tilt": [0.0, 0.33],
