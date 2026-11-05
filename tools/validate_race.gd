@@ -150,6 +150,52 @@ func _run() -> void:
 		"one more each race, till he has them all (%s)" % [mm.unlocked_modes])
 	await _end(e)
 
+	# RISING POND (Muse Pro): the pond rises, slowly then quicker; caught by it, out; the last frog dry wins.
+	e = await _race("pond")
+	race = e._race
+	party.run_started_ms -= 3200
+	await _frames(4)
+	party.run_started_ms -= 10000
+	await _frames(2)
+	var since: float = race.clock()
+	var risen: float = e.WATER_Y - race.flood_y()
+	_expect(since > 10.0 and absf(risen - (12.0 * since + 0.4 * since * since)) < 2.0 and risen > 150.0,
+		"the pond rises: %.0f px in its first %.1f s, quicker as it goes" % [risen, since])
+	_expect(race._flood != null and race._flood.is_inside_tree(), "and it's drawn, over everything")
+	e._on_frog_moved(PAL, [0.0, -900.0, "default", 0, false, 0.0, 0, 90, 0, 0, 0])
+	e.player.global_position.y = race.flood_y() + 30.0
+	await _frames(3)
+	_expect(race.out and not e.player.visible and _said.any(func(w) -> bool: return w.get("k") == "out"), "caught by the pond: he's out")
+	await _frames(4)
+	_expect(race.over, "with the friend the last frog dry, it's over")
+	await create_timer(1.6).timeout
+	_expect(_words(race.results).contains("1st  @pal  90 m") and _words(race.results).contains("@pal won!"),
+		"the results: the friend, still dry, won (%s)" % _words(race.results))
+	await _end(e)
+
+	# FROG TAG (Muse Pro): IT, he tags a frog in reach; tagged straight back, he can't tag them again at once;
+	# whoever's been IT least wins.
+	e = await _race("tag")
+	race = e._race
+	party.run_started_ms -= 3200
+	await _frames(4)
+	_expect(race._it == PAL, "who's IT first is the party seed's pick, the same for everyone (%d)" % race._it)
+	race._it = party.me()
+	e._on_frog_moved(PAL, [e.player.global_position.x + 10.0, e.player.global_position.y, "default", 0, false, 0.0, 0, 3, 0, 0, 0])
+	await _frames(3)
+	_expect(race._it == PAL and _said.any(func(w) -> bool: return w.get("k") == "tag" and int(w.get("to", 0)) == PAL),
+		"IT, with a frog in reach: tagged, and it's theirs")
+	race.heard(PAL, {"k": "tag", "to": party.me(), "s": race.clock()})
+	await _frames(20)
+	_expect(race._it == party.me() and e._height_label.text == "You're IT!", "tagged back: he's IT, and can't tag them straight back")
+	_expect(race._it_label.visible, "IT! over him")
+	party.run_started_ms -= 91000
+	await _frames(4)
+	_expect(race.over, "time's up")
+	await create_timer(1.6).timeout
+	_expect(_words(race.results).contains("@pal won!"), "the results: the friend, IT the least, won (%s)" % _words(race.results))
+	await _end(e)
+
 	# The party screen's races: the ones he has to start; the rest there, greyed.
 	mm.unlocked_modes = ["sprint"]
 	var screen: CanvasLayer = load("res://scenes/PartyScreen.gd").new()
@@ -166,6 +212,30 @@ func _run() -> void:
 	_expect(buttons.get("Minute Race") == true and buttons.get("Sprint to 100 m") == true and buttons.get("Fly Rush") == false
 		and buttons.get("Knockout") == false, "the party screen: Minute Race and Sprint to start, Fly Rush and Knockout locked (%s)" % [buttons])
 	_expect(_words(screen).contains("Finish a race to unlock the next one."), "and how to unlock the rest")
+	_expect(buttons.get("Rising Pond") == false and buttons.get("Frog Tag") == false
+		and _words(screen).contains("Hosting these needs Muse Pro. Friends without it can still join and play."),
+		"without Muse Pro: its games greyed, and friends can still play them")
+	var acct := root.get_node("MuseAccount")
+	var real_acct := [acct.save_path, acct._loaded, acct._refresh_token, acct._pro, acct._pro_checked_at]
+	acct.save_path = "user://test_race_muse.save"
+	acct._loaded = true
+	acct._refresh_token = "test"
+	acct._pro = true
+	acct._pro_checked_at = acct._now()
+	for old in screen._box.get_children():
+		old.queue_free()
+	await _frames(1)
+	screen._starts()
+	buttons = {}
+	for b in screen._box.get_children():
+		if b is Button:
+			buttons[b.text] = not b.disabled
+	_expect(buttons.get("Rising Pond") == true and buttons.get("Frog Tag") == true, "with Muse Pro, the host starts them (%s)" % [buttons])
+	acct.save_path = real_acct[0]
+	acct._loaded = real_acct[1]
+	acct._refresh_token = real_acct[2]
+	acct._pro = real_acct[3]
+	acct._pro_checked_at = real_acct[4]
 	screen.queue_free()
 
 	party.in_run = false

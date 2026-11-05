@@ -160,7 +160,8 @@ func _players() -> void:
 
 ## The host's ways to start: up the World Tree (everyone appears beside you, each in their own world), a
 ## new Endless tower for all, or a race up one (PartyRace): the minute race to begin with, and each race
-## finished unlocks the next, one by one; the locked ones show, greyed, so you know what's coming.
+## finished unlocks the next, one by one; the locked ones show, greyed, so you know what's coming. And
+## Muse Pro's games (Rising Pond, Frog Tag), for a host with it: their friends play whether they have it or not.
 func _starts() -> void:
 	_box.add_child(_button("Climb the World Tree", func() -> void: Party.start("story"), "go"))
 	_box.add_child(_button("Climb Endless", func() -> void: Party.start("endless")))
@@ -178,6 +179,18 @@ func _starts() -> void:
 			_box.add_child(shut)
 	if locked > 0:
 		_box.add_child(_label("Finish a race to unlock the next one.", BODY_FONT_SZ, DIM))
+	# (Muse Pro's: the host needs it; friends without it join and play all the same)
+	_header("Muse Pro")
+	var pro: bool = MuseAccount.has_pro()
+	for id in race.PRO:
+		var lonely: bool = id == "tag" and Party.players.size() < 2
+		var start := _button(race.RACES[id].label, func() -> void: Party.start("endless", id), "gold" if pro else "quiet")
+		start.disabled = not pro or lonely
+		_box.add_child(start)
+	if not pro:
+		_box.add_child(_label("Hosting these needs Muse Pro. Friends without it can still join and play.", BODY_FONT_SZ, DIM))
+	elif Party.players.size() < 2:
+		_box.add_child(_label("Frog Tag needs a friend or two.", BODY_FONT_SZ, DIM))
 
 
 ## You, as your friends see you: your froggy (your look: FroggyLook) and, signed in to Muse, your

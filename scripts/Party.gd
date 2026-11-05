@@ -672,7 +672,8 @@ func _begin(the_seed: int, ago_ms: int, what := "endless", race_kind := "") -> v
 	run_started_ms = Time.get_ticks_msec() - ago_ms
 	in_run = true
 	mode = what
-	race = race_kind if what == "endless" and race_kind in load("res://scripts/PartyRace.gd").ORDER else ""
+	var races: GDScript = load("res://scripts/PartyRace.gd")
+	race = race_kind if what == "endless" and (race_kind in races.ORDER or race_kind in races.PRO) else ""
 	if what == "story" and beside == "" and not is_host() and not everyone:
 		beside = name_of(_host_seat if _ws != null else 1)
 	started.emit()
