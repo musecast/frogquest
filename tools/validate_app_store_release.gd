@@ -129,13 +129,20 @@ func _check_export_preset() -> bool:
 			_blocker("iOS launch storyboard uses %s. Keep the launch screen image-free so BootLoader can appear sooner." % key)
 			failed = true
 
-	if not bool(cfg.get_value(options, "privacy/tracking_enabled", false)):
-		_blocker("iOS export privacy does not declare tracking, but Frog Quest asks for ATT so ads can be targeted. Enable privacy/tracking_enabled.")
+	# The app's privacy manifest is about Frog Quest's own code, which doesn't track. Declaring
+	# tracking needs the tracking domains it connects to: with tracking on and none listed, Apple
+	# marks the build Invalid Binary when it goes to review (ITMS-91064; build 31, 2026-11-05). Listing
+	# AdMob's domains would make iOS block them for everyone who says no to tracking, ads and all.
+	# AdMob's SDK declares its own tracking in its own manifest, and App Store Connect's App Privacy
+	# label still says Data Used to Track You for it. (1.0, approved, had tracking off like this.)
+	var tracking := bool(cfg.get_value(options, "privacy/tracking_enabled", false))
+	var domains: PackedStringArray = cfg.get_value(options, "privacy/tracking_domains", PackedStringArray())
+	if tracking and domains.is_empty():
+		_blocker("iOS export privacy declares tracking with no tracking domains: Apple marks that build Invalid Binary (ITMS-91064). Frog Quest's own code doesn't track, so leave privacy/tracking_enabled off (AdMob's SDK declares its own).")
 		failed = true
-
 	for data_type in ["device_id", "advertising_data"]:
-		if not bool(cfg.get_value(options, "privacy/collected_data/%s/used_for_tracking" % data_type, false)):
-			_blocker("iOS export privacy does not mark %s as used for tracking. With ATT allowed, AdMob uses it for targeted ads." % data_type)
+		if bool(cfg.get_value(options, "privacy/collected_data/%s/used_for_tracking" % data_type, false)) and not tracking:
+			_blocker("iOS export privacy marks %s as used for tracking but declares no tracking: keep the manifest consistent (both off, as 1.0 had)." % data_type)
 			failed = true
 
 	if str(cfg.get_value(options, "privacy/collected_data/advertising_data/collected", "false")) != "true":
