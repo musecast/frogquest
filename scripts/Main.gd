@@ -44,9 +44,10 @@ signal _tv_next  # (a tap, once the TV's line is all there)
 ## The lost frog, once the gate's open, follows him out of the dark: from the top of the shaft the gate
 ## shut (where he hops up from) onto the bridge just out of the dark, beside where he comes out (feet on
 ## its floor, 20 px under him). Not ahead of him up the tree: he followed his jumps.
-const LOST_FROG_CLIMB := [Vector2(2544, -3418), Vector2(2544, -3552), Vector2(2544, -3591)]  # (the shaft's rungs, up through where the gate was)
+const LOST_FROG_CLIMB := [Vector2(2544, -3418), Vector2(2544, -3514), Vector2(2544, -3591)]  # (feet on the shaft's rungs, up through where the gate was)
 const LOST_FROG_OUT := Vector2(2450, -3630)
-const LOST_FROG_ARC := 26.0  # (how far over a straight line each hop goes)
+const LOST_FROG_CLEAR := 20.0  # (how far over the higher end each hop peaks, as far as FROGGY_RISE allows)
+const FROGGY_RISE := 103.0  # (the most Froggy's jump rises: 450 px/s up against his gravity, 980)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
@@ -943,9 +944,10 @@ func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_sha
 
 
 ## The lost frog follows him out of the dark, once he's up and standing: out of the dark at the bottom
-## of the shaft (fading in), up its rungs through where the gate was, a hop at a time (each eased in and
-## out, in his airborne frame, a moment crouched between), and out onto the bridge beside him. If he's
-## there, he's thanked.
+## of the shaft (fading in), up its rungs through where the gate was, a hop at a time, and out onto the
+## bridge beside him. Each hop is a real jump by Froggy's physics (launched, his gravity bringing him
+## down, never higher than Froggy can jump), with Froggy's jump sound, crouched a moment between. If
+## he's there, he's thanked.
 func _lost_frog_follows(hop := true) -> void:
 	var frog: AnimatedSprite2D = $frogNPC4
 	if not hop:  # (a climb loaded from past the gate: he's out already)
@@ -959,15 +961,30 @@ func _lost_frog_follows(hop := true) -> void:
 	frog.play("prejump1")
 	create_tween().tween_property(frog, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	$frogNPC4/npc4talk.play()
+	var hop_sound := AudioStreamPlayer2D.new()  # (Froggy's own jump, a little deeper: a bigger frog)
+	hop_sound.name = "hop"
+	hop_sound.stream = load("res://assets/frogjump.wav")
+	hop_sound.volume_db = -12.0
+	hop_sound.bus = &"FX"
+	frog.add_child(hop_sound)
+	var g := float($Player.gravity)
 	for to: Vector2 in LOST_FROG_CLIMB.slice(1) + [LOST_FROG_OUT]:
-		await get_tree().create_timer(0.35, false).timeout
+		await get_tree().create_timer(0.35, false).timeout  # (crouched)
 		frog.play("airborne")
+		hop_sound.pitch_scale = randf_range(0.75, 0.9)
+		hop_sound.play()
+		# Froggy's physics: launched up and across, his gravity bringing him down onto it, peaking no
+		# higher than Froggy can jump.
 		var a := from
+		var peak := minf(a.y, to.y) - clampf(FROGGY_RISE - (a.y - to.y), 4.0, LOST_FROG_CLEAR)
+		var vy := -sqrt(2.0 * g * (a.y - peak))
+		var flight := sqrt(2.0 * (a.y - peak) / g) + sqrt(2.0 * (to.y - peak) / g)
+		var vx := (to.x - a.x) / flight
 		var jump := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 		jump.tween_method(func(t: float) -> void:
-			frog.position = a.lerp(to, t) + Vector2(0.0, -LOST_FROG_ARC * 4.0 * t * (1.0 - t)),
-			0.0, 1.0, 0.55 if a.y - to.y > 60.0 else 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			frog.position = a + Vector2(vx * t, vy * t + 0.5 * g * t * t), 0.0, flight, flight)
 		await jump.finished
+		frog.position = to
 		frog.play("prejump1")
 		from = to
 	if $frogNPC4/Area2D4.overlaps_body($Player):

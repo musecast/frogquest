@@ -1,7 +1,8 @@
 extends Node2D
 ## A little yellow songbird sitting about the tree: it hops, turns round and pecks, and when the frog comes near
 ## (or lands, or jumps, near it) it's off with a flutter and a chirp, up and away; it's back later, once
-## he's gone a good way off. Wildlife.gd puts them out.
+## he's gone a good way off. Wildlife.gd puts them out. It flies the way that's open (never into a wall or
+## a ceiling): it picks its way out before it goes, steers round what's ahead, and shut in, it fades.
 
 const ART := "res://assets/critters.png"
 ## (its frames: CritterArt's bird_sit, bird_peck, bird_fly1 and bird_fly2, at its pixel size)
@@ -11,6 +12,8 @@ const FAST := 140.0
 const BACK_AFTER := 30.0  # seconds gone at the least, before it's back (and only with him far off)
 const AWAKE := 1000.0  # (it only bothers with anything with the camera this near)
 const SOUND := "res://assets/bird_away.wav"
+const OPEN := 56.0  # (a way out has to be open this far at least)
+const LOOK := 40.0  # (how far ahead it looks for a wall, flying)
 
 enum { SITTING, FLYING, GONE }
 
@@ -28,6 +31,7 @@ var _hop_to := 0.0
 var _vel := Vector2.ZERO
 var _gone := 0.0
 var _left := true  # facing left (as drawn)
+var _fading := false  # (no way out: it fades instead of flying through a wall)
 var _sound: AudioStreamPlayer2D
 
 
@@ -109,8 +113,12 @@ func fly_off() -> void:
 		away = signf(global_position.x - frog.global_position.x)
 	if away == 0.0:
 		away = 1.0 if randf() < 0.5 else -1.0
-	_left = away < 0.0
-	_vel = Vector2(away * randf_range(60.0, 85.0), -randf_range(80.0, 105.0))
+	var way := _clear_way(away)
+	_fading = way == Vector2.ZERO
+	if _fading:
+		way = Vector2(away, -1.0).normalized()
+	_left = way.x < 0.0
+	_vel = way * randf_range(115.0, 140.0)
 	_t = 0.0
 	_sound.pitch_scale = randf_range(0.92, 1.12)
 	_sound.play()
@@ -118,11 +126,52 @@ func fly_off() -> void:
 
 func _fly(delta: float) -> void:
 	_vel += Vector2(signf(_vel.x) * 40.0, -30.0) * delta
+	if not _fading and _open(_vel.normalized(), LOOK) < LOOK:  # (a wall ahead: round it, or fade)
+		var way := _clear_way(signf(_vel.x) if _vel.x != 0.0 else 1.0)
+		if way == Vector2.ZERO:
+			_fading = true
+		else:
+			_vel = way * _vel.length()
+			_left = _vel.x < 0.0
+	if _fading:
+		modulate.a = maxf(0.0, modulate.a - delta * 3.0)
+		if _open(_vel.normalized(), LOOK * 0.5) < LOOK * 0.5:
+			_vel *= 0.8  # (slowing at the wall as it goes)
 	position += _vel * delta
-	if _t > 4.0 or not _view().grow(120.0).has_point(global_position):
+	if _t > 4.0 or modulate.a <= 0.0 or not _view().grow(120.0).has_point(global_position):
 		state = GONE
 		_gone = 0.0
 		visible = false
+		modulate.a = 1.0
+		_fading = false
+
+
+## Of a few ways up and away, the one that's open furthest (walls, ceilings), away from him and upward
+## rather; zero when none is open OPEN at least.
+func _clear_way(away: float) -> Vector2:
+	var best := Vector2.ZERO
+	var best_score := -INF
+	for dir: Vector2 in [Vector2(away, -1.2), Vector2(away, -0.5), Vector2(0.0, -1.0), Vector2(-away, -1.2),
+			Vector2(-away, -0.5), Vector2(away, -0.1), Vector2(-away, -0.1)]:
+		var d := dir.normalized()
+		var reach := _open(d, 240.0)
+		if reach < OPEN:
+			continue
+		var score := reach + (60.0 if signf(d.x) == away else 0.0) - d.y * 30.0
+		if score > best_score:
+			best_score = score
+			best = d
+	return best
+
+
+## How far it can fly `dir` from its middle before something solid (as far as `far`).
+func _open(dir: Vector2, far: float) -> float:
+	var from := global_position + Vector2(0.0, -4.0 * scale.y)
+	var q := PhysicsRayQueryParameters2D.create(from, from + dir * far)
+	if frog and is_instance_valid(frog) and frog is CollisionObject2D:
+		q.exclude = [(frog as CollisionObject2D).get_rid()]
+	var hit := get_world_2d().direct_space_state.intersect_ray(q)
+	return far if hit.is_empty() else from.distance_to(hit.position)
 
 
 ## Him far off, and its perch not on the screen: nobody sees it come back.

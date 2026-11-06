@@ -330,6 +330,8 @@ func _run() -> void:
 	await _game_time(2.2)
 	_expect(lost.position.distance_to(main.LOST_FROG_OUT) < 1.0 and lost.modulate.a > 0.99 and titles.area_at(lost.position) == "THE MUSHROOMS",
 		"and out onto the bridge (%s)" % lost.position.round())
+	var hop: AudioStreamPlayer2D = lost.get_node_or_null("hop")
+	_expect(hop != null and hop.stream != null and hop.stream.resource_path.ends_with("frogjump.wav"), "each hop with Froggy's jump sound")
 	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))
 	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
 	await _game_time(0.5)

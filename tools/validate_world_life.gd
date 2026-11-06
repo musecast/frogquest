@@ -179,6 +179,34 @@ func _run() -> void:
 	_expect(bird.state == bird.GONE, "not back with him still about")
 	await _look(player, bird.perch + Vector2(-1600, -1000))
 	_expect(bird.state == bird.SITTING and bird.position == bird.perch, "back on its perch once he's far off (and it's not on the screen) (state %d, at %s, perch %s, him %s, view %s)" % [bird.state, bird.position, bird.perch, player.global_position, bird._view()])
+	# Every bird, startled from either side, flies the way that's open: never into a wall or a ceiling
+	# (its middle never inside anything solid), and shut in, it fades rather than fly through.
+	var space: PhysicsDirectSpaceState2D = bird.get_world_2d().direct_space_state
+	var into_walls := []
+	var flown := 0
+	for b in life.birds:
+		for side in [-40.0, 40.0]:
+			await _look(player, b.perch + Vector2(side * 8.0, -10.0))
+			b.state = b.SITTING
+			b.position = b.perch
+			b.visible = true
+			player.global_position = b.perch + Vector2(side, -10.0)
+			b.fly_off()
+			for _i in 90:
+				b._fly(1.0 / 60.0)
+				if b.state != b.FLYING:
+					break
+				flown += 1
+				var q := PhysicsPointQueryParameters2D.new()
+				q.position = b.global_position + Vector2(0.0, -4.0 * b.scale.y)
+				q.exclude = [player.get_rid()]
+				if not space.intersect_point(q, 1).is_empty():
+					into_walls.append(b.perch)
+					break
+			b.state = b.GONE
+			b.visible = false
+	_expect(into_walls.is_empty() and flown >= life.birds.size() * 2 * 20,
+		"birds fly the way that's open, never into a wall (%s; %d frames flown)" % [into_walls, flown])
 
 	# Butterflies about their flowers; off up when he comes near.
 	_expect(life.butterflies.size() >= 5, "butterflies about (%d)" % life.butterflies.size())
@@ -223,6 +251,20 @@ func _run() -> void:
 	for _i in 300:
 		await process_frame
 	_expect(leaves._leaves.is_empty(), "none in the dark (%d)" % leaves._leaves.size())
+	_expect(leaves._petals.size() == 2, "the white petals drawn, two ways up")
+	await _look(player, Vector2(2800, -5650))  # (the castle: where the petals have fallen)
+	leaves._leaves.clear()
+	leaves._wait = 0.0
+	for _i in 300:
+		await process_frame
+	_expect(not leaves._leaves.is_empty() and leaves._leaves.all(func(l: Dictionary) -> bool: return l.petal),
+		"at the castle it's white petals that fall (%d, %s)" % [leaves._leaves.size(), leaves._leaves.map(func(l: Dictionary) -> bool: return l.petal)])
+	await _look(player, Vector2(2900, -900))
+	leaves._leaves.clear()
+	leaves._wait = 0.0
+	for _i in 300:
+		await process_frame
+	_expect(leaves._leaves.all(func(l: Dictionary) -> bool: return not l.petal), "lower down, still leaves")
 
 	main.queue_free()
 	for _i in 3:
