@@ -123,6 +123,7 @@ func _ready():
 
 	_make_tv_bubble()
 	_make_no_gods_line()
+	_words_out_of_the_dark()
 	var titles: CanvasLayer = load("res://scripts/AreaTitle.gd").new()  # (where he is, named as he gets there)
 	titles.player = $Player
 	add_child(titles)
@@ -577,6 +578,18 @@ func _place_tv_more() -> void:
 	var bottom := _tv_bubble.position.y + pivot.y + (lines * _tv_bubble.get_line_height() - pivot.y) * _tv_bubble.scale.y
 	_tv_more.pixel = 2.0
 	_tv_more.position = Vector2(_tv_bubble.position.x + pivot.x - _tv_more.size.x * 0.5, bottom + 4.0).round()
+
+
+## The frogs' words stay readable in the dark. The dark (Darkness, a CanvasModulate) swallows whatever
+## the lantern doesn't reach, and the lost frog's two-line lines went half missing in it. Unshaded, the
+## words are drawn as they are, whatever the light; the frogs themselves stay in the dark.
+func _words_out_of_the_dark() -> void:
+	var unshaded := CanvasItemMaterial.new()
+	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	for frog in get_children():
+		var words := frog.get_node_or_null(NodePath("%sspeechbubble" % str(frog.name).replace("frogNPC", "npc"))) as Label
+		if words:
+			words.material = unshaded
 
 
 ## The climb's last words, in the finale's own look ("you are the"'s), just under the plank below the glass

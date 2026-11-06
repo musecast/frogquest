@@ -42,6 +42,9 @@ var _sound: AudioStreamPlayer
 ## Where `at` is (by its height, currentHeight's: a tenth of a pixel up from 472; and across, for the sky
 ## beside the castle), or "" below the tree (home, and the way out of it).
 const TREE_FOOT := Vector2(2480.0, 3260.0)  # (x: the World Tree's foot, where its name comes up from the ground)
+## THE DARK ends where the dark itself does (player.gd's fade_darkness puts it out above 313): the bridge
+## just over it, at 314.7, is the mushrooms' already, bright, and was being named THE DARK.
+const DARK_TOP := 313.0
 
 
 static func area_at(at: Vector2) -> String:
@@ -52,7 +55,7 @@ static func area_at(at: Vector2) -> String:
 		# (named at its foot, or once he's up off the ground: not on the way to it, over the signs)
 		var at_foot := at.x > TREE_FOOT.x and at.x < TREE_FOOT.y
 		return "THE WORLD TREE" if at_foot or h > 12.0 else ""
-	if h < 315.0:
+	if h <= DARK_TOP:
 		return "THE DARK" if at.x > 2100.0 and at.x < 3450.0 else ""  # (in the tree: out in the sky beside it, it's not dark)
 	if h < 505.0:
 		return "THE MUSHROOMS"

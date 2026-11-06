@@ -25,8 +25,10 @@ var _upright_rule: HSeparator  # (between the two, when they're one column)
 var _ask: VBoxContainer  # "Reset your climb?" and the like
 var _ask_words: Label
 var _ask_yes: Button
+var _ask_alt: Button  # (a third choice: going harder partway up, keep climbing on it from here)
+var _ask_no: Button
 var _close: Button
-var _pending := ""  # what YES does: "climb" or "all"
+var _pending := ""  # what YES does: "climb", "all", or a difficulty partway up ("easier:normal", "harder:hard")
 var _toggles := {}  # "music", "sound", "timer" -> its ON/OFF button
 var _aim_slider: HSlider
 var _aim_value: Label
@@ -145,7 +147,10 @@ func _build() -> void:
 	_ask.add_child(_ask_words)
 	_ask_yes = _button("", _on_yes, "danger")
 	_ask.add_child(_ask_yes)
-	_ask.add_child(_button("No, Keep It", _on_no))
+	_ask_alt = _button("", _on_alt)
+	_ask.add_child(_ask_alt)
+	_ask_no = _button("No, Keep It", _on_no)
+	_ask.add_child(_ask_no)
 
 	_close = _button("Close", func() -> void: closed.emit())
 	frame.add_child(_close)
@@ -219,13 +224,72 @@ func _toggle_timer() -> void:
 	_refresh()
 
 
+## A difficulty picked. Partway up a climb, with an achievement at stake, it asks first: easier, and the
+## climb stops counting for it (even if you go back); harder, and it only counts from a climb's first
+## jump, so start over on it, or keep climbing on it from here without.
 func _set_difficulty(mode: String) -> void:
+	var stakes := _difficulty_stakes(mode)
+	if stakes.is_empty():
+		_apply_difficulty(mode)
+	else:
+		_ask_difficulty(mode, stakes)
+
+
+func _apply_difficulty(mode: String) -> void:
 	if player and player.has_method("set_difficulty"):
 		player.set_difficulty(mode)
 	else:  # (no climb here: just the choice, for next time)
 		MusicManager.difficulty = mode
 		MusicManager.save_wardrobe()
 	_refresh()
+
+
+## What picking `mode` partway up this climb would cost: {"lose": [names]}, the achievements (not yet
+## earned) the climb would stop counting for, going easier; {"start": name}, the one it can't count for
+## unless started over, going harder. Empty when nothing's at stake (no climb under way, before its first
+## jump, or nothing left to earn).
+func _difficulty_stakes(mode: String) -> Dictionary:
+	if player == null or not player.has_method("climb_is_hard") or int(player.get("jumpCount")) == 0:
+		return {}
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	if mode == difficulty.current():
+		return {}  # (the one it's on already: asked when it was chosen)
+	var achievements: GDScript = load("res://scripts/Achievements.gd")
+	var now := int(player.get("easiest_rank"))
+	var to: int = difficulty.rank(mode)
+	var goals := {"og": "beat_og", "hard": "beat_hard"}  # (the hardest first)
+	var lose: Array[String] = []
+	for level in goals:
+		var needs: int = difficulty.rank(level)
+		if achievements.has(goals[level]):
+			continue
+		if to < now and now >= needs and to < needs:
+			lose.append(achievements.LIST[goals[level]].name)
+		elif to > now and to >= needs and now < needs:
+			return {"start": achievements.LIST[goals[level]].name}
+	return {"lose": lose} if not lose.is_empty() else {}
+
+
+func _ask_difficulty(mode: String, stakes: Dictionary) -> void:
+	var difficulty: GDScript = load("res://scripts/Difficulty.gd")
+	var name_of: String = difficulty.NAMES[mode]
+	var on := "in OG mode" if mode == "og" else "on " + name_of
+	if stakes.has("lose"):
+		_pending = "easier:" + mode
+		_ask_words.text = "Switch to %s? This climb won't count for %s anymore, even if you switch back later." % [
+			name_of, " or ".join(stakes.lose)]
+		_ask_yes.text = "Switch to %s" % name_of
+		_ask_no.text = "Keep %s" % difficulty.NAMES[difficulty.current()]
+		_ask_alt.visible = false
+	else:
+		_pending = "harder:" + mode
+		_ask_words.text = ("%s is for climbing the whole tree %s, from the very first jump. Start over %s to go for it, "
+			+ "or keep climbing %s from here (this climb won't count for %s).") % [stakes.start, on, on, on, stakes.start]
+		_ask_yes.text = "Start Over on " + name_of
+		_ask_alt.text = "Keep Climbing on " + name_of
+		_ask_alt.visible = true
+		_ask_no.text = "Never Mind"
+	_show_ask()
 
 
 func _set_aim(sensitivity: float) -> void:
@@ -256,6 +320,12 @@ func _ask_first(what: String) -> void:
 	else:
 		_ask_words.text = "Reset your climb? You'll start again from the very bottom."
 		_ask_yes.text = "Yes, Reset It"
+	_ask_alt.visible = false
+	_ask_no.text = "No, Keep It"
+	_show_ask()
+
+
+func _show_ask() -> void:
 	_list.visible = false
 	_ask.visible = true
 	_close.visible = false
@@ -263,8 +333,25 @@ func _ask_first(what: String) -> void:
 
 
 func _on_yes() -> void:
+	if _pending.begins_with("easier:"):
+		_apply_difficulty(_pending.trim_prefix("easier:"))
+		_on_no()
+		return
+	if _pending.begins_with("harder:"):  # (start over on it: a new climb takes the difficulty chosen)
+		MusicManager.difficulty = _pending.trim_prefix("harder:")
+		MusicManager.save_wardrobe()
+		if player:
+			player.reset_progress("climb")  # (reloads the game: this screen goes with it)
+		return
 	if player:
 		player.reset_progress(_pending)  # (reloads the game: this screen goes with it)
+
+
+## Going harder partway up: keep climbing on it from here (the climb won't count for its achievement).
+func _on_alt() -> void:
+	if _pending.begins_with("harder:"):
+		_apply_difficulty(_pending.trim_prefix("harder:"))
+	_on_no()
 
 
 func _on_no() -> void:

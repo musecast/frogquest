@@ -230,6 +230,10 @@ func _run() -> void:
 		and titles.area_at(Vector2(2787, -4400)) == "THE MUSHROOMS"
 		and titles.area_at(main.LOST_FROG_TOP) == "THE CASTLE" and titles.area_at(Vector2(1500, -6300)) == "THE CLOUDS"
 		and titles.area_at(Vector2(2800, -7300)) == "THE TOP OF THE TREE", "the tree's parts, each with its name")
+	# THE DARK only where it's dark: the bridge just above it (314.7, the dark already out) is the mushrooms'.
+	var bridge := Vector2(2700.0, -(314.7 * 10.0 + 472.0))
+	_expect(titles.area_at(bridge) == "THE MUSHROOMS" and titles.area_at(bridge + Vector2(0.0, 20.0)) == "THE DARK",
+		"the bridge over the dark is THE MUSHROOMS; a fall back into the dark is THE DARK")
 	var home: Vector2 = player.global_position
 	await _put(player, Vector2(250, -150))
 	await _game_time(0.6)
@@ -303,6 +307,13 @@ func _run() -> void:
 	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
 	await _game_time(6.5)
 	_expect(main.get_node("frogNPC4/npc4speechbubble").text.begins_with("they say there's a key"), "the lost frog hints at the key")
+	# His words (every frog's) are drawn unshaded, so the dark can't swallow them past the lantern's light.
+	var lit := 0
+	for i in range(1, 7):
+		var said: Label = main.get_node_or_null("frogNPC%d/npc%dspeechbubble" % [i, i])
+		if said and said.material is CanvasItemMaterial and said.material.light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED:
+			lit += 1
+	_expect(lit == 6, "every frog's words stay readable in the dark (%d of 6 unshaded)" % lit)
 	await _game_time(4.0)
 
 	# The gate open and him well up: the lost frog turns up by the castle, and thanks him.

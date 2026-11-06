@@ -131,6 +131,43 @@ func _run() -> void:
 	player = main.get_node("Player")
 	_expect(player.easiest_rank == difficulty.rank("easy"), "the climb remembers it (saved)")
 
+	# Changing it partway up asks first, when an achievement's at stake (Settings).
+	var asking: CanvasLayer = load("res://scenes/SettingsScreen.gd").new()
+	asking.player = player
+	_view.add_child(asking)
+	await process_frame
+	player.jumpCount = 3
+	player.easiest_rank = difficulty.rank("hard")
+	mm.difficulty = "hard"
+	asking._set_difficulty("normal")
+	_expect(asking._ask.visible and mm.difficulty == "hard" and asking._ask_words.text.contains("Hard Hopper")
+		and asking._ask_yes.text == "Switch to Normal" and asking._ask_no.text == "Keep Hard",
+		"going easier on a Hard climb asks first, naming Hard Hopper (still Hard till yes)")
+	asking._on_yes()
+	_expect(mm.difficulty == "normal" and player.easiest_rank == difficulty.rank("normal") and not asking._ask.visible,
+		"yes: Normal, and the climb no longer counts as Hard")
+	asking._set_difficulty("hard")
+	_expect(asking._ask.visible and asking._ask_alt.visible and asking._ask_words.text.contains("first jump")
+		and asking._ask_yes.text == "Start Over on Hard" and asking._ask_alt.text == "Keep Climbing on Hard",
+		"going harder partway up asks: start over on Hard for Hard Hopper, or keep climbing on it")
+	asking._on_alt()
+	_expect(mm.difficulty == "hard" and player.easiest_rank == difficulty.rank("normal") and not asking._ask.visible,
+		"keep climbing: Hard from here, the climb still counted as Normal")
+	asking._set_difficulty("hard")
+	_expect(not asking._ask.visible, "picking the one it's on: no question again")
+	asking._set_difficulty("easy")
+	_expect(not asking._ask.visible and mm.difficulty == "easy", "nothing at stake (not a Hard climb): no question")
+	player.jumpCount = 0
+	asking._set_difficulty("hard")
+	_expect(not asking._ask.visible and player.easiest_rank == difficulty.rank("hard"), "before a climb's first jump: no question, a Hard climb")
+	player.jumpCount = 3
+	mm.achievements = ["beat_hard"]
+	asking._set_difficulty("normal")
+	_expect(not asking._ask.visible and mm.difficulty == "normal", "Hard Hopper earned already: nothing to warn about")
+	mm.achievements = []
+	asking.queue_free()
+	await process_frame
+
 	# The top, on Normal: the achievement, no OG. On Hard: OG mode and its achievement, and its news.
 	player.easiest_rank = difficulty.rank("normal")
 	player._record_win()
