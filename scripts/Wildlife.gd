@@ -45,6 +45,7 @@ func _ready() -> void:
 	add_child(dirt)
 	var leaves: Node2D = load("res://scripts/Leaves.gd").new()
 	leaves.name = "Leaves"
+	leaves.story = level  # (the castle's petals wait for its way to be opened)
 	add_child(leaves)
 	var glow: Node2D = load("res://scripts/Fireflies.gd").new()
 	glow.name = "Fireflies"

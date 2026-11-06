@@ -43,6 +43,8 @@ func _run() -> void:
 	var player: CharacterBody2D = main.get_node("Player")
 	_expect(main.npc1 == 0 and main.npc5 == 0, "a conversation cut off by closing the game starts over (%s, %s)" % [main.npc1, main.npc5])
 	_expect(main.npc3 == 1, "the campfire frog's is done once he has the lantern (%s)" % main.npc3)
+	_expect(not main.way_open and main.get_node_or_null("finale/finale walls/hidethis/delete") != null,
+		"the way up to the top of the tree shut, till the frog at the castle door opens it")
 
 	# Home: he wakes up there. Asleep in his beanbag, the TV off (a press is no jump yet); it comes on by
 	# itself and he wakes; it speaks, a line a tap (the arrow under it once it's all there, on the screen
@@ -207,15 +209,23 @@ func _run() -> void:
 	await _put(player, Vector2(1291.1925, 262.79996))
 	await _game_time(5.0)  # (THE MUSHROOMS named on the way: faded)
 
-	# A glimpse of the frog god up the climb (FROG KING2...): a plain shadow when it comes, then slowly the
-	# frog god as the intro shows him (his shadow look: the violet rim, the glowing eyes).
+	# A glimpse of the frog god up the climb (FROG KING2...): the plain shadow it always was when it comes,
+	# and then, a while after, only its eyes, slowly glowing up out of it (the shadow left as it is).
 	var god: Sprite2D = main.get_node("finale/Control/FROG KING2")
-	var god_look := god.material as ShaderMaterial
-	_expect(god_look != null and float(god_look.get_shader_parameter("shadow_amount")) == 0.0, "a glimpse of the frog god: a plain shadow at first")
+	var god_eyes := god.get_node_or_null("eyes") as Sprite2D
+	var eyes_look: ShaderMaterial = (god_eyes.material as ShaderMaterial) if god_eyes else null
+	var shade := god.self_modulate
+	_expect(god.material == null and shade.r == 0.0 and shade.g == 0.0 and shade.b == 0.0 and eyes_look != null
+		and float(eyes_look.get_shader_parameter("glow")) == 0.0, "a glimpse of the frog god: its plain shadow, as it always was")
 	god.visible = true
-	await _game_time(9.0)
-	_expect(float(god_look.get_shader_parameter("shadow_amount")) > 0.95 and god.self_modulate.r > 0.9,
-		"then, slowly, the frog god as the intro shows him (%.2f, %s)" % [float(god_look.get_shader_parameter("shadow_amount")), god.self_modulate])
+	await _game_time(main.GOD_EYES_WAIT.x * 0.5)
+	_expect(float(eyes_look.get_shader_parameter("glow")) == 0.0, "its eyes wait a while")
+	await _game_time(main.GOD_EYES_WAIT.y + main.GOD_EYES_IN.y * 0.3)
+	var glow := float(eyes_look.get_shader_parameter("glow"))
+	_expect(glow > 0.05 and glow < 0.95, "then come up slowly (%.2f)" % glow)
+	await _game_time(main.GOD_EYES_IN.y)
+	_expect(float(eyes_look.get_shader_parameter("glow")) > 0.99 and god.material == null and god.self_modulate == shade,
+		"till they glow: the rest of it still just its shadow (%.2f)" % float(eyes_look.get_shader_parameter("glow")))
 	god.visible = false
 
 	# Where he is, named as he gets there: not at home, nor on the way out of it (its signs are telling him
@@ -322,26 +332,36 @@ func _run() -> void:
 	# thanks him, each line only while he's by; found, he's just not lost anymore.
 	var lost: AnimatedSprite2D = main.get_node("frogNPC4")
 	var lost_words: Label = lost.get_node("npc4speechbubble")
+	var voice: AudioStreamPlayer2D = lost.get_node("npc4talk")
 	main.gateDestroyed = 1
-	await _put(player, main.LOST_FROG_OUT + Vector2(300.0, 0.0))
+	player.global_position = main.LOST_FROG_OUT + Vector2(300.0, 0.0)
+	player.velocity = Vector2.ZERO
+	for _i in 60:
+		await physics_frame
+		if main._lost_frog_up:
+			break
+	_expect(main._lost_frog_up and not voice.playing,
+		"he comes out quietly: his first sound is his first hop (not his voice and a hop at once)")
+	await _physics(20)
 	await _game_time(0.9)
 	_expect(main._lost_frog_up and lost.position.x == main.LOST_FROG_CLIMB[0].x and lost.position.y > main.LOST_FROG_OUT.y + 20.0,
 		"up and standing, he sees the lost frog climbing up the shaft out of the dark (%s)" % lost.position.round())
 	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)  # (as if they touched while he's hopping)
 	await _game_time(0.1)
-	_expect(main._lost_frog_hopping and not lost_words.visible and not main._lost_frog_talking,
+	_expect(main._lost_frog_arriving and not lost_words.visible and not main._lost_frog_talking,
 		"no words mid-hop: he lands before he says anything")
-	await _game_time(2.1)
+	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))  # (beside where he lands)
+	await _until(func() -> bool: return lost.position.distance_to(main.LOST_FROG_OUT) < 1.0, 4.0)
 	_expect(lost.position.distance_to(main.LOST_FROG_OUT) < 1.0 and lost.modulate.a > 0.99 and titles.area_at(lost.position) == "THE MUSHROOMS",
 		"and out onto the bridge (%s)" % lost.position.round())
 	var hop: AudioStreamPlayer2D = lost.get_node_or_null("hop")
-	var voice: AudioStreamPlayer2D = lost.get_node("npc4talk")
 	_expect(hop != null and hop.stream != null and hop.stream == voice.stream and hop.pitch_scale == voice.pitch_scale
 		and hop.volume_db == voice.volume_db and hop.bus == voice.bus, "each hop in his own voice: the very sound he talks with")
-	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))
-	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
-	await _game_time(0.5)
-	_expect(lost_words.visible and lost_words.text == "i followed your jumps...", "by him: he thanks him")
+	await _game_time(main.LOST_FROG_SETTLES * 0.5)
+	_expect(main._lost_frog_arriving and not lost_words.visible and not main._lost_frog_talking,
+		"landed beside him: a moment before he says anything")
+	await _game_time(main.LOST_FROG_SETTLES * 0.5 + 0.4)
+	_expect(lost_words.visible and lost_words.text == "i followed your jumps...", "then he thanks him")
 	await _put(player, main.LOST_FROG_OUT + Vector2(400.0, 0.0))
 	await _game_time(4.0)
 	_expect(not lost_words.visible and lost_words.text == "i followed your jumps...", "hopped away: his words wait (hidden), not run on without him")
@@ -405,6 +425,19 @@ func _run() -> void:
 	for _i in 3:
 		await process_frame
 	_expect(not main._tv_done and not main._tv_bubble.visible, "the TV keeps quiet once he's won")
+	main.queue_free()
+	await process_frame
+
+	# A climb saved after the frog at the castle door opened the way (a fall back down below it, a landing:
+	# saved): loaded, the way's open still, not shut with him gone.
+	file = FileAccess.open(SAVE, FileAccess.WRITE)
+	file.store_var({"position": Vector2(2780, -5620), "has_lantern": true, "gateDestroyed": 1, "npc1": 1, "npc2": 1,
+		"npc3": 1, "npc4": 1, "npc5": 1, "npc6": 1})
+	file.close()
+	main = await _game()
+	_expect(main.way_open and main.get_node_or_null("finale/finale walls/hidethis/delete") == null
+		and main.get_node("finale/finale walls/toshow").visible and not main.get_node("frogNPC6").visible,
+		"a climb saved after he opened the way: loaded, it's open still (%s)" % main.way_open)
 	mm.wardrobe_path = real_wardrobe
 	mm.game_beaten = real_beaten
 	mm.look_made = real_made

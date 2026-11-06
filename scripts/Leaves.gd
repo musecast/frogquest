@@ -2,7 +2,8 @@ extends Node2D
 ## Leaves drifting down past the World Tree: a few at a time, swaying and turning over as they fall, mostly
 ## green, now and then a gold one. Only where the tree is and there's light to see them (not in the dark,
 ## not over the top); behind Froggy and the platforms. Up at the castle it's the white petals instead:
-## there, as its frog says, the petals have fallen (lighter: slower, and swaying wider).
+## there, as its frog says, the petals have fallen (lighter: slower, and swaying wider). Only once he's opened
+## the way up, though (Main.way_open): before that, nothing falls in the castle.
 
 const ART := "res://assets/critters.png"
 ## (CritterArt's leaf0 and leaf1, a green leaf two ways up, and leaf_gold, at its pixel size)
@@ -26,6 +27,7 @@ var _petals: Array[Texture2D] = []  # (the leaf's two ways up, in the white peta
 var _scale := 2.4
 var _leaves: Array[Dictionary] = []
 var _wait := 0.0
+var story: Node  # (Main: whether the castle's way is open yet, for its petals)
 
 
 func _ready() -> void:
@@ -64,9 +66,12 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 
-## Whether leaves fall anywhere in what the camera sees.
+## Whether leaves fall anywhere in what the camera sees (at the castle: its petals, once the way's open).
 func _falls_here(view: Rect2) -> bool:
-	var across := PETALS_ACROSS if _petals_here(view) else ACROSS
+	var petal := _petals_here(view)
+	if petal and not (story != null and bool(story.get("way_open"))):
+		return false
+	var across := PETALS_ACROSS if petal else ACROSS
 	if view.end.x < across.x or view.position.x > across.y:
 		return false
 	var h := (GROUND - view.get_center().y) / 10.0

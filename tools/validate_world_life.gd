@@ -267,12 +267,19 @@ func _run() -> void:
 	leaves._wait = 0.0
 	for _i in 300:
 		await process_frame
-	_expect(not leaves._leaves.is_empty() and leaves._leaves.all(func(l: Dictionary) -> bool: return l.petal),
-		"at the castle it's white petals that fall (%d, %s)" % [leaves._leaves.size(), leaves._leaves.map(func(l: Dictionary) -> bool: return l.petal)])
-	await _look(player, Vector2(3950, -5620))  # (the castle's east end, past the tree)
-	leaves._leaves.clear()
+	_expect(not main.way_open and leaves._leaves.is_empty(),
+		"at the castle, before its frog has opened the way: nothing falling yet (%d)" % leaves._leaves.size())
+	main._open_the_way()
+	main.get_node("finale/Control/froggod").stop()  # (quiet: it's the petals this is about)
 	leaves._wait = 0.0
 	for _i in 300:
+		await process_frame
+	_expect(not leaves._leaves.is_empty() and leaves._leaves.all(func(l: Dictionary) -> bool: return l.petal),
+		"once he has, it's white petals that fall (%d, %s)" % [leaves._leaves.size(), leaves._leaves.map(func(l: Dictionary) -> bool: return l.petal)])
+	await _look(player, Vector2(3950, -5620))  # (the castle's east end, past the tree)
+	leaves._leaves.clear()
+	for _i in 30:  # (as many as there can be: where each comes in is chance, across what's seen)
+		leaves._wait = 0.0
 		await process_frame
 	_expect(leaves._leaves.any(func(l: Dictionary) -> bool: return l.petal and l.x0 > 3700.0),
 		"and across the castle's whole width, not just the tree's (%s)" % [leaves._leaves.map(func(l: Dictionary) -> int: return int(l.x0))])

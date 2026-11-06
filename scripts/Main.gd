@@ -48,6 +48,9 @@ const LOST_FROG_CLIMB := [Vector2(2544, -3418), Vector2(2544, -3514), Vector2(25
 const LOST_FROG_OUT := Vector2(2450, -3630)
 const LOST_FROG_CLEAR := 20.0  # (how far over the higher end each hop peaks, as far as FROGGY_RISE allows)
 const FROGGY_RISE := 103.0  # (the most Froggy's jump rises: 450 px/s up against his gravity, 980)
+const LOST_FROG_SETTLES := 1.0  # (landed: a moment before he says anything)
+const GOD_EYES_WAIT := Vector2(2.0, 4.0)  # (a frog god's shadow come: a while before its eyes start to glow)
+const GOD_EYES_IN := Vector2(9.0, 13.0)  # (and so slowly up: it's a while before you're sure they're there)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
@@ -79,8 +82,9 @@ var _tv_crackle: AudioStreamPlayer
 var _lost_frog_up := false
 var _lost_frog_thanked := false
 var _lost_frog_talking := false  # (his thanks under way: once at a time)
-var _lost_frog_hopping := false  # (on his way up out of the dark: he lands before he says anything)
+var _lost_frog_arriving := false  # (hopping up out of the dark, and a moment once he's landed: no words till then)
 var _dark_top := 313.0  # (where the dark ends: AreaTitle.DARK_TOP, read in _ready)
+var way_open := false  # (the frog at the castle door has opened the way up to the top of the tree: _open_the_way)
 var _no_gods: Label
 
 #top of script
@@ -132,6 +136,9 @@ func _ready():
 			set(n, 0)
 	if npc3 == 3:
 		npc3 = 1  # (he has the lantern: that part's done)
+	if npc6 == 1:  # (a climb saved after the frog at the castle door opened the way: it's open still, he's gone on)
+		_open_the_way()
+		$frogNPC6.visible = false
 	_catch_up_gifts()
 
 	_make_tv_bubble()
@@ -380,30 +387,55 @@ func wake_up(from_dark: bool) -> void:
 	player.waking = false
 
 
-## The frog god's glimpses up the climb (FROG KING2 on: a shadow of him come as he passes each): once one's
-## there, a plain shadow, it slowly turns (each in its own time) into the frog god as the intro shows him
-## (CreatorIntro): dark, a violet rim breathing round him, his eyes glowing.
+## The frog god's glimpses up the climb (FROG KING2 on: a shadow of him come as he passes each): each the plain
+## shadow it always was, and then, a while after it's come, its eyes glowing up out of it, so slowly it's
+## subtle (_god_eyes). Only the eyes: drawn over the shadow (frog_god_eyes.gdshader), the shadow left as it is.
 func _frog_gods() -> void:
-	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	var eyes_look: Shader = load("res://assets/frog_god_eyes.gdshader")
 	for god in $"finale/Control".get_children():
 		if god is Sprite2D and str(god.name).begins_with("FROG KING"):
-			var mat: ShaderMaterial = looks.material({}, "")
-			mat.set_shader_parameter("shadow_amount", 0.0)  # (a plain shadow to start: as it always was)
-			god.material = mat
-			god.visibility_changed.connect(_godlike.bind(god))
+			var eyes := Sprite2D.new()
+			eyes.name = "eyes"
+			eyes.texture = god.texture
+			eyes.centered = god.centered
+			eyes.offset = god.offset
+			eyes.flip_h = god.flip_h
+			eyes.flip_v = god.flip_v
+			var look := ShaderMaterial.new()
+			look.shader = eyes_look
+			look.set_shader_parameter("glow", 0.0)  # (none yet: set, so the tween has it to start from)
+			look.set_shader_parameter("phase", randf() * TAU)  # (each breathing in its own time)
+			eyes.material = look
+			god.add_child(eyes)
+			god.visibility_changed.connect(_god_eyes.bind(god))
 
 
-func _godlike(god: Sprite2D) -> void:
-	if not god.visible or god.has_meta("godlike"):
+## A frog god's shadow come: after a while (GOD_EYES_WAIT), its eyes start to glow, and slowly, slowly come
+## all the way up (GOD_EYES_IN), eased in and out.
+func _god_eyes(god: Sprite2D) -> void:
+	if not god.visible or god.has_meta("eyes_coming"):
 		return
-	god.set_meta("godlike", true)
-	var shade := god.self_modulate
-	var slow := randf_range(4.0, 6.0)
-	var turn := god.create_tween()
-	turn.tween_interval(randf_range(0.8, 2.2))
-	# (him first, while it's still dark: then his violet rim and his eyes come up out of the black)
-	turn.tween_property(god.material, "shader_parameter/shadow_amount", 1.0, slow * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	turn.parallel().tween_property(god, "self_modulate", Color(1.0, 1.0, 1.0, maxf(shade.a, 0.92)), slow) 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	god.set_meta("eyes_coming", true)
+	var look := (god.get_node("eyes") as Sprite2D).material as ShaderMaterial
+	var come := god.create_tween()
+	come.tween_interval(randf_range(GOD_EYES_WAIT.x, GOD_EYES_WAIT.y))
+	come.tween_property(look, "shader_parameter/glow", 1.0, randf_range(GOD_EYES_IN.x, GOD_EYES_IN.y)) 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## The way up to the top of the tree, opened by the frog at the castle door (his talk; or a climb loaded after
+## he had): the castle's top opened, the finale's tiles and its wall in, the frog god's music; and from now
+## on the white petals fall in the castle (Leaves: none before).
+func _open_the_way() -> void:
+	way_open = true
+	$"finale/finale walls/toshow/Screenshot2024-06-26160646/StaticBody2D".set_collision_layer_value(1, 1)
+	$"finale/finale walls/toshow".visible = true
+	$"finale/finale walls/hidethis".visible = false
+	var shut := get_node_or_null("finale/finale walls/hidethis/delete")
+	if shut:
+		shut.queue_free()
+	$TileMap.set_layer_enabled(2, 1) #enable finale foreground
+	$shadowtilemap.set_layer_enabled(3, 1) #enable finale foreground shadows
+	$finale/Control/froggod.play()
 
 
 func _wait(seconds: float) -> bool:
@@ -906,7 +938,7 @@ func _on_lanternhitbox_body_shape_entered(body_rid, body, body_shape_index, loca
 func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	var bubble: Label = $frogNPC4/npc4speechbubble
 	if _lost_frog_up:  # (out of the dark at last, on the bridge he followed him up to)
-		if not _lost_frog_hopping:  # (still hopping up: his thanks come once he's landed)
+		if not _lost_frog_arriving:  # (still on his way: his thanks come a moment after he's landed)
 			_lost_frog_thanks()
 		return
 
@@ -949,7 +981,8 @@ func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_sha
 ## of the shaft (fading in), up its rungs through where the gate was, a hop at a time, and out onto the
 ## bridge beside him. Each hop is a real jump by Froggy's physics (launched, his gravity bringing him
 ## down, never higher than Froggy can jump), in his own voice (the very sound he talks with), crouched a
-## moment between. If he's there once he's landed, he's thanked (not before: he doesn't talk mid-air).
+## moment between; he comes out quietly, so his first sound is his first hop. If he's there a moment after
+## he's landed (LOST_FROG_SETTLES), he's thanked (not before: he doesn't talk mid-air, or the instant he lands).
 func _lost_frog_follows(hop := true) -> void:
 	var frog: AnimatedSprite2D = $frogNPC4
 	if not hop:  # (a climb loaded from past the gate: he's out already)
@@ -962,13 +995,11 @@ func _lost_frog_follows(hop := true) -> void:
 	frog.modulate.a = 0.0
 	frog.play("prejump1")
 	create_tween().tween_property(frog, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	var talk: AudioStreamPlayer2D = $frogNPC4/npc4talk
-	var hop_sound := talk.duplicate() as AudioStreamPlayer2D  # (his hops in his own voice: the sound he talks with)
-	hop_sound.name = "hop"  # (its own player, so a hop doesn't cut off his "!" as he comes out)
+	var hop_sound := $frogNPC4/npc4talk.duplicate() as AudioStreamPlayer2D  # (his hops in his own voice: the sound he talks with)
+	hop_sound.name = "hop"
 	frog.add_child(hop_sound)
-	talk.play()
 	var g := float($Player.gravity)
-	_lost_frog_hopping = true
+	_lost_frog_arriving = true
 	for to: Vector2 in LOST_FROG_CLIMB.slice(1) + [LOST_FROG_OUT]:
 		await get_tree().create_timer(0.35, false).timeout  # (crouched)
 		frog.play("airborne")
@@ -987,7 +1018,8 @@ func _lost_frog_follows(hop := true) -> void:
 		frog.position = to
 		frog.play("prejump1")
 		from = to
-	_lost_frog_hopping = false
+	await get_tree().create_timer(LOST_FROG_SETTLES, false).timeout  # (landed: a moment first)
+	_lost_frog_arriving = false
 	if $frogNPC4/Area2D4.overlaps_body($Player):
 		_lost_frog_thanks()
 
@@ -1310,12 +1342,7 @@ func _on_area_2d_6_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			await get_tree().create_timer(3.0).timeout
 			#OPEN PATH NOISE AND HIDE OUTSIDE (SHOW OUTSIDE SPRITES)
 			$frogNPC6/pathopen.play()
-			$"finale/finale walls/toshow".visible = true
-			$"finale/finale walls/hidethis".visible = false
-			$"finale/finale walls/hidethis/delete".queue_free()
-			$TileMap.set_layer_enabled(2, 1) #enable finale foreground
-			$shadowtilemap.set_layer_enabled(3, 1) #enable finale foreground shadows
-			$finale/Control/froggod.play()
+			_open_the_way()
 			
 			
 			await get_tree().create_timer(3.0).timeout
