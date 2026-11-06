@@ -252,6 +252,16 @@ func _run() -> void:
 		await process_frame
 	_expect(leaves._leaves.is_empty(), "none in the dark (%d)" % leaves._leaves.size())
 	_expect(leaves._petals.size() == 2, "the white petals drawn, two ways up")
+	var petal_img: Image = leaves._petals[0].get_image()
+	var petal_colours := {}
+	for py in petal_img.get_height():
+		for px in petal_img.get_width():
+			var pc := petal_img.get_pixel(px, py)
+			if pc.a > 0.0:
+				petal_colours[pc.to_html(false)] = true
+	_expect(petal_colours.has("fefefe") and petal_colours.has("e8fbfa") and petal_colours.has("444b60")
+		and petal_colours.keys().all(func(h: String) -> bool: return h in ["fefefe", "e8fbfa", "444b60"]),
+		"the falling petals are the ledges' white petals' own colours, no green left (%s)" % [petal_colours.keys()])
 	await _look(player, Vector2(2800, -5650))  # (the castle: where the petals have fallen)
 	leaves._leaves.clear()
 	leaves._wait = 0.0
@@ -259,6 +269,13 @@ func _run() -> void:
 		await process_frame
 	_expect(not leaves._leaves.is_empty() and leaves._leaves.all(func(l: Dictionary) -> bool: return l.petal),
 		"at the castle it's white petals that fall (%d, %s)" % [leaves._leaves.size(), leaves._leaves.map(func(l: Dictionary) -> bool: return l.petal)])
+	await _look(player, Vector2(3950, -5620))  # (the castle's east end, past the tree)
+	leaves._leaves.clear()
+	leaves._wait = 0.0
+	for _i in 300:
+		await process_frame
+	_expect(leaves._leaves.any(func(l: Dictionary) -> bool: return l.petal and l.x0 > 3700.0),
+		"and across the castle's whole width, not just the tree's (%s)" % [leaves._leaves.map(func(l: Dictionary) -> int: return int(l.x0))])
 	await _look(player, Vector2(2900, -900))
 	leaves._leaves.clear()
 	leaves._wait = 0.0

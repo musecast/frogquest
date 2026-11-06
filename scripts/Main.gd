@@ -79,6 +79,7 @@ var _tv_crackle: AudioStreamPlayer
 var _lost_frog_up := false
 var _lost_frog_thanked := false
 var _lost_frog_talking := false  # (his thanks under way: once at a time)
+var _lost_frog_hopping := false  # (on his way up out of the dark: he lands before he says anything)
 var _dark_top := 313.0  # (where the dark ends: AreaTitle.DARK_TOP, read in _ready)
 var _no_gods: Label
 
@@ -905,7 +906,8 @@ func _on_lanternhitbox_body_shape_entered(body_rid, body, body_shape_index, loca
 func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	var bubble: Label = $frogNPC4/npc4speechbubble
 	if _lost_frog_up:  # (out of the dark at last, on the bridge he followed him up to)
-		_lost_frog_thanks()
+		if not _lost_frog_hopping:  # (still hopping up: his thanks come once he's landed)
+			_lost_frog_thanks()
 		return
 
 	if npc4 == 1:
@@ -947,7 +949,7 @@ func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_sha
 ## of the shaft (fading in), up its rungs through where the gate was, a hop at a time, and out onto the
 ## bridge beside him. Each hop is a real jump by Froggy's physics (launched, his gravity bringing him
 ## down, never higher than Froggy can jump), with Froggy's jump sound, crouched a moment between. If
-## he's there, he's thanked.
+## he's there once he's landed, he's thanked (not before: he doesn't talk mid-air).
 func _lost_frog_follows(hop := true) -> void:
 	var frog: AnimatedSprite2D = $frogNPC4
 	if not hop:  # (a climb loaded from past the gate: he's out already)
@@ -964,10 +966,11 @@ func _lost_frog_follows(hop := true) -> void:
 	var hop_sound := AudioStreamPlayer2D.new()  # (Froggy's own jump, a little deeper: a bigger frog)
 	hop_sound.name = "hop"
 	hop_sound.stream = load("res://assets/frogjump.wav")
-	hop_sound.volume_db = -12.0
+	hop_sound.volume_db = -8.0  # (as loud as Froggy's own -10, pitched down and a little way off)
 	hop_sound.bus = &"FX"
 	frog.add_child(hop_sound)
 	var g := float($Player.gravity)
+	_lost_frog_hopping = true
 	for to: Vector2 in LOST_FROG_CLIMB.slice(1) + [LOST_FROG_OUT]:
 		await get_tree().create_timer(0.35, false).timeout  # (crouched)
 		frog.play("airborne")
@@ -987,6 +990,7 @@ func _lost_frog_follows(hop := true) -> void:
 		frog.position = to
 		frog.play("prejump1")
 		from = to
+	_lost_frog_hopping = false
 	if $frogNPC4/Area2D4.overlaps_body($Player):
 		_lost_frog_thanks()
 

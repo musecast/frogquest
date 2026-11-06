@@ -14,9 +14,10 @@ const ACROSS := Vector2(2150.0, 3650.0)
 const HEIGHTS := [Vector2(-60.0, 145.0), Vector2(318.0, 610.0)]
 const GROUND := -472.0
 const PETALS_FROM := 505.0  # (THE CASTLE: where the white petals have fallen)
+const PETALS_ACROSS := Vector2(2150.0, 4300.0)  # (the castle's wider than the tree: out to its east wall)
 ## The white petals' colours, for the leaf's own three (its outline, its light and its shade): the white
-## petals' white and lavender, the outline a soft purple.
-const PETAL_OF := {"345551": Color8(105, 105, 178), "36e377": Color8(234, 242, 250), "2eb082": Color8(177, 177, 237)}
+## petals' own, as they're drawn on the ledges (a white shine, icy white, the slate outline).
+const PETAL_OF := {"345551": Color8(68, 75, 96), "36e377": Color8(254, 254, 254), "2eb082": Color8(232, 251, 250)}
 
 var _art: Texture2D
 var _kinds := []
@@ -50,8 +51,9 @@ func _process(delta: float) -> void:
 	if _wait <= 0.0:
 		_wait = randf_range(EVERY.x, EVERY.y)
 		if _leaves.size() < MOST and _falls_here(view):
-			var x := randf_range(maxf(view.position.x, ACROSS.x), minf(view.end.x, ACROSS.y))
-			var petal := (GROUND - view.get_center().y) / 10.0 >= PETALS_FROM
+			var petal := _petals_here(view)
+			var across := PETALS_ACROSS if petal else ACROSS
+			var x := randf_range(maxf(view.position.x, across.x), minf(view.end.x, across.y))
 			_leaves.append({
 				"x0": x, "x": x, "y": view.position.y - 20.0, "t": 0.0, "phase": randf() * TAU,
 				"fall": randf_range(16.0, 26.0) if petal else randf_range(22.0, 34.0), "sway": randf_range(1.2, 2.1),
@@ -64,7 +66,8 @@ func _process(delta: float) -> void:
 
 ## Whether leaves fall anywhere in what the camera sees.
 func _falls_here(view: Rect2) -> bool:
-	if view.end.x < ACROSS.x or view.position.x > ACROSS.y:
+	var across := PETALS_ACROSS if _petals_here(view) else ACROSS
+	if view.end.x < across.x or view.position.x > across.y:
 		return false
 	var h := (GROUND - view.get_center().y) / 10.0
 	for band in HEIGHTS:
@@ -90,6 +93,11 @@ func _draw() -> void:
 			draw_texture_rect_region(_art, rect, frame)
 
 
+## Whether it's the castle the camera's at: the white petals, not leaves.
+func _petals_here(view: Rect2) -> bool:
+	return (GROUND - view.get_center().y) / 10.0 >= PETALS_FROM
+
+
 ## What the camera sees, in the world.
 func _view() -> Rect2:
 	var vp := get_viewport()
@@ -109,6 +117,6 @@ func _petal(frame: Rect2) -> Texture2D:
 		for x in img.get_width():
 			var c := img.get_pixel(x, y)
 			if c.a > 0.0:
-				var to: Color = PETAL_OF.get(c.to_html(false), Color8(234, 242, 250))
+				var to: Color = PETAL_OF.get(c.to_html(false), Color8(232, 251, 250))
 				img.set_pixel(x, y, Color(to, c.a))
 	return ImageTexture.create_from_image(img)

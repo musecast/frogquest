@@ -327,7 +327,11 @@ func _run() -> void:
 	await _game_time(0.9)
 	_expect(main._lost_frog_up and lost.position.x == main.LOST_FROG_CLIMB[0].x and lost.position.y > main.LOST_FROG_OUT.y + 20.0,
 		"up and standing, he sees the lost frog climbing up the shaft out of the dark (%s)" % lost.position.round())
-	await _game_time(2.2)
+	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)  # (as if they touched while he's hopping)
+	await _game_time(0.1)
+	_expect(main._lost_frog_hopping and not lost_words.visible and not main._lost_frog_talking,
+		"no words mid-hop: he lands before he says anything")
+	await _game_time(2.1)
 	_expect(lost.position.distance_to(main.LOST_FROG_OUT) < 1.0 and lost.modulate.a > 0.99 and titles.area_at(lost.position) == "THE MUSHROOMS",
 		"and out onto the bridge (%s)" % lost.position.round())
 	var hop: AudioStreamPlayer2D = lost.get_node_or_null("hop")
