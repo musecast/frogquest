@@ -44,9 +44,9 @@ signal _tv_next  # (a tap, once the TV's line is all there)
 ## The lost frog, once the gate's open, follows him out of the dark: from the top of the shaft the gate
 ## shut (where he hops up from) onto the bridge just out of the dark, beside where he comes out (feet on
 ## its floor, 20 px under him). Not ahead of him up the tree: he followed his jumps.
-const LOST_FROG_FROM := Vector2(2544, -3591)
+const LOST_FROG_CLIMB := [Vector2(2544, -3418), Vector2(2544, -3552), Vector2(2544, -3591)]  # (the shaft's rungs, up through where the gate was)
 const LOST_FROG_OUT := Vector2(2450, -3630)
-const LOST_FROG_HOP := 70.0  # (how high over the bridge his hop goes)
+const LOST_FROG_ARC := 26.0  # (how far over a straight line each hop goes)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
@@ -593,7 +593,12 @@ func _place_tv_more() -> void:
 
 ## The frogs' words stay readable in the dark. The dark (Darkness, a CanvasModulate) swallows whatever
 ## the lantern doesn't reach, and the lost frog's two-line lines went half missing in it. Unshaded, the
-## words are drawn as they are, whatever the light; the frogs themselves stay in the dark.
+## words are drawn as they are, whatever the light; the frogs themselves stay in the dark. And they're
+## drawn over the world (WORDS_Z): the tiles' layer and its shadows (z 2) greyed a long line's end where
+## it ran over a wall.
+const WORDS_Z := 20
+const WORDS_ROOM := 6  # (lines of room over a frog's head)
+
 func _words_out_of_the_dark() -> void:
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
@@ -601,6 +606,16 @@ func _words_out_of_the_dark() -> void:
 		var words := frog.get_node_or_null(NodePath("%sspeechbubble" % str(frog.name).replace("frogNPC", "npc"))) as Label
 		if words:
 			words.material = unshaded
+			words.z_as_relative = false
+			words.z_index = WORDS_Z
+			# (more than one line grows up from over his head, not down over it: the last line stays just
+			# where one line was, and the wobble turns about it)
+			var line := float(words.get_line_height())
+			var bottom := words.offset_top + line
+			words.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+			words.offset_top = bottom - line * WORDS_ROOM
+			words.offset_bottom = bottom
+			words.pivot_offset = Vector2(words.size.x * 0.5, words.size.y - line * 0.5)
 
 
 ## The climb's last words, in the finale's own look ("you are the"'s), just under the plank below the glass
@@ -642,8 +657,9 @@ func _process(delta):
 		_keep_tv_words_in_view()
 		_place_tv_more()
 	_tv_words_static(delta)
-	# The lost frog, let out by the gate he opened, follows him out of the dark (once he's out of it).
-	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > _dark_top:
+	# The lost frog, let out by the gate he opened, follows him out of the dark (once he's out of it, and
+	# standing, so he sees him come up).
+	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > _dark_top and $Player.is_on_floor():
 		_lost_frog_up = true
 		_lost_frog_follows()
 
@@ -917,10 +933,6 @@ func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_
 			$frogNPC4/npc4talk.play()
 			bubble.text = "is that a key..?\nyou could get out of here"
 			await get_tree().create_timer(3.5).timeout
-		elif gateDestroyed == 0:
-			$frogNPC4/npc4talk.play()
-			bubble.text = "they say there's a key\nsomewhere in the dark..."
-			await get_tree().create_timer(3.5).timeout
 		bubble.visible = false
 		npc4 = 1
 
@@ -930,24 +942,34 @@ func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_sha
 		$frogNPC4/npc4speechbubble.visible = false
 
 
-## The lost frog follows him out of the dark: up from the shaft the gate shut, one hop (eased in and
-## out, in his airborne frame) onto the bridge beside where he came out. If he's there, he's thanked.
+## The lost frog follows him out of the dark, once he's up and standing: out of the dark at the bottom
+## of the shaft (fading in), up its rungs through where the gate was, a hop at a time (each eased in and
+## out, in his airborne frame, a moment crouched between), and out onto the bridge beside him. If he's
+## there, he's thanked.
 func _lost_frog_follows(hop := true) -> void:
 	var frog: AnimatedSprite2D = $frogNPC4
 	if not hop:  # (a climb loaded from past the gate: he's out already)
 		frog.position = LOST_FROG_OUT
 		frog.reset_physics_interpolation()
 		return
-	frog.position = LOST_FROG_FROM
+	var from: Vector2 = LOST_FROG_CLIMB[0]
+	frog.position = from
 	frog.reset_physics_interpolation()
-	frog.play("airborne")
-	$frogNPC4/npc4talk.play()
-	var jump := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	jump.tween_method(func(t: float) -> void:
-		frog.position = LOST_FROG_FROM.lerp(LOST_FROG_OUT, t) + Vector2(0.0, -LOST_FROG_HOP * 4.0 * t * (1.0 - t)),
-		0.0, 1.0, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	await jump.finished
+	frog.modulate.a = 0.0
 	frog.play("prejump1")
+	create_tween().tween_property(frog, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	$frogNPC4/npc4talk.play()
+	for to: Vector2 in LOST_FROG_CLIMB.slice(1) + [LOST_FROG_OUT]:
+		await get_tree().create_timer(0.35, false).timeout
+		frog.play("airborne")
+		var a := from
+		var jump := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+		jump.tween_method(func(t: float) -> void:
+			frog.position = a.lerp(to, t) + Vector2(0.0, -LOST_FROG_ARC * 4.0 * t * (1.0 - t)),
+			0.0, 1.0, 0.55 if a.y - to.y > 60.0 else 0.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		await jump.finished
+		frog.play("prejump1")
+		from = to
 	if $frogNPC4/Area2D4.overlaps_body($Player):
 		_lost_frog_thanks()
 
@@ -965,7 +987,8 @@ func _lost_frog_thanks() -> void:
 		await _say(area, bubble, talk, "thank you for showing\nme the way out...", 3.5)
 		_lost_frog_thanked = true
 		MusicManager.unlock("pattern_hearts")  # (his thanks: the Hearts pattern)
-	await _say(area, bubble, talk, "go on...\nthey're waiting for you", 3.0)
+	else:
+		await _say(area, bubble, talk, "i'm not lost anymore...", 3.0)  # (just a lost froggy, found)
 	bubble.visible = false
 	_lost_frog_talking = false
 

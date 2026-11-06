@@ -302,29 +302,34 @@ func _run() -> void:
 	await _until(func() -> bool: return waited[0], 3.0)
 	_expect(waited[0] and bubble.visible, "and goes on when he's back")
 
-	# The lost frog: the hint, first time, without the key.
+	# The lost frog, first time, without the key: hello, he's lost, and that's all (no hint at the key).
 	main.npc4 = 0
 	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
 	await _game_time(6.5)
-	_expect(main.get_node("frogNPC4/npc4speechbubble").text.begins_with("they say there's a key"), "the lost frog hints at the key")
+	var first_words: Label = main.get_node("frogNPC4/npc4speechbubble")
+	_expect(first_words.text == "i'm lost..." and not first_words.visible and main.npc4 == 1, "the lost frog says he's lost, and that's all (%s)" % first_words.text)
 	# His words (every frog's) are drawn unshaded, so the dark can't swallow them past the lantern's light.
 	var lit := 0
 	for i in range(1, 7):
 		var said: Label = main.get_node_or_null("frogNPC%d/npc%dspeechbubble" % [i, i])
-		if said and said.material is CanvasItemMaterial and said.material.light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED:
+		if said and said.material is CanvasItemMaterial and said.material.light_mode == CanvasItemMaterial.LIGHT_MODE_UNSHADED 				and not said.z_as_relative and said.z_index == main.WORDS_Z:
 			lit += 1
-	_expect(lit == 6, "every frog's words stay readable in the dark (%d of 6 unshaded)" % lit)
+	_expect(lit == 6, "every frog's words stay readable in the dark, over the tiles (%d of 6)" % lit)
 	await _game_time(4.0)
 
-	# The gate open and him out of the dark: the lost frog follows him out (a hop up from the shaft onto
-	# the bridge beside him: not up ahead in the castle), and thanks him, each line only while he's by.
+	# The gate open and him out of the dark, standing: the lost frog follows him out (fading in at the
+	# bottom of the shaft, up its rungs and onto the bridge beside him: not up ahead in the castle), and
+	# thanks him, each line only while he's by; found, he's just not lost anymore.
 	var lost: AnimatedSprite2D = main.get_node("frogNPC4")
 	var lost_words: Label = lost.get_node("npc4speechbubble")
 	main.gateDestroyed = 1
 	await _put(player, main.LOST_FROG_OUT + Vector2(300.0, 0.0))
-	await _game_time(1.2)
-	_expect(main._lost_frog_up and lost.position.distance_to(main.LOST_FROG_OUT) < 1.0 and titles.area_at(lost.position) == "THE MUSHROOMS",
-		"out of the dark, the lost frog follows him out onto the bridge (%s)" % lost.position.round())
+	await _game_time(0.9)
+	_expect(main._lost_frog_up and lost.position.x == main.LOST_FROG_CLIMB[0].x and lost.position.y > main.LOST_FROG_OUT.y + 20.0,
+		"up and standing, he sees the lost frog climbing up the shaft out of the dark (%s)" % lost.position.round())
+	await _game_time(2.2)
+	_expect(lost.position.distance_to(main.LOST_FROG_OUT) < 1.0 and lost.modulate.a > 0.99 and titles.area_at(lost.position) == "THE MUSHROOMS",
+		"and out onto the bridge (%s)" % lost.position.round())
 	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))
 	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
 	await _game_time(0.5)
@@ -335,6 +340,13 @@ func _run() -> void:
 	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))
 	await _game_time(3.5)
 	_expect(lost_words.visible and lost_words.text.begins_with("thank you for showing"), "back: the rest, from where it was")
+	var head_y := lost.global_position.y
+	_expect(lost_words.vertical_alignment == VERTICAL_ALIGNMENT_BOTTOM and lost_words.get_global_rect().end.y < head_y,
+		"two lines grow up from over his head, not down over it")
+	await _game_time(3.0)
+	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
+	await _game_time(0.5)
+	_expect(main._lost_frog_thanked and lost_words.text == "i'm not lost anymore...", "found, he's just not lost anymore (%s)" % lost_words.text)
 
 	# The glass, hit until it gives: the last words come up, under the plank below it.
 	_expect(main._no_gods.modulate.a == 0.0, "the last words wait for the glass")
