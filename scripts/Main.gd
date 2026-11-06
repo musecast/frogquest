@@ -41,7 +41,12 @@ const TV_GOD_SHOWS := 0.66  # (as much of him as comes through the static, at mo
 const TV_GOD_IN := 1.6  # (seconds he takes to come through, or to fade, each line)
 const TV_GOD_GONE := 2.0  # (seconds he takes, done, to fade back into the static: it stays, till he's won)
 signal _tv_next  # (a tap, once the TV's line is all there)
-const LOST_FROG_TOP := Vector2(2950, -5626)  # (where the lost frog turns up once the gate's open: the castle hall)
+## The lost frog, once the gate's open, follows him out of the dark: from the top of the shaft the gate
+## shut (where he hops up from) onto the bridge just out of the dark, beside where he comes out (feet on
+## its floor, 20 px under him). Not ahead of him up the tree: he followed his jumps.
+const LOST_FROG_FROM := Vector2(2544, -3591)
+const LOST_FROG_OUT := Vector2(2450, -3630)
+const LOST_FROG_HOP := 70.0  # (how high over the bridge his hop goes)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
@@ -72,6 +77,8 @@ var _tv_voice: AudioStreamPlayer
 var _tv_crackle: AudioStreamPlayer
 var _lost_frog_up := false
 var _lost_frog_thanked := false
+var _lost_frog_talking := false  # (his thanks under way: once at a time)
+var _dark_top := 313.0  # (where the dark ends: AreaTitle.DARK_TOP, read in _ready)
 var _no_gods: Label
 
 #top of script
@@ -105,9 +112,13 @@ func _ready():
 		if area:
 			area.queue_free()
 		$Player.setup_key_trail()
+	_dark_top = load("res://scripts/AreaTitle.gd").DARK_TOP
 	if gateDestroyed == 1:
 		$"World Sprites/Key".queue_free()
 		$"World Sprites/Keyhole".queue_free()
+		if $Player.currentHeight > _dark_top:  # (out of the dark already: the lost frog followed him out)
+			_lost_frog_up = true
+			_lost_frog_follows(false)
 
 	# If the player skipped picking up the lantern from npc3, reset npc3 so
 	# the lantern offer replays on the next visit — prevents a softlock.
@@ -631,10 +642,10 @@ func _process(delta):
 		_keep_tv_words_in_view()
 		_place_tv_more()
 	_tv_words_static(delta)
-	# The lost frog, let out by the gate he opened, turns up by the castle (while he's well away from both).
-	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > 400.0:
+	# The lost frog, let out by the gate he opened, follows him out of the dark (once he's out of it).
+	if gateDestroyed == 1 and not _lost_frog_up and $Player.currentHeight > _dark_top:
 		_lost_frog_up = true
-		$frogNPC4.position = LOST_FROG_TOP
+		_lost_frog_follows()
 
 	#DELETE THIS IN FINAL PRODUCT
 	#DELETE THIS IN FINAL PRODUCT
@@ -876,23 +887,8 @@ func _on_lanternhitbox_body_shape_entered(body_rid, body, body_shape_index, loca
 
 func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
 	var bubble: Label = $frogNPC4/npc4speechbubble
-	if _lost_frog_up:  # (out of the dark at last, by the castle)
-		$frogNPC4/npc4talk.play()
-		bubble.visible = true
-		if _lost_frog_thanked:
-			bubble.text = "go on...\nthey're waiting for you"
-			return
-		_lost_frog_thanked = true
-		bubble.text = "i followed your jumps..."
-		await get_tree().create_timer(3.0).timeout
-		$frogNPC4/npc4talk.play()
-		bubble.text = "thank you for showing\nme the way out..."
-		MusicManager.unlock("pattern_hearts")  # (his thanks: the Hearts pattern)
-		await get_tree().create_timer(3.5).timeout
-		$frogNPC4/npc4talk.play()
-		bubble.text = "go on...\nthey're waiting for you"
-		await get_tree().create_timer(3.0).timeout
-		bubble.visible = false
+	if _lost_frog_up:  # (out of the dark at last, on the bridge he followed him up to)
+		_lost_frog_thanks()
 		return
 
 	if npc4 == 1:
@@ -932,6 +928,63 @@ func _on_area_2d_4_body_shape_entered(_body_rid, body, _body_shape_index, local_
 func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_shape_index):
 	if npc4 == 1 or _lost_frog_up:
 		$frogNPC4/npc4speechbubble.visible = false
+
+
+## The lost frog follows him out of the dark: up from the shaft the gate shut, one hop (eased in and
+## out, in his airborne frame) onto the bridge beside where he came out. If he's there, he's thanked.
+func _lost_frog_follows(hop := true) -> void:
+	var frog: AnimatedSprite2D = $frogNPC4
+	if not hop:  # (a climb loaded from past the gate: he's out already)
+		frog.position = LOST_FROG_OUT
+		frog.reset_physics_interpolation()
+		return
+	frog.position = LOST_FROG_FROM
+	frog.reset_physics_interpolation()
+	frog.play("airborne")
+	$frogNPC4/npc4talk.play()
+	var jump := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	jump.tween_method(func(t: float) -> void:
+		frog.position = LOST_FROG_FROM.lerp(LOST_FROG_OUT, t) + Vector2(0.0, -LOST_FROG_HOP * 4.0 * t * (1.0 - t)),
+		0.0, 1.0, 0.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	await jump.finished
+	frog.play("prejump1")
+	if $frogNPC4/Area2D4.overlaps_body($Player):
+		_lost_frog_thanks()
+
+
+## His thanks, each line only while he's by to hear it (_say): hopping past doesn't lose any of it.
+func _lost_frog_thanks() -> void:
+	if _lost_frog_talking:
+		return
+	_lost_frog_talking = true
+	var area: Area2D = $frogNPC4/Area2D4
+	var bubble: Label = $frogNPC4/npc4speechbubble
+	var talk: AudioStreamPlayer2D = $frogNPC4/npc4talk
+	if not _lost_frog_thanked:
+		await _say(area, bubble, talk, "i followed your jumps...", 3.0)
+		await _say(area, bubble, talk, "thank you for showing\nme the way out...", 3.5)
+		_lost_frog_thanked = true
+		MusicManager.unlock("pattern_hearts")  # (his thanks: the Hearts pattern)
+	await _say(area, bubble, talk, "go on...\nthey're waiting for you", 3.0)
+	bubble.visible = false
+	_lost_frog_talking = false
+
+
+## One line said to him, only while he's there to hear it: it waits for him (hidden), and its time runs
+## only while he's by (and the game isn't paused), so a hop past doesn't lose it.
+func _say(area: Area2D, bubble: Label, talk: AudioStreamPlayer2D, words: String, seconds: float) -> void:
+	var heard := 0.0
+	var said := false
+	while heard < seconds and is_inside_tree():
+		var here := area.overlaps_body($Player)
+		if here and not said:
+			said = true
+			bubble.text = words
+			talk.play()
+		bubble.visible = here and said
+		if here and not get_tree().paused:
+			heard += get_process_delta_time()
+		await get_tree().process_frame
 
 
 func _on_area_2dkey_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):

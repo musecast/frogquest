@@ -228,7 +228,7 @@ func _run() -> void:
 	_expect(titles.area_at(Vector2(250, -150)) == "" and titles.area_at(Vector2(2797, -1240)) == "THE WORLD TREE"
 		and titles.area_at(Vector2(2831, -2950)) == "THE DARK" and titles.area_at(Vector2(1150, -2700)) == ""
 		and titles.area_at(Vector2(2787, -4400)) == "THE MUSHROOMS"
-		and titles.area_at(main.LOST_FROG_TOP) == "THE CASTLE" and titles.area_at(Vector2(1500, -6300)) == "THE CLOUDS"
+		and titles.area_at(Vector2(2950, -5626)) == "THE CASTLE" and titles.area_at(Vector2(1500, -6300)) == "THE CLOUDS"
 		and titles.area_at(Vector2(2800, -7300)) == "THE TOP OF THE TREE", "the tree's parts, each with its name")
 	# THE DARK only where it's dark: the bridge just above it (314.7, the dark already out) is the mushrooms'.
 	var bridge := Vector2(2700.0, -(314.7 * 10.0 + 472.0))
@@ -316,14 +316,25 @@ func _run() -> void:
 	_expect(lit == 6, "every frog's words stay readable in the dark (%d of 6 unshaded)" % lit)
 	await _game_time(4.0)
 
-	# The gate open and him well up: the lost frog turns up by the castle, and thanks him.
+	# The gate open and him out of the dark: the lost frog follows him out (a hop up from the shaft onto
+	# the bridge beside him: not up ahead in the castle), and thanks him, each line only while he's by.
+	var lost: AnimatedSprite2D = main.get_node("frogNPC4")
+	var lost_words: Label = lost.get_node("npc4speechbubble")
 	main.gateDestroyed = 1
-	await _put(player, Vector2(3150, -5680))
-	for _i in 3:
-		await process_frame
-	_expect(main.get_node("frogNPC4").position == main.LOST_FROG_TOP, "the lost frog turns up by the castle once the gate's open")
+	await _put(player, main.LOST_FROG_OUT + Vector2(300.0, 0.0))
+	await _game_time(1.2)
+	_expect(main._lost_frog_up and lost.position.distance_to(main.LOST_FROG_OUT) < 1.0 and titles.area_at(lost.position) == "THE MUSHROOMS",
+		"out of the dark, the lost frog follows him out onto the bridge (%s)" % lost.position.round())
+	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))
 	main._on_area_2d_4_body_shape_entered(RID(), player, 0, 0)
-	_expect(main.get_node("frogNPC4/npc4speechbubble").text == "i followed your jumps...", "and thanks him")
+	await _game_time(0.5)
+	_expect(lost_words.visible and lost_words.text == "i followed your jumps...", "by him: he thanks him")
+	await _put(player, main.LOST_FROG_OUT + Vector2(400.0, 0.0))
+	await _game_time(4.0)
+	_expect(not lost_words.visible and lost_words.text == "i followed your jumps...", "hopped away: his words wait (hidden), not run on without him")
+	await _put(player, main.LOST_FROG_OUT + Vector2(8.0, 0.0))
+	await _game_time(3.5)
+	_expect(lost_words.visible and lost_words.text.begins_with("thank you for showing"), "back: the rest, from where it was")
 
 	# The glass, hit until it gives: the last words come up, under the plank below it.
 	_expect(main._no_gods.modulate.a == 0.0, "the last words wait for the glass")
