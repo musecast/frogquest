@@ -3,6 +3,7 @@ extends Node
 var MusicPosition = 0
 var froggyCrown = 0
 var game_beaten: bool = false
+var wins := 0  # (climbs to the very top: the secrets at 5 and 10, player.gd _record_win)
 var desktop_frog_unlocked: bool = false  # Lil Froggy has jumped out onto the desktop at least once
 var ads_removed: bool = false
 var has_launched_before: bool = false
@@ -58,6 +59,7 @@ func save_wardrobe() -> void:
 		"seen_cosmetics": seen_cosmetics,
 		"flies_caught": flies_caught,
 		"game_beaten": game_beaten,
+		"wins": wins,
 		"desktop_frog_unlocked": desktop_frog_unlocked,
 		"ads_removed": ads_removed,
 		"has_launched_before": has_launched_before,
@@ -93,6 +95,7 @@ func load_wardrobe() -> void:
 		achievements = []
 		unlocked_modes = []
 		frenzy_best = 0
+		wins = 0
 		_trace("MusicManager load_wardrobe end missing file")
 		return
 	var f = FileAccess.open(wardrobe_path, FileAccess.READ)
@@ -108,6 +111,7 @@ func load_wardrobe() -> void:
 	seen_cosmetics = d.get("seen_cosmetics", [])
 	flies_caught   = d.get("flies_caught", [])
 	game_beaten         = d.get("game_beaten",          false)
+	wins                = maxi(int(d.get("wins", 0)), 1 if game_beaten else 0)  # (beaten before it counted: once)
 	desktop_frog_unlocked = d.get("desktop_frog_unlocked", false)
 	ads_removed         = d.get("ads_removed",          false)
 	has_launched_before = d.get("has_launched_before",  false)

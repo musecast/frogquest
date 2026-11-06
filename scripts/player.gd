@@ -863,6 +863,17 @@ func _record_win() -> void:
 			MusicManager.save_wardrobe()
 	if easiest_rank >= difficulty.rank("og"):
 		achievements.earn("beat_og")
+	# The secrets: the World Tree remembers every climb. Five to the top, and ten.
+	MusicManager.wins += 1
+	MusicManager.save_wardrobe()
+	if MusicManager.wins >= 5:
+		achievements.earn("beat_5")
+		MusicManager.unlock("aurora")
+		MusicManager.unlock("laurel")
+	if MusicManager.wins >= 10:
+		achievements.earn("beat_10")
+		MusicManager.unlock("legendary")
+		MusicManager.unlock("starcrown")
 
 
 ## Starts over, once the settings have asked: "climb" deletes the save (back to the bottom), "all" the

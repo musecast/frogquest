@@ -43,6 +43,11 @@ const ITEMS: Dictionary = {
 	"starry":         {"label": "Starry",        "type": "skin", "how": "Climb all the way to space in Endless"},
 	"holo":           {"label": "Holo",          "type": "skin", "how": "Climb with 3 friends at once"},
 	"shadow":         {"label": "God's Shadow", "type": "skin", "how": "Beat Frog Quest"},
+	# (the secrets: ??? in STILL TO FIND till they're yours, SECRET_HOW)
+	"aurora":         {"label": "Aurora",        "type": "skin", "how": "Beat Frog Quest 5 times", "secret": true},
+	"legendary":      {"label": "Legendary",     "type": "skin", "how": "Beat Frog Quest 10 times", "secret": true},
+	"laurel":         {"label": "Golden Laurel", "type": "hat", "pixel": true, "how": "Beat Frog Quest 5 times", "secret": true},
+	"starcrown":      {"label": "Star Crown",    "type": "hat", "pixel": true, "how": "Beat Frog Quest 10 times", "secret": true},
 	# (patterns over your froggy, in his colours: earned by playing; one at a time. Their colour's chosen
 	# in CHANGE YOUR LOOK)
 	"pattern_spots":    {"label": "Spots",       "type": "pattern", "pattern": 1, "how": "Find the key in the dark"},
@@ -53,6 +58,8 @@ const ITEMS: Dictionary = {
 	"lil_froggy":     {"label": "Lil Froggy",    "type": "desktop", "icon": "res://assets/frog.png",
 					  "how": "He lives on your desktop. Right-click him or his tray icon for more."},
 }
+
+const SECRET_HOW := "A secret... the World Tree remembers every climb."
 
 var _item_buttons: Dictionary = {}  # item_id -> Button
 var _item_rows: Dictionary = {}  # item_id -> its row (lit up while worn)
@@ -469,12 +476,13 @@ func _locked_row(id: String, font_size: int, icon_size: float) -> Control:
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 0)
+	var secret: bool = ITEMS[id].get("secret", false)
 	var name_label := Label.new()
-	name_label.text = ITEMS[id]["label"]
+	name_label.text = "???" if secret else ITEMS[id]["label"]
 	ui.style_label(name_label, font_size, ui.CREAM.darkened(0.25))
 	words.add_child(name_label)
 	var how := Label.new()
-	how.text = ITEMS[id].get("how", "")
+	how.text = SECRET_HOW if secret else ITEMS[id].get("how", "")
 	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ui.style_label(how, 16, ui.CREAM.darkened(0.45))
 	words.add_child(how)

@@ -23,7 +23,7 @@ func _run() -> void:
 		_failures.append("timed out")
 		_finish())
 	var mm := root.get_node("MusicManager")
-	var real := [mm.wardrobe_path, mm.look_made, mm.difficulty, mm.og_unlocked, mm.og_seen, mm.achievements.duplicate(), mm.game_beaten, mm.sensitivity]
+	var real := [mm.wardrobe_path, mm.look_made, mm.difficulty, mm.og_unlocked, mm.og_seen, mm.achievements.duplicate(), mm.game_beaten, mm.sensitivity, mm.wins, mm.unlocked_skins.duplicate()]
 	mm.wardrobe_path = WARDROBE
 	mm.sensitivity = mm.SENSITIVITY
 	mm.look_made = true
@@ -180,6 +180,29 @@ func _run() -> void:
 	player.easiest_rank = difficulty.rank("og")
 	player._record_win()
 	_expect("beat_og" in mm.achievements, "the top in OG mode: True OG")
+
+	# The secrets: the World Tree remembers every climb. The 5th win and the 10th.
+	mm.wins = 3
+	player.easiest_rank = difficulty.rank("normal")
+	player._record_win()
+	_expect(mm.wins == 4 and not "beat_5" in mm.achievements and not "aurora" in mm.unlocked_skins, "4 wins: no secret yet (%d)" % mm.wins)
+	player._record_win()
+	_expect(mm.wins == 5 and "beat_5" in mm.achievements and "aurora" in mm.unlocked_skins and "laurel" in mm.unlocked_skins,
+		"the 5th win: Fate's Favourite, the Aurora skin and the Golden Laurel")
+	mm.wins = 9
+	player._record_win()
+	_expect(mm.wins == 10 and "beat_10" in mm.achievements and "legendary" in mm.unlocked_skins and "starcrown" in mm.unlocked_skins,
+		"the 10th: Frog of Legend, the Legendary skin and the Star Crown")
+	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	_expect(looks.hat_texture("laurel") != null and looks.hat_texture("starcrown") != null and looks.EFFECTS.has("aurora")
+		and looks.EFFECTS.has("legendary"), "the secret hats draw, and the skins are the shader's")
+	var wardrobe: CanvasLayer = load("res://scenes/WardrobeScreen.gd").new()
+	var secret_row: Control = wardrobe._locked_row("aurora", 16, 32.0)
+	var secret_words: Array = secret_row.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	_expect(secret_words.size() == 2 and secret_words[0] == "???" and not "5 times" in secret_words[1],
+		"still to find, a secret shows ??? and a riddle (%s)" % [secret_words])
+	secret_row.free()
+	wardrobe.free()
 	mm.save_wardrobe()
 	var kept := [mm.og_unlocked, mm.achievements.duplicate(), mm.difficulty]
 	mm.og_unlocked = false
@@ -213,6 +236,8 @@ func _run() -> void:
 	mm.achievements = real[5]
 	mm.game_beaten = real[6]
 	mm.sensitivity = real[7]
+	mm.wins = real[8]
+	mm.unlocked_skins = real[9]
 	_finish()
 
 

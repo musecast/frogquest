@@ -147,7 +147,7 @@ static func nearest(colours: Array, c: Color) -> int:
 
 ## The skins (effects) over your froggy, by what MusicManager.equipped_skin holds: the shader's number.
 const EFFECTS := {"": 0, "shiny": 1, "rainbow": 2, "glow": 3, "ghost": 4, "starry": 5, "holo": 6, "shadow": 7,
-	"golden_skin": 8, "grayscale_skin": 9}  # (the Negative skin keeps its own shader: see material())
+	"golden_skin": 8, "grayscale_skin": 9, "aurora": 10, "legendary": 11}  # (the Negative skin keeps its own shader: see material())
 
 
 ## His body's material: your look, with a skin's effect over it ("" for none), and how much of him is
@@ -214,6 +214,14 @@ const HATS := {
 	"mushroom": ["Mushroom", [".......KKKKKKKK.......", "....KKKRRRRWWRRKKK....", "...KRRWWRRRRRRRRRRK...", "..KRRRWWRRRRRRWWRRRK..",
 		".KRRRRRRRRRRRRWWRRRRK.", "KRRWWRRRRRRWWRRRRRRRRK", "KRRWWRRRRRRWWRRRRRWWRK", "KrrrrrrrrrrrrrrrrrrrrK", ".KKKKKKKKKKKKKKKKKKKK."],
 		{"R": Color(0.92, 0.25, 0.24), "r": Color(0.68, 0.16, 0.16), "W": Color(1.0, 0.97, 0.94)}, 0],
+	# (the secrets, for beating it again and again: 5 times, the laurel; 10, the star crown)
+	"laurel": ["Golden Laurel", ["K.................K", "YK...............KY", "KYK.K.........K.KYK", ".KYKYK.......KYKYK.",
+		"K.KYYK.......KYYK.K", "YKKYyYK.....KYyYKKY", ".KYYyYYK...KYYyYYK.", "..KKYyYYKRKYYyYKK..", "....KKKKKKKKKKK...."],
+		{"Y": Color(1.0, 0.86, 0.34), "y": Color(0.80, 0.56, 0.12), "R": Color(0.90, 0.20, 0.30)}, 0],
+	"starcrown": ["Star Crown", ["......K......", ".....KYK.....", "..KKKKYKKKK..", "..KYYYWYYYK..", "...KYYYYYK...",
+		"..KYYKKKYYK..", "K.KKK.K.KKK.K", "KYK..KYK..KYK", "KYYKKYYYKKYYK", "KYPYYYPYYYPYK", "KyyyyyyyyyyyK",
+		".KKKKKKKKKKK."],
+		{"Y": Color(1.0, 0.84, 0.30), "y": Color(0.78, 0.55, 0.12), "W": Color(1.0, 1.0, 0.92), "P": Color(0.62, 0.38, 1.0)}, 0],
 }
 static var _hat_cache := {}
 
@@ -289,4 +297,9 @@ const UNLOCKS := {
 	"starry": ["skin", "Starry", "Climb all the way to space in Endless"],
 	"holo": ["skin", "Holo", "Climb with 3 friends at once"],
 	"shadow": ["skin", "Frog God's Shadow", "Beat Frog Quest"],
+	# (secrets: the wardrobe shows ??? till they're found, WardrobeScreen.ITEMS)
+	"aurora": ["skin", "Aurora", "Beat Frog Quest 5 times"],
+	"laurel": ["hat", "Golden Laurel", "Beat Frog Quest 5 times"],
+	"legendary": ["skin", "Legendary", "Beat Frog Quest 10 times"],
+	"starcrown": ["hat", "Star Crown", "Beat Frog Quest 10 times"],
 }

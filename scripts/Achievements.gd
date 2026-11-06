@@ -10,6 +10,9 @@ const LIST := {
 		"gc": "frogquest.top_of_the_tree"},
 	"beat_hard": {"name": "Hard Hopper", "about": "Beat Frog Quest on Hard.", "gc": "frogquest.hard_hopper"},
 	"beat_og": {"name": "True OG", "about": "Beat Frog Quest in OG mode.", "gc": "frogquest.true_og"},
+	# (secrets: nothing says they're here till they're earned)
+	"beat_5": {"name": "Fate's Favourite", "about": "Beat Frog Quest 5 times.", "gc": "frogquest.five_wins"},
+	"beat_10": {"name": "Frog of Legend", "about": "Beat Frog Quest 10 times.", "gc": "frogquest.ten_wins"},
 }
 const MUSE_RPC := "muse_game_achievement_earn"  # (p_game, p_achievement)
 

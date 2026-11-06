@@ -166,7 +166,7 @@ void fragment() {
 	// (his neighbours, for the rings round him and the shadow's eyes: read only when they're wanted)
 	float near = 0.0;
 	float by_eye = 0.0;
-	if (effect == 3 || effect == 7 || shadow_amount > 0.0) {
+	if (effect == 3 || effect == 7 || effect == 11 || shadow_amount > 0.0) {
 		vec2 t = 1.0 / tex_px;
 		vec4 r = texture(TEXTURE, uv + vec2(t.x, 0.0));
 		vec4 l = texture(TEXTURE, uv - vec2(t.x, 0.0));
@@ -204,6 +204,24 @@ void fragment() {
 		col = mix(col, vec3(1.0, 0.75, 0.0), 0.55);
 	} else if (effect == 9) {  // grayscale
 		col = vec3(lum(col));
+	} else if (effect == 10 && (body || belly)) {  // aurora (5 wins): the northern lights, flowing down him
+		float wave = sin(cell.y * 0.32 - TIME * 1.1 + sin(cell.x * 0.28 + TIME * 0.6) * 1.6);
+		vec3 lights = mix(vec3(0.18, 0.95, 0.58), vec3(0.30, 0.62, 1.0), 0.5 + 0.5 * wave);
+		lights = mix(lights, vec3(0.80, 0.42, 1.0), smoothstep(0.6, 1.0, wave));
+		col = lights * (lum(px.rgb) / lum(BODY_BASE) * 0.75 + 0.35);
+	} else if (effect == 11) {  // legendary (10 wins): molten gold, a glint sweeping him, sparkles, a gold aura
+		if (body || belly || mouth || tinted) {
+			float shade = clamp((lum(px.rgb) - 0.45) / 0.55, 0.0, 1.0);
+			vec3 gold = mix(vec3(0.70, 0.32, 0.04), vec3(1.0, 0.80, 0.22), shade);
+			gold = mix(gold, vec3(1.0, 0.97, 0.70), smoothstep(0.75, 1.0, shade));
+			float sweep = fract(TIME * 0.28) * 1.8 - 0.4;
+			gold = mix(gold, vec3(1.0, 1.0, 0.92), smoothstep(0.07, 0.0, abs((uv.x + uv.y) * 0.5 - sweep)) * 0.85);
+			col = mix(gold, vec3(1.0), step(0.975, hash(cell + floor(TIME * 2.5) * 0.61)));
+		}
+		if (px.a < 0.5 && near > 0.5) {
+			col = mix(vec3(1.0, 0.62, 0.12), vec3(1.0, 0.92, 0.45), 0.5 + 0.5 * sin(TIME * 2.2));
+			alpha = max(alpha, 0.65 + 0.3 * sin(TIME * 2.2));
+		}
 	}
 
 	if (shadow_amount > 0.0 && effect != 7) {  // (the intro: the shadow he starts as, his colours filling in)
