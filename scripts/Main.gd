@@ -948,8 +948,8 @@ func _on_area_2d_4_body_shape_exited(body_rid, body, body_shape_index, local_sha
 ## The lost frog follows him out of the dark, once he's up and standing: out of the dark at the bottom
 ## of the shaft (fading in), up its rungs through where the gate was, a hop at a time, and out onto the
 ## bridge beside him. Each hop is a real jump by Froggy's physics (launched, his gravity bringing him
-## down, never higher than Froggy can jump), with Froggy's jump sound, crouched a moment between. If
-## he's there once he's landed, he's thanked (not before: he doesn't talk mid-air).
+## down, never higher than Froggy can jump), in his own voice (the very sound he talks with), crouched a
+## moment between. If he's there once he's landed, he's thanked (not before: he doesn't talk mid-air).
 func _lost_frog_follows(hop := true) -> void:
 	var frog: AnimatedSprite2D = $frogNPC4
 	if not hop:  # (a climb loaded from past the gate: he's out already)
@@ -962,19 +962,16 @@ func _lost_frog_follows(hop := true) -> void:
 	frog.modulate.a = 0.0
 	frog.play("prejump1")
 	create_tween().tween_property(frog, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	$frogNPC4/npc4talk.play()
-	var hop_sound := AudioStreamPlayer2D.new()  # (Froggy's own jump, a little deeper: a bigger frog)
-	hop_sound.name = "hop"
-	hop_sound.stream = load("res://assets/frogjump.wav")
-	hop_sound.volume_db = -8.0  # (as loud as Froggy's own -10, pitched down and a little way off)
-	hop_sound.bus = &"FX"
+	var talk: AudioStreamPlayer2D = $frogNPC4/npc4talk
+	var hop_sound := talk.duplicate() as AudioStreamPlayer2D  # (his hops in his own voice: the sound he talks with)
+	hop_sound.name = "hop"  # (its own player, so a hop doesn't cut off his "!" as he comes out)
 	frog.add_child(hop_sound)
+	talk.play()
 	var g := float($Player.gravity)
 	_lost_frog_hopping = true
 	for to: Vector2 in LOST_FROG_CLIMB.slice(1) + [LOST_FROG_OUT]:
 		await get_tree().create_timer(0.35, false).timeout  # (crouched)
 		frog.play("airborne")
-		hop_sound.pitch_scale = randf_range(0.75, 0.9)
 		hop_sound.play()
 		# Froggy's physics: launched up and across, his gravity bringing him down onto it, peaking no
 		# higher than Froggy can jump.
