@@ -70,6 +70,9 @@ var _froggy_link = null  # DesktopFrogLink.gd, loaded on first use
 var _froggy_busy_until := 0  # msec; LET OUT / CALL IN waits while froggy starts up or heads home
 var _froggy_refresh_in := 0.0
 var _built_for := []  # [screen size, room] the panel was last built for
+var _doll: Control = null  # (FroggyDoll: your froggy as you look now, wearing what you've got on)
+var _item_icons: Dictionary = {}  # item_id -> its picture (the skins' and patterns' show your froggy in them)
+var _badges: Dictionary = {}  # item_id -> its little red "new" dot (yours, never worn yet)
 
 func _compute_action_button_size(base_size: Vector2, font_size: int) -> Vector2:
 	var button_font := load("res://assets/fibberish.ttf") as Font
@@ -91,6 +94,7 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_viewport_resized)
 	add_to_group("banner_reserve_ui")  # (AdsManager calls _apply_ui_layout when a banner comes or goes)
 	_play_sfx("res://assets/wardrobe_open.wav", -11.0)  # (its door: a soft knock, a little creak)
+	_warm_change_look()
 
 
 func _apply_ui_layout() -> void:
@@ -98,6 +102,10 @@ func _apply_ui_layout() -> void:
 
 func _mark_all_seen() -> void:
 	var changed := false
+	for id in ITEMS:  # (what he has on now has been worn: no "new" dot on it)
+		if _is_unlocked(id) and _is_equipped(id) and id not in MusicManager.worn_cosmetics:
+			MusicManager.worn_cosmetics.append(id)
+			changed = true
 	if MusicManager.froggyCrown != 0 and "froggycrown" not in MusicManager.seen_cosmetics:
 		MusicManager.seen_cosmetics.append("froggycrown")
 		changed = true
@@ -122,6 +130,9 @@ func _on_viewport_resized() -> void:
 		child.queue_free()
 	_item_buttons.clear()
 	_item_rows.clear()
+	_item_icons.clear()
+	_badges.clear()
+	_doll = null
 	_hint_label = null
 	_hint_box = null
 	_build_ui()
@@ -185,7 +196,6 @@ func _build_ui() -> void:
 	title.text = "WARDROBE"
 	ui.style_label(title, font_size_title, ui.GOLD)
 	title_row.add_child(title)
-	outer.add_child(title_row)
 	var look_btn := Button.new()  # (back to the frog god, to choose again: CreatorIntro)
 	look_btn.name = "ChangeLookButton"
 	look_btn.text = "CHANGE YOUR LOOK"
@@ -193,7 +203,33 @@ func _build_ui() -> void:
 	look_btn.custom_minimum_size = Vector2(0, btn_min.y)
 	ui.style_button(look_btn, font_size_body, "wood")
 	look_btn.pressed.connect(_change_look)
-	outer.add_child(look_btn)
+	# (the mirror: your froggy as you look now, in what you've got on, changing as you put things on and take
+	# them off. Upright, beside CHANGE YOUR LOOK, under the title (over it, it took two rows from the list);
+	# sideways, where there's width, beside them both)
+	_doll = load("res://scripts/FroggyDoll.gd").new()
+	_doll.name = "FroggyDoll"
+	_doll.px = 2.0 if is_portrait else 1.0
+	if is_portrait:
+		outer.add_child(title_row)
+		var mirror_row := HBoxContainer.new()
+		mirror_row.add_theme_constant_override("separation", 8)
+		mirror_row.add_child(_doll)
+		look_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		look_btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		mirror_row.add_child(look_btn)
+		outer.add_child(mirror_row)
+	else:
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 10)
+		head.add_child(_doll)
+		var column := VBoxContainer.new()
+		column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		column.alignment = BoxContainer.ALIGNMENT_CENTER
+		column.add_theme_constant_override("separation", 4)
+		column.add_child(title_row)
+		column.add_child(look_btn)
+		head.add_child(column)
+		outer.add_child(head)
 
 	# ScrollContainer holds all the items and expands to fill available space
 	# (what a row gets across: the panel less its padding, the scroll bar and a row's own lit box)
@@ -319,7 +355,9 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	row.add_theme_constant_override("separation", 8)
 	box.add_child(row)
 
-	row.add_child(ui.slot(item_icon(id, 0.0), icon_size))
+	var icon := item_icon(id, 0.0)
+	_item_icons[id] = icon
+	row.add_child(_badged(ui.slot(icon, icon_size), id, icon_size))
 
 	var lbl := Label.new()
 	lbl.text = ITEMS[id]["label"]
@@ -371,6 +409,56 @@ func _make_item_row(id: String, btn_min: Vector2, font_size: int, info_btn_size:
 	return box
 
 
+## An item's picture with, while it's new (yours, and never worn yet), a little red dot on its corner, as the
+## wardrobe's button has for something new in it. It fades away once it's been worn (_wore).
+func _badged(slot: PanelContainer, id: String, size: float) -> Control:
+	if not _is_new(id):
+		return slot
+	var holder := Control.new()  # (the picture, and the dot over its corner, not laid out with it)
+	holder.custom_minimum_size = Vector2.ONE * size
+	holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.add_child(slot)
+	var d := clampf(roundf(size * 0.28), 10.0, 18.0)
+	var over := roundf(d * 0.25)  # (a little past the corner, as on the wardrobe's button)
+	var dot := Panel.new()
+	dot.name = "NewBadge"
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	dot.offset_left = -d + over
+	dot.offset_right = over
+	dot.offset_top = -over
+	dot.offset_bottom = d - over
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.9, 0.1, 0.1, 1.0)
+	style.set_corner_radius_all(int(d))
+	style.set_border_width_all(1)
+	style.border_color = Color(0.64, 0.0, 0.171, 1.0)
+	dot.add_theme_stylebox_override("panel", style)
+	holder.add_child(dot)
+	_badges[id] = dot
+	return holder
+
+
+## Yours, and never worn yet (what's on now counts as worn).
+func _is_new(id: String) -> bool:
+	return _is_unlocked(id) and not _is_equipped(id) and id not in MusicManager.worn_cosmetics
+
+
+## Worn at last: not new any more (kept in the wardrobe's save), its dot fading softly away.
+func _wore(id: String) -> void:
+	if id in MusicManager.worn_cosmetics:
+		return
+	MusicManager.worn_cosmetics.append(id)
+	var dot: Control = _badges.get(id)
+	_badges.erase(id)
+	if is_instance_valid(dot):
+		var go := dot.create_tween().set_ignore_time_scale(true)
+		go.tween_property(dot, "modulate:a", 0.0, 0.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		go.tween_callback(dot.queue_free)
+
+
 ## The item's picture: the hat itself, or the frog wearing the skin (size 0: no minimum size).
 static func item_icon(id: String, size: float) -> TextureRect:
 	var def: Dictionary = ITEMS.get(id, {})
@@ -385,23 +473,32 @@ static func item_icon(id: String, size: float) -> TextureRect:
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icon.custom_minimum_size = Vector2(size, size)
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.material = icon_material(id)
+	return icon
+
+
+## How an item's picture is drawn: a skin or a pattern, on your froggy as you look now; the old skins' own
+## shaders and tints; nothing for a hat.
+static func icon_material(id: String) -> Material:
+	var def: Dictionary = ITEMS.get(id, {})
+	var look: GDScript = load("res://scripts/FroggyLook.gd")
 	if def.get("type") == "skin":
-		icon.material = look.material(MusicManager.look, id)  # (your froggy, wearing it)
-	elif def.get("type") == "pattern":
+		return look.material(MusicManager.look, id)  # (your froggy, wearing it)
+	if def.get("type") == "pattern":
 		var with_it: Dictionary = look.clean(MusicManager.look)  # (your froggy, in it)
 		with_it.pattern = int(def["pattern"])
-		icon.material = look.material(with_it)
-	elif def.has("shader"):
+		return look.material(with_it)
+	if def.has("shader"):
 		var mat := ShaderMaterial.new()
 		mat.shader = load(def["shader"])
-		icon.material = mat
-	elif def.has("tint"):
+		return mat
+	if def.has("tint"):
 		var mat := ShaderMaterial.new()
 		mat.shader = load("res://assets/skin_tint.gdshader")
 		mat.set_shader_parameter("tint_color", def["tint"])
 		mat.set_shader_parameter("tint_strength", def.get("strength", 1.0))
-		icon.material = mat
-	return icon
+		return mat
+	return null
 
 
 ## The picture cut down to the art in it: hats are drawn with room around them for wearing (the wiz
@@ -490,15 +587,51 @@ func _locked_row(id: String, font_size: int, icon_size: float) -> Control:
 	return row
 
 
-## Back to the frog god, to choose your look again (CreatorIntro, just the choosing); then this again,
-## with it.
+## Back to the frog god, to choose your look again (CreatorIntro, just the choosing), eased in over this; then
+## this again as it eases away, with your new look on the mirror and the pictures, right where you were in the
+## list (nothing built again). Hidden while it's covered, so there's less to draw under it.
 func _change_look() -> void:
 	var intro: CanvasLayer = load("res://scenes/CreatorIntro.gd").new()
 	intro.from_wardrobe = true
-	get_tree().root.add_child(intro)
-	intro.done.connect(func() -> void:
-		cosmetic_changed.emit()
-		_rebuild())
+	intro.covered.connect(func() -> void: visible = false)
+	intro.uncovering.connect(func() -> void:
+		_refresh_look()
+		visible = true)
+	intro.done.connect(func() -> void: cosmetic_changed.emit())
+	get_viewport().add_child(intro)  # (over the wardrobe's own screen: the game's window)
+
+
+## Your look's changed: the mirror and the pictures that show your froggy (the skins', the patterns'), where they
+## are.
+func _refresh_look() -> void:
+	for id in _item_icons:
+		var icon: TextureRect = _item_icons[id]
+		if is_instance_valid(icon) and ITEMS[id].get("type") in ["skin", "pattern"]:
+			icon.material = icon_material(id)
+	if is_instance_valid(_doll):
+		_doll.refresh()
+
+
+## What CHANGE YOUR LOOK needs, made ready while you look through this, so it comes up at once: its script, its
+## music and its sky loaded off to the side, and its sky's shader drawn once, unseen (a first draw builds it).
+func _warm_change_look() -> void:
+	for path in ["res://scenes/CreatorIntro.gd", "res://assets/froggod_intro.ogg", "res://assets/void.gdshader"]:
+		if not ResourceLoader.has_cached(path):
+			ResourceLoader.load_threaded_request(path)
+	await get_tree().process_frame
+	var sky: Shader = load("res://assets/void.gdshader")
+	var dot := ColorRect.new()
+	dot.size = Vector2(1, 1)
+	dot.modulate.a = 0.01
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = sky
+	dot.material = mat
+	add_child(dot)
+	for _i in 3:
+		await get_tree().process_frame
+	if is_instance_valid(dot):
+		dot.queue_free()
 
 
 func _rebuild() -> void:
@@ -508,6 +641,9 @@ func _rebuild() -> void:
 		child.queue_free()
 	_item_buttons.clear()
 	_item_rows.clear()
+	_item_icons.clear()
+	_badges.clear()
+	_doll = null
 	_hint_label = null
 	_hint_box = null
 	_build_ui()
@@ -581,6 +717,8 @@ func _on_item_button_pressed(id: String, btn: Button) -> void:
 			link.send_command("home", link.game_window_rect())  # he hops back into this window
 		else:
 			link.let_out(link.game_window_rect())  # he hops out of this window
+			_wore(id)
+			MusicManager.save_wardrobe()
 		_froggy_busy_until = Time.get_ticks_msec() + 3000
 		_update_button_label(btn, id)
 		return
@@ -594,10 +732,14 @@ func _on_item_button_pressed(id: String, btn: Button) -> void:
 		MusicManager.look = l
 	else:
 		MusicManager.equipped_skin = "" if _is_equipped(id) else id
+	if _is_equipped(id):
+		_wore(id)
 	MusicManager.save_wardrobe()
 	# Refresh all item buttons
 	for item_id in _item_buttons:
 		_update_button_label(_item_buttons[item_id], item_id)
+	if is_instance_valid(_doll):
+		_doll.refresh()  # (on him at once, with a little hop)
 	cosmetic_changed.emit()
 
 

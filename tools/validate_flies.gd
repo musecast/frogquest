@@ -147,6 +147,7 @@ func _check_reach(main: Node) -> void:
 		_failures.append("the jump search has to run inside a physics frame")
 	var spots: Array = FlyHunt.SPOTS
 	var reached := {}
+	var standing := {}  # (and caught from where he comes to stand: not only by a lucky shot in passing)
 	var space := body.get_world_2d().direct_space_state
 	var tm: TileMap = main.get_node("TileMap")
 	var launches := _launches()
@@ -155,16 +156,17 @@ func _check_reach(main: Node) -> void:
 		_failures.append("the frog never lands from where a new climb starts")
 		main.queue_free()
 		return
+	_stood(first, spots, standing, space, body)
 	var places: Array = [first]
 	var seen := {_key(first): true}
 	var i := 0
-	while i < places.size() and reached.size() < spots.size() and places.size() < MAX_PLACES:
-		# (nearest to a fly still out of reach first: the search heads for them)
+	while i < places.size() and standing.size() < spots.size() and places.size() < MAX_PLACES:
+		# (nearest to a fly not yet caught from where he can stand first: the search heads for them)
 		var best := i
 		var best_d := INF
 		for j in range(i, mini(places.size(), i + 400)):
 			for k in spots.size():
-				if not reached.has(k):
+				if not standing.has(k):
 					var d: float = places[j].distance_squared_to(spots[k])
 					if d < best_d:
 						best_d = d
@@ -181,6 +183,7 @@ func _check_reach(main: Node) -> void:
 			if land != null and not seen.has(_key(land)):
 				seen[_key(land)] = true
 				places.append(land)
+				_stood(land, spots, standing, space, body)
 	var missing := []
 	for k in spots.size():
 		if not reached.has(k):
@@ -191,6 +194,12 @@ func _check_reach(main: Node) -> void:
 			missing.append("%d at %s (nearest place he can stand: %s, %.0f away)" % [
 				k, spots[k], nearest.round(), nearest.distance_to(spots[k])])
 	_expect(missing.is_empty(), "the frog can get to every fly (out of reach: %s; searched %d places)" % [missing, i])
+	var only_in_passing := []
+	for k in spots.size():
+		if reached.has(k) and not standing.has(k):
+			only_in_passing.append("%d at %s" % [k, spots[k]])
+	_expect(only_in_passing.is_empty(),
+		"and every one from somewhere he can stand, not only by a lucky shot (only in passing: %s)" % [only_in_passing])
 	print("  Jumped from %d landing places (%d found) in %.1f s." % [i, places.size(), (Time.get_ticks_msec() - began) / 1000.0])
 	main.queue_free()
 	if FileAccess.file_exists(SCRATCH_SAVE):
@@ -229,6 +238,24 @@ func _jump(body: CharacterBody2D, tm: TileMap, from: Vector2, launch: Vector2, s
 		else:
 			airborne += 1
 	return null
+
+
+## Where he's come to stand (at): the flies his tongue gets from there, marked in standing. Not from a scrap of
+## floor shut in under something (a mushroom's stem, under its cap: narrower than a frog's width either side of
+## him, and a ceiling close over him), which only a lucky shot lands on.
+func _stood(at: Vector2, spots: Array, standing: Dictionary, space: PhysicsDirectSpaceState2D, body: CharacterBody2D) -> void:
+	var mouth: Vector2 = at + Fly.mouth_of(body) - body.global_position
+	var exclude: Array[RID] = [body.get_rid()]
+	var narrow := false
+	for dx in [-18.0, 18.0]:
+		var under := space.intersect_ray(PhysicsRayQueryParameters2D.create(at + Vector2(dx, 0.0), at + Vector2(dx, 40.0), body.collision_mask, exclude))
+		narrow = narrow or under.is_empty() or under.normal.y > -0.5
+	var shut_in := not space.intersect_ray(PhysicsRayQueryParameters2D.create(at, at + Vector2(0.0, -90.0), body.collision_mask, exclude)).is_empty()
+	if narrow and shut_in:
+		return
+	for k in spots.size():
+		if not standing.has(k) and Fly.can_catch(space, mouth, spots[k], exclude):
+			standing[k] = true
 
 
 ## TileMap.gd: the jump pad tiles (source 3, atlas 12-15 by 0; the bed is 16 by 0) send him up, if

@@ -888,6 +888,7 @@ func reset_progress(kind: String) -> void:
 		MusicManager.equipped_skin = ""
 		MusicManager.unlocked_skins = []
 		MusicManager.seen_cosmetics = []
+		MusicManager.worn_cosmetics = []
 		MusicManager.game_beaten = false
 		MusicManager.desktop_frog_unlocked = false
 		MusicManager.difficulty = "normal"

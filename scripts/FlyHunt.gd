@@ -21,7 +21,7 @@ const SPOTS := [
 	Vector2(2966.0, -3350.0),
 	Vector2(3130.0, -3847.0),
 	Vector2(2477.0, -4154.0),
-	Vector2(3110.0, -4480.0),
+	Vector2(3100.0, -4571.0),  # (over the mushroom by THE MUSHROOMS' wide one: under its cap, only a lucky shot got it)
 	Vector2(4243.0, -5076.0),
 	Vector2(4243.0, -5632.0),
 ]

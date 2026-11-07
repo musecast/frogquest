@@ -65,11 +65,18 @@ func _process(delta: float) -> void:
 		_shown = want
 		queue_redraw()
 		return
-	var k := 1.0 - exp(-delta * 16.0)
+	var k := 1.0 - exp(-_real(delta) * 16.0)
 	var was := _shown
 	_shown = Rect2(_shown.position.lerp(want.position, k), _shown.size.lerp(want.size, k))
 	if not _shown.position.is_equal_approx(was.position) or not _shown.size.is_equal_approx(was.size):
 		queue_redraw()
+
+
+## A frame's time, never slower than it really went: the pause menu runs the game at a twentieth of its speed
+## (Engine.time_scale), and a menu over it shouldn't crawl; sped up (the tests' fast-forward), it goes with the
+## game. Steady frame to frame, as the game's own is.
+func _real(delta: float) -> float:
+	return delta / Engine.time_scale if Engine.time_scale > 0.0 and Engine.time_scale < 1.0 else delta
 
 
 func _gui_input(e: InputEvent) -> void:

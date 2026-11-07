@@ -12,6 +12,7 @@ var equipped_hat: String = ""
 var equipped_skin: String = ""
 var unlocked_skins: Array = []
 var seen_cosmetics: Array = []
+var worn_cosmetics: Array = []  # (worn at least once: its little "new" dot in the wardrobe goes)
 var flies_caught: Array = []  # the hidden flies you've caught (FlyHunt.gd): ids like "fly_3"
 var look: Dictionary = {}  # your froggy, as you made him (FroggyLook: colours, pattern, eyes, band)
 var look_made := false  # (you've made him: the intro, CreatorIntro, doesn't come again)
@@ -57,6 +58,7 @@ func save_wardrobe() -> void:
 		"equipped_skin": equipped_skin,
 		"unlocked_skins": unlocked_skins,
 		"seen_cosmetics": seen_cosmetics,
+		"worn_cosmetics": worn_cosmetics,
 		"flies_caught": flies_caught,
 		"game_beaten": game_beaten,
 		"wins": wins,
@@ -86,6 +88,7 @@ func load_wardrobe() -> void:
 		equipped_skin  = ""
 		unlocked_skins = []
 		seen_cosmetics = []
+		worn_cosmetics = []
 		flies_caught   = []
 		look = {}
 		look_made = false
@@ -111,6 +114,13 @@ func load_wardrobe() -> void:
 	equipped_skin  = d.get("equipped_skin",  "")
 	unlocked_skins = d.get("unlocked_skins", [])
 	seen_cosmetics = d.get("seen_cosmetics", [])
+	if d.get("worn_cosmetics") is Array:
+		worn_cosmetics = d.get("worn_cosmetics")
+	else:  # (a save from before they were kept: what had been seen in the wardrobe isn't new, nor what's on)
+		worn_cosmetics = seen_cosmetics.duplicate()
+		for on in [equipped_hat, equipped_skin]:
+			if on != "" and on not in worn_cosmetics:
+				worn_cosmetics.append(on)
 	flies_caught   = d.get("flies_caught", [])
 	game_beaten         = d.get("game_beaten",          false)
 	wins                = maxi(int(d.get("wins", 0)), 1 if game_beaten else 0)  # (beaten before it counted: once)

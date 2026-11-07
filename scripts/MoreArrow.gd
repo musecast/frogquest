@@ -21,6 +21,7 @@ func _init() -> void:
 
 
 func _process(delta: float) -> void:
+	delta = _real(delta)
 	_clock += delta
 	if shown:
 		_waited += delta
@@ -46,3 +47,10 @@ func _draw() -> void:
 			if c == ".":
 				continue
 			draw_rect(Rect2(Vector2(x, y) * pixel + Vector2(0, bob), Vector2(pixel, pixel)), colour if c == "C" else edge)
+
+
+## A frame's time, never slower than it really went: the pause menu runs the game at a twentieth of its speed
+## (Engine.time_scale), and a menu over it shouldn't crawl; sped up (the tests' fast-forward), it goes with the
+## game. Steady frame to frame, as the game's own is.
+func _real(delta: float) -> float:
+	return delta / Engine.time_scale if Engine.time_scale > 0.0 and Engine.time_scale < 1.0 else delta

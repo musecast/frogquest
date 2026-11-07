@@ -3,10 +3,13 @@ extends Node2D
 ## green, now and then a gold one. Only where the tree is and there's light to see them (not in the dark,
 ## not over the top); behind Froggy and the platforms. Up at the castle it's the white petals instead:
 ## there, as its frog says, the petals have fallen (lighter: slower, and swaying wider). Only once he's opened
-## the way up, though (Main.way_open): before that, nothing falls in the castle. The petals fall in front of
+## the way up, though (Main.way_open): before that, nothing falls in the castle. Which it is goes by where each
+## starts: over the castle's floor it's in the castle (CASTLE_FLOOR), so a petal, or nothing, never a leaf, even
+## with him under the castle and only its inside showing at the top. The petals fall in front of
 ## the castle's platforms (a layer of their own over them). Leaves and petals come to rest on the floor they
 ## fall onto, lying there a while before they slowly fade; Froggy landing by them, or jumping from by them,
-## throws them up (they flutter down again), and flying right through falling ones sweeps them along.
+## throws them up (they flutter down again), and flying right through falling ones sweeps them along. A mushroom
+## bouncing him throws up every one lying on its cap (bounce, from the mushrooms' TileMap.gd).
 
 const ART := "res://assets/critters.png"
 ## (CritterArt's leaf0 and leaf1, a green leaf two ways up, and leaf_gold, at its pixel size)
@@ -17,7 +20,7 @@ const EVERY := Vector2(0.7, 1.6)  # seconds between new ones
 const ACROSS := Vector2(2150.0, 3650.0)
 const HEIGHTS := [Vector2(-60.0, 145.0), Vector2(318.0, 610.0)]
 const GROUND := -472.0
-const PETALS_FROM := 505.0  # (THE CASTLE: where the white petals have fallen)
+const CASTLE_FLOOR := -5568.0  # (the castle's floor, its underside: one that starts over it is in the castle)
 const PETALS_ACROSS := Vector2(2150.0, 4300.0)  # (the castle's wider than the tree: out to its east wall)
 const PETAL_Z := 1  # (the petals' layer: in front of the platforms (0), behind Froggy and the overlay (2))
 const REST := Vector2(6.0, 12.0)  # (landed: how long one lies there before it starts to fade)
@@ -29,6 +32,7 @@ const KICK_NEAR := Vector2(46.0, 24.0)  # (how near his feet a lying one is thro
 const KICK_UP := Vector2(90.0, 200.0)  # (how hard up: by how hard he came down, or went up)
 const KICK_SIDE := Vector2(25.0, 85.0)  # (and away from him)
 const KICK_SLOW := 260.0  # (a throw dying away, px/s every second)
+const BOUNCE_UP := Vector2(200.0, 300.0)  # (off a mushroom's cap as it bounces him: how hard up)
 const BRUSH := 20.0  # (a falling one this near him as he flies by fast is swept along)
 const SETTLE := 0.3  # (landed mid-turn: how long it takes to settle flat)
 const THINNEST := 0.5  # (turning, the thinnest one gets: half its width, every column of its pixels still drawn)
@@ -104,12 +108,13 @@ func _process(delta: float) -> void:
 	_wait -= delta
 	if _wait <= 0.0:
 		_wait = randf_range(EVERY.x, EVERY.y)
-		if _leaves.filter(func(l: Dictionary) -> bool: return not l.down).size() < MOST and _falls_here(view):
-			var petal := _petals_here(view)
+		var y := view.position.y - 20.0  # (just over what's seen)
+		var petal := y < CASTLE_FLOOR  # (starting in the castle: its white petals, never the tree's leaves)
+		if _leaves.filter(func(l: Dictionary) -> bool: return not l.down).size() < MOST and _falls_here(view, petal):
 			var across := PETALS_ACROSS if petal else ACROSS
 			var x := randf_range(maxf(view.position.x, across.x), minf(view.end.x, across.y))
 			_leaves.append({
-				"x0": x, "x": x, "y": view.position.y - 20.0, "t": 0.0, "phase": randf() * TAU,
+				"x0": x, "x": x, "y": y, "t": 0.0, "phase": randf() * TAU,
 				"fall": randf_range(16.0, 26.0) if petal else randf_range(22.0, 34.0), "sway": randf_range(1.2, 2.1),
 				"wide": randf_range(14.0, 28.0) if petal else randf_range(10.0, 22.0),
 				"gold": not petal and randf() < 0.18, "flip": randf() < 0.5, "petal": petal,
@@ -177,18 +182,32 @@ func kick(feet: Vector2, hard: float) -> void:
 		if absf(off.x) > KICK_NEAR.x or absf(off.y) > KICK_NEAR.y:
 			continue
 		var near := 1.0 - absf(off.x) / KICK_NEAR.x
-		leaf.down = false
-		leaf.rest = 0.0
-		leaf.phase = (0.0 if leaf.side > 0.0 else PI) - leaf.t * leaf.sway  # (turning on from flat, the side it lay)
-		leaf.x0 = leaf.x  # (and its sway from where it lay)
-		leaf.vy = -lerpf(KICK_UP.x, KICK_UP.y, power) * (0.55 + 0.45 * near)
 		var away := signf(off.x) if off.x != 0.0 else (1.0 if randf() < 0.5 else -1.0)
-		leaf.vx = away * randf_range(KICK_SIDE.x, KICK_SIDE.y) * power
+		_throw(leaf, lerpf(KICK_UP.x, KICK_UP.y, power) * (0.55 + 0.45 * near), away * randf_range(KICK_SIDE.x, KICK_SIDE.y) * power)
 
 
-## Whether leaves fall anywhere in what the camera sees (at the castle: its petals, once the way's open).
-func _falls_here(view: Rect2) -> bool:
-	var petal := _petals_here(view)
+## A mushroom bouncing him: every one lying on its cap (from left to right, its top at top, in the world) thrown
+## up high off it, as he is, to flutter back down.
+func bounce(left: float, right: float, top: float) -> void:
+	for leaf in _leaves:
+		if leaf.down and leaf.x >= left - 2.0 and leaf.x <= right + 2.0 and leaf.y >= top - 24.0 and leaf.y <= top + 14.0:
+			_throw(leaf, randf_range(BOUNCE_UP.x, BOUNCE_UP.y), randf_range(-1.0, 1.0) * KICK_SIDE.y)
+
+
+## A lying one thrown up (px/s) and to the side: turning on from flat, the side it lay, swaying from where it lay.
+func _throw(leaf: Dictionary, up: float, side: float) -> void:
+	leaf.down = false
+	leaf.rest = 0.0
+	leaf.phase = (0.0 if leaf.side > 0.0 else PI) - leaf.t * leaf.sway
+	leaf.x0 = leaf.x
+	leaf.vy = -up
+	leaf.vx = side
+
+
+## Whether one falls in what the camera sees, starting just over it: in the castle (`petal`: it starts over the
+## castle's floor) a white petal, once the way's open; elsewhere a leaf. Across the tree (the petals: the castle's
+## width), and only at the leaves' heights (not in the dark, not over the top).
+func _falls_here(view: Rect2, petal: bool) -> bool:
 	if petal and not (story != null and bool(story.get("way_open"))):
 		return false
 	var across := PETALS_ACROSS if petal else ACROSS
@@ -265,11 +284,6 @@ func _measure(img: Image, frame: Rect2) -> void:
 	var middle := sum / float(n) if n > 0 else frame.size * 0.5
 	_middles.append(middle - frame.size * 0.5)
 	_lows.append((float(low) - middle.y) * _scale)
-
-
-## Whether it's the castle the camera's at: the white petals, not leaves.
-func _petals_here(view: Rect2) -> bool:
-	return (GROUND - view.get_center().y) / 10.0 >= PETALS_FROM
 
 
 ## What the camera sees, in the world.

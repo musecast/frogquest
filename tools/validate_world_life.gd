@@ -283,6 +283,23 @@ func _run() -> void:
 		await process_frame
 	_expect(leaves._leaves.any(func(l: Dictionary) -> bool: return l.petal and l.x0 > 3700.0),
 		"and across the castle's whole width, not just the tree's (%s)" % [leaves._leaves.map(func(l: Dictionary) -> int: return int(l.x0))])
+	# Under the castle, only its inside showing at the top of what's seen: what starts in it is its petals, never
+	# the tree's leaves (they came to lie on its floor, indoors); and before the way's open, nothing.
+	await _look(player, Vector2(2900, -5480))
+	var view_top: float = leaves._view().position.y
+	main.way_open = false
+	leaves._leaves.clear()
+	for _i in 30:
+		leaves._wait = 0.0
+		await process_frame
+	_expect(view_top < leaves.CASTLE_FLOOR and leaves._leaves.is_empty(),
+		"under the castle, before the way's open: no leaf starting in it (%d; the view's top %.0f)" % [leaves._leaves.size(), view_top])
+	main.way_open = true
+	for _i in 30:
+		leaves._wait = 0.0
+		await process_frame
+	_expect(not leaves._leaves.is_empty() and leaves._leaves.all(func(l: Dictionary) -> bool: return l.petal),
+		"and once it's open, only its petals (%s)" % [leaves._leaves.map(func(l: Dictionary) -> bool: return l.petal)])
 	# Turning over as they fall, leaves and petals change sides at their thinnest, about their own middle: they
 	# don't jump a few pixels as they turn (their pixels aren't centred in their frames), and they never go so
 	# thin they're gone (half their width at the least: all 4 columns of their pixels still drawn). Lying, they
@@ -346,6 +363,22 @@ func _run() -> void:
 	for _i in 3:
 		await process_frame
 	_expect(not petal in leaves._leaves, "it fades away in time")
+	# Froggy bouncing off a mushroom throws up what's lying on its cap, end to end (not only by his feet).
+	await _look(player, Vector2(3100, -4600))  # (THE MUSHROOMS' wide one: its cap x 3014-3187, its top -4531)
+	leaves._leaves.clear()
+	leaves._wait = 9999.0
+	var on_cap := {"x0": 3030.0, "x": 3030.0, "y": -4531.0 - leaves._half_height(), "t": 0.0, "phase": 0.0, "fall": 28.0,
+		"sway": 1.5, "wide": 12.0, "gold": false, "flip": false, "petal": false, "vx": 0.0, "vy": 0.0, "down": true,
+		"rest": 0.0, "lies": 30.0, "side": 1.0, "face_at": 1.0}
+	leaves._leaves.append(on_cap)
+	var mushrooms: Node = main.get_node("TileMap")
+	mushrooms._last_bounce_ms = 0
+	player.global_position = Vector2(3170.0, -4545.0)  # (on its other end, 140 px off: past where landing throws them)
+	player.velocity = Vector2(120.0, 0.0)
+	mushrooms._process(0.016)
+	_expect(not on_cap.down and on_cap.vy < -150.0,
+		"a bounce off a mushroom throws up a leaf lying at the far end of its cap (%s, %.0f)" % [on_cap.down, on_cap.vy])
+	player.velocity = Vector2.ZERO
 	leaves._wait = 0.0
 
 	await _look(player, Vector2(2900, -900))

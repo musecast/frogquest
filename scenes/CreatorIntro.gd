@@ -8,10 +8,14 @@ extends CanvasLayer
 ## (he's lil froggy, as everyone is; friends know you by your Muse @handle): hats, patterns and skins are
 ## earned by playing. His look is kept (MusicManager.look) and goes online with him (Party), with a band
 ## of a colour all his own (a random one: he changes it in Play Together, not here). From the wardrobe
-## (from_wardrobe): just the choosing, with his pattern's colour when he's wearing one. (The mood's a
+## (from_wardrobe): just the choosing, with his pattern's colour when he's wearing one, eased in over the
+## wardrobe and out again, its question there at once (no slow typing), the game's music turned down under its
+## own, all on real time (the pause menu runs the game at a twentieth of its speed). (The mood's a
 ## dream-like void; the words, the frog god's and the art are Frog Quest's own.)
 
 signal done
+signal covered  ## (from the wardrobe: eased all the way in, nothing else to be seen)
+signal uncovering  ## (and starting to ease away, back to the wardrobe)
 
 const LINES := ["...LITTLE ONE...", "YOU HAVE COME FROM BELOW.", "BEFORE THE TREE CAN KNOW YOU...", "TELL ME."]
 const ASK := "WHAT DO YOU LOOK LIKE?"
@@ -24,6 +28,8 @@ const HOLD := 2.5  # (seconds of black after the cut, its sound ringing out, bef
 const FADE := 3.5  # (and the slow fade into his bedroom: he's asleep in it)
 const QUICK_HOLD := 1.1  # (into Endless, or Play Together's menu: on with it)
 const QUICK_FADE := 1.8
+const FROM_WARDROBE := 0.35  # (from the wardrobe: easing in, and away again)
+const DUCK_DB := 24.0  # (the game's own music turned down this much under the frog god's, from the wardrobe)
 const MUSIC_DB := -9.0  # (its file's at -16 LUFS: this puts it at about -25, as loud as the hum before it)
 const IDLE := ["res://assets/frog.png", "res://assets/frog2.png"]
 const TYPE_SPEED := 10.0  # letters a second (slow: the frog god is old, and big)
@@ -86,6 +92,8 @@ var _spaced: FontVariation
 var _black: ColorRect
 var _music: AudioStreamPlayer
 var _more: Control  # (MoreArrow: under its words once they're all there, for a tap)
+var _ducked := {}  # (from the wardrobe: the game's music players turned down under the frog god's, and how loud they were)
+var _evened := {}  # (_even's answers, by words and room: worked out once, not every frame)
 var _blip: AudioStreamPlayer
 
 
@@ -136,7 +144,7 @@ func _ready() -> void:
 	_frog.stretch_mode = TextureRect.STRETCH_SCALE
 	_frog.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_frog.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_frog.material = _looks.material(_look, "", 1.0)
+	_frog.material = _looks.material(_look, "", 0.0 if from_wardrobe else 1.0)  # (from the wardrobe: him at once, no shadow first)
 	_root.add_child(_frog)
 	_dress_hat()
 
@@ -207,7 +215,8 @@ func _ready() -> void:
 	_music.volume_db = -50.0
 	add_child(_music)
 	_music.play()
-	_music.create_tween().tween_property(_music, "volume_db", MUSIC_DB, FADE_IN if fade_in else 2.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_music.create_tween().set_ignore_time_scale(from_wardrobe).tween_property(_music, "volume_db", MUSIC_DB, FADE_IN if fade_in else 2.0) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)  # (from the wardrobe the pause menu may have slowed the game right down)
 	_blip = AudioStreamPlayer.new()
 	_blip.stream = load("res://assets/frogaim.wav")
 	_blip.bus = &"FX"
@@ -218,6 +227,11 @@ func _ready() -> void:
 	if from_wardrobe:
 		_centred = 0.0
 		_choose(0)
+		_duck(true)
+		_root.modulate.a = 0.0  # (eased in over the wardrobe, not there all at once)
+		var come := create_tween().set_ignore_time_scale(true)
+		come.tween_property(_root, "modulate:a", 1.0, FROM_WARDROBE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		come.tween_callback(func() -> void: covered.emit())
 	else:
 		_step = "talk"
 		if fade_in:
@@ -230,6 +244,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	delta = _real(delta)
 	_clock += delta
 	if _quiet > 0.0:
 		_quiet -= delta
@@ -237,7 +252,10 @@ func _process(delta: float) -> void:
 			_say(LINES[0])
 	_fit()
 	var total := _words.text.length()
-	if _typed < total:
+	if from_wardrobe:  # (its question there at once: it's been asked before)
+		_typed = float(total)
+		_words.visible_characters = -1
+	elif _typed < total:
 		var before := int(_typed)
 		_typed = minf(float(total), _typed + delta * TYPE_SPEED)
 		_words.visible_characters = int(_typed)
@@ -377,9 +395,11 @@ func _end() -> void:
 	_step = ""
 	_tap.visible = false
 	if from_wardrobe:
-		var away := create_tween()
-		away.tween_property(_root, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		away.parallel().tween_property(_music, "volume_db", -50.0, 0.35).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		uncovering.emit()
+		var away := create_tween().set_ignore_time_scale(true)
+		away.tween_property(_root, "modulate:a", 0.0, FROM_WARDROBE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		away.parallel().tween_property(_music, "volume_db", -50.0, FROM_WARDROBE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_duck(false, away)
 		await away.finished
 		done.emit()
 		queue_free()
@@ -540,6 +560,13 @@ func _lay_choosing(at: Vector2, w: float, grid_h: float, label_h: float, gap: fl
 ## short as it can be: never one word on its own under the rest). Spaces become the breaks, so it's
 ## as long as it was (what's typed out stays where it is).
 func _even(words: String, room: float) -> String:
+	var key := "%s|%d|%d" % [words, roundi(room), _voice_px]
+	if not _evened.has(key):
+		_evened[key] = _even_now(words, room)
+	return _evened[key]
+
+
+func _even_now(words: String, room: float) -> String:
 	var parts := words.split(" ", false)
 	var size := _voice_px
 	if parts.size() < 2 or _spaced.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= room:
@@ -618,3 +645,30 @@ func _button(text: String, on_press: Callable, kind: String) -> Button:
 	load("res://scripts/UIStyle.gd").style_button(b, 16, kind)
 	b.pressed.connect(on_press)
 	return b
+
+
+## From the wardrobe: the game's own music (whatever's playing on the Music bus) turned down under the frog
+## god's as it eases in (down), and back up as it eases away (with `away`: alongside its fade).
+func _duck(down: bool, away: Tween = null) -> void:
+	if down:
+		var players: Array[Node] = get_tree().root.find_children("*", "AudioStreamPlayer", true, false)
+		players.append_array(get_tree().root.find_children("*", "AudioStreamPlayer2D", true, false))
+		for p in players:
+			if p != _music and p != _blip and p.bus == &"Music" and p.playing:
+				_ducked[p] = p.volume_db
+		var dip := create_tween().set_ignore_time_scale(true).set_parallel(true)
+		for p in _ducked:
+			dip.tween_property(p, "volume_db", float(_ducked[p]) - DUCK_DB, FROM_WARDROBE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		if _ducked.is_empty():
+			dip.kill()
+		return
+	for p in _ducked:
+		if is_instance_valid(p):
+			away.parallel().tween_property(p, "volume_db", float(_ducked[p]), FROM_WARDROBE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+
+## A frame's time, never slower than it really went: the pause menu runs the game at a twentieth of its speed
+## (Engine.time_scale), and a menu over it shouldn't crawl; sped up (the tests' fast-forward), it goes with the
+## game. Steady frame to frame, as the game's own is.
+func _real(delta: float) -> float:
+	return delta / Engine.time_scale if Engine.time_scale > 0.0 and Engine.time_scale < 1.0 else delta

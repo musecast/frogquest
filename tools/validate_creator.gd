@@ -30,7 +30,7 @@ func _run() -> void:
 	mm = root.get_node("MusicManager")
 	var look: GDScript = load("res://scripts/FroggyLook.gd")
 	var real := [mm.wardrobe_path, mm.look.duplicate(), mm.look_made, mm.equipped_hat, mm.equipped_skin,
-		mm.unlocked_skins.duplicate(), mm.mushroom_bounces, mm.froggyCrown, mm.seen_cosmetics.duplicate()]
+		mm.unlocked_skins.duplicate(), mm.mushroom_bounces, mm.froggyCrown, mm.seen_cosmetics.duplicate(), mm.worn_cosmetics.duplicate()]
 	mm.wardrobe_path = SCRATCH_WARDROBE
 	mm.look = {}
 	mm.look_made = false
@@ -274,7 +274,10 @@ func _run() -> void:
 	await _frames(3)
 
 	# The wardrobe's CHANGE YOUR LOOK: just the choosing (with his pattern's colour, when he's wearing one;
-	# not his band's, that's Play Together's); the climb goes on.
+	# not his band's, that's Play Together's); the climb goes on. From the pause menu (the game at a twentieth of
+	# its speed), it still eases in and away at its own pace: its question there at once, the wardrobe hidden under
+	# it once it's all in, the game's music turned down under its own; and back to the wardrobe as it was, nothing
+	# built again, its mirror and pictures in the new look.
 	mm.unlocked_skins.append("pattern_spots")
 	var spotted: Dictionary = look.clean(mm.look)
 	spotted.pattern = 1
@@ -282,15 +285,35 @@ func _run() -> void:
 	var ws: CanvasLayer = load("res://scenes/WardrobeScreen.gd").new()
 	player.add_child(ws)
 	await _frames(3)
+	var doll: Control = ws._doll
+	var spots_icon: TextureRect = ws._item_icons.get("pattern_spots")
+	_expect(doll != null and doll.is_inside_tree() and doll.get_script().resource_path == "res://scripts/FroggyDoll.gd"
+		and spots_icon != null and int(doll._frog.material.get_shader_parameter("pattern")) == 1,
+		"the wardrobe's mirror: his froggy as he looks now, spots and all")
+	var song := AudioStreamPlayer.new()  # (the game's music, playing under it)
+	song.stream = load("res://assets/froggod_intro.ogg")
+	song.bus = &"Music"
+	song.volume_db = -6.0
+	root.add_child(song)
+	song.play()
+	Engine.time_scale = 0.05  # (the pause menu's)
 	var change: Button = ws.find_child("ChangeLookButton", true, false)
 	_expect(change != null and change.visible, "the wardrobe has CHANGE YOUR LOOK")
 	if change:
+		var went := Time.get_ticks_msec()
 		change.pressed.emit()
 		await _frames(3)
 		var again = root.get_node_or_null("CreatorIntro")
 		_expect(again != null and again.from_wardrobe and again._said == "WHAT DO YOU LOOK LIKE?" and again._part.text == "SKIN"
 			and again._shadow < 0.05, "which goes straight to the choosing, no shadow")
 		if again:
+			_expect(again._words.visible_characters == -1 and again._root.modulate.a < 0.9,
+				"its question there at once, the choosing easing in over the wardrobe (%.2f)" % again._root.modulate.a)
+			await _until(func() -> bool: return not ws.visible, 2.0)
+			var took := Time.get_ticks_msec() - went
+			_expect(not ws.visible and again._root.modulate.a > 0.99 and took < 1200,
+				"all in at its own pace, the game paused or not, the wardrobe hidden under it (%d ms)" % took)
+			_expect(song.volume_db < -6.0 - 20.0, "the game's music turned down under its own (%.1f dB)" % song.volume_db)
 			_expect(again._steps == ["body", "belly", "pattern_colour"], "his skin and belly, his pattern's colour (not his eyes', not his band's)")
 			again._grid._choose_at(again._grid.cell(4).get_center())
 			var new_skin: Color = look.colour(again._look, "body")
@@ -300,10 +323,21 @@ func _run() -> void:
 			await _frames(1)
 			_expect(again._part.text == "PATTERN" and again._next.text == "DONE", "his pattern's colour last")
 			again._grid._choose_at(again._grid.cell(13).get_center())
+			var back := Time.get_ticks_msec()
 			again._next_pressed()
+			await _frames(1)
+			_expect(ws.visible and ws._doll == doll and ws._item_icons.get("pattern_spots") == spots_icon
+				and _near(doll._frog.material.get_shader_parameter("body_colour"), new_skin)
+				and _near(spots_icon.material.get_shader_parameter("body_colour"), new_skin),
+				"DONE: the wardrobe back under it as it was, nothing built again, its mirror and pictures in his new look")
 			await _until(func() -> bool: return not is_instance_valid(again), 3.0)
+			var gone := Time.get_ticks_msec() - back
+			_expect(not is_instance_valid(again) and gone < 1200 and absf(song.volume_db + 6.0) < 0.1,
+				"eased away in a moment, the game's music back up (%d ms, %.1f dB)" % [gone, song.volume_db])
 			_expect(_near(look.colour(mm.look, "body"), new_skin) and _near(look.band_colour(mm.look), band) and int(mm.look.pattern) == 1
 				and is_instance_valid(main) and player.get_node("Trajectory").endGame == 0, "and back, his new look kept (his band as it was), the climb as it was")
+	Engine.time_scale = 1.0
+	song.queue_free()
 	ws.queue_free()
 	mm.unlocked_skins.erase("pattern_spots")
 	spotted = look.clean(mm.look)
@@ -365,7 +399,50 @@ func _run() -> void:
 	if spots_btn:
 		spots_btn.pressed.emit()
 	_expect(spots_btn != null and int(look.clean(mm.look).pattern) == 1, "EQUIP on Spots: he's spotted")
+	_expect(int(ws2._doll._frog.material.get_shader_parameter("pattern")) == 1, "and the mirror shows it at once")
+	var leaf_btn: Button = ws2._item_buttons.get("leaf")
+	if leaf_btn:
+		leaf_btn.pressed.emit()
+	await _frames(1)
+	_expect(leaf_btn != null and mm.equipped_hat == "leaf" and ws2._doll._hat.visible and ws2._doll._hat.texture == look.hat_texture("leaf")
+		and ws2._doll._hat.position.y < ws2._doll._frog.position.y + ws2._doll._frog.size.y * 0.5,
+		"a hat put on: on him in the mirror at once, on his head")
+	if leaf_btn:
+		leaf_btn.pressed.emit()
+	_expect(mm.equipped_hat == "" and not ws2._doll._hat.visible, "and off again")
 	ws2.queue_free()
+
+	# Something new in the wardrobe (yours, never worn): a little red dot on its picture, till it's worn; then
+	# gone for good. A save from before they were kept: what had been seen, and what's on, isn't new.
+	mm.unlock("cap")
+	mm.worn_cosmetics.erase("cap")
+	var ws3: CanvasLayer = load("res://scenes/WardrobeScreen.gd").new()
+	player.add_child(ws3)
+	await _frames(3)
+	var cap_dot: Control = ws3._badges.get("cap")
+	_expect(cap_dot != null and cap_dot.is_inside_tree() and cap_dot.visible and not ws3._badges.has("leaf"),
+		"a new hat has its little red dot (and the leaf, worn already, has none)")
+	var cap_btn: Button = ws3._item_buttons.get("cap")
+	if cap_btn:
+		cap_btn.pressed.emit()
+	_expect("cap" in mm.worn_cosmetics and not ws3._badges.has("cap"), "worn: it's not new any more")
+	await _until(func() -> bool: return not is_instance_valid(cap_dot), 2.0)
+	_expect(not is_instance_valid(cap_dot), "its dot fades away")
+	if cap_btn:
+		cap_btn.pressed.emit()
+	ws3.queue_free()
+	var ws4: CanvasLayer = load("res://scenes/WardrobeScreen.gd").new()
+	player.add_child(ws4)
+	await _frames(3)
+	_expect(not ws4._badges.has("cap"), "and it stays worn, the wardrobe opened again")
+	ws4.queue_free()
+	var old_save := FileAccess.open(mm.wardrobe_path, FileAccess.WRITE)
+	old_save.store_var({"unlocked_skins": ["leaf", "cap", "bow"], "seen_cosmetics": ["leaf"], "equipped_hat": "cap"})
+	old_save.close()
+	mm.load_wardrobe()
+	_expect(mm.worn_cosmetics.has("leaf") and mm.worn_cosmetics.has("cap") and not mm.worn_cosmetics.has("bow"),
+		"a save from before: what had been seen and what's on isn't new; what's not been seen is (%s)" % [mm.worn_cosmetics])
+	mm.save_wardrobe()
 	await _finish(real, main)
 
 
@@ -409,6 +486,7 @@ func _finish(real: Array, main: Node) -> void:
 	mm.mushroom_bounces = real[6]
 	mm.froggyCrown = real[7]
 	mm.seen_cosmetics = real[8]
+	mm.worn_cosmetics = real[9]
 	Engine.time_scale = 1.0
 	for p in [SCRATCH_SAVE, SCRATCH_WARDROBE]:
 		if FileAccess.file_exists(p):
