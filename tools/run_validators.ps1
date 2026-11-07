@@ -11,7 +11,7 @@ function Snap {
     ForEach-Object { "{0} {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.Substring(0, 12), $_.FullName.Substring($ud.Length) }
 }
 $before = @(Snap)
-$names = "app_store_release", "release_load", "muse_account", "endless", "flies", "desktop_frog", "ads_manager_runtime", "party", "party_online", "froggy_jump", "level", "layout_fit", "button_words", "story", "keyboard", "handles", "story_party", "creator", "world_life", "difficulty", "race", "frenzy", "og_endless"
+$names = "app_store_release", "release_load", "muse_account", "ota", "endless", "flies", "desktop_frog", "ads_manager_runtime", "party", "party_online", "froggy_jump", "level", "layout_fit", "button_words", "story", "keyboard", "handles", "story_party", "creator", "world_life", "difficulty", "race", "frenzy", "og_endless"
 if ($only) { $names = $only }
 $failed = @()
 foreach ($n in $names) {

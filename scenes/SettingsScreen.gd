@@ -3,7 +3,8 @@ extends CanvasLayer
 ## how hard a drag throws him (aim), the privacy policy and terms, and starting over (the climb, or
 ## everything, each asked first). Built in code in the menus' look (UIStyle) and placed like Muse
 ## account: clear of the notch and the ad banners, at a whole size, the middle scrolling if it's too
-## tall. player is the story's player (player.gd), which keeps the timer and the aim.
+## tall. player is the story's player (player.gd), which keeps the timer and the aim. A store build says
+## which it is at the bottom, and which update it's on (Updater.gd).
 
 signal closed
 
@@ -135,6 +136,14 @@ func _build() -> void:
 	_right.add_child(ui.rule())
 	_right.add_child(_button("Reset Climb", _ask_first.bind("climb"), "danger"))
 	_right.add_child(_button("Delete All Data", _ask_first.bind("all"), "danger"))
+	if Updater.build > 0:  # (a store build: which one, and which update it's on: what a phone has, at a glance)
+		var which := Label.new()
+		which.text = "Version %s (%d)" % [Updater.version, Updater.build]
+		if Updater.update > 0:
+			which.text += ", update %d" % Updater.update
+		which.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ui.style_label(which, FONT_SZ, Color(0.6, 0.57, 0.52))
+		_right.add_child(which)
 
 	_ask = VBoxContainer.new()
 	_ask.add_theme_constant_override("separation", 10)

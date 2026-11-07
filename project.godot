@@ -30,6 +30,7 @@ config/custom_user_dir_name="Godot/app_userdata/Frog Quest+"
 
 [autoload]
 
+Updater="*res://scripts/Updater.gd"
 MusicManager="*res://scripts/MusicManager.gd"
 MuseAccount="*res://scripts/MuseAccount.gd"
 MuseSocial="*res://scripts/MuseSocial.gd"

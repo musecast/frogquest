@@ -171,6 +171,7 @@ func _ready():
 	add_child(together)
 
 	_trace("Main ready end")
+	Updater.started()  # (the world's loaded: an update in, if there is one, got the game going)
 	_request_ads_after_first_frames()
 
 

@@ -12,6 +12,10 @@
 #
 # Built with Xcode 27.1: only apps linked against the iOS 27.1 SDK use the whole inner display on iPhone Duo
 # (older SDKs run in a smaller window, or leave a strip by the status bar).
+#
+# Updates over the air (scripts/Updater.gd): the build's number and version go in its game pack
+# (build_info.cfg), and that exact pack is kept on a GitHub release, build-<number>, as base.pck, so updates can
+# be made for the build without another one (tools/ota/publish_update.ps1).
 
 name: TestFlight
 
@@ -25,6 +29,8 @@ jobs:
   ios:
     runs-on: xcode-27
     timeout-minutes: 60
+    permissions:
+      contents: write  # (the release that keeps the build's own pack, for its updates)
     env:
       GODOT_VERSION: "4.7.1"
       XCODE_APP: /Applications/Xcode_27.1.app
@@ -82,6 +88,12 @@ jobs:
       - name: Import the project
         run: '"$GODOT" --headless --path . --import'
 
+      - name: Write the build's number and version into it (its updates go by them)
+        run: |
+          short=$(grep -m1 -o 'application/short_version="[^"]*"' export_presets.cfg | cut -d'"' -f2)
+          printf '[build]\nnumber=%s\nversion="%s"\ncommit="%s"\n' "$BUILD" "$short" "$GITHUB_SHA" > build_info.cfg
+          cat build_info.cfg
+
       - name: Export the Xcode project
         run: |
           out="$RUNNER_TEMP/xcode"
@@ -90,6 +102,21 @@ jobs:
           "$GODOT" --headless --path . --script res://tools/ci/patch_admob_pbxproj.gd -- "$out/$PROJECT.xcodeproj/project.pbxproj"
           version=$(grep -m1 -o 'MARKETING_VERSION = [^;]*' "$out/$PROJECT.xcodeproj/project.pbxproj" | cut -d' ' -f3)
           echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Keep the build's own pack (its updates are made against it)
+        continue-on-error: true  # (if it can't be kept, the build still goes to TestFlight)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          pck="$RUNNER_TEMP/xcode/$PROJECT.pck"
+          [ -f "$pck" ] || pck=$(find "$RUNNER_TEMP/xcode" -maxdepth 2 -name '*.pck' | head -1)
+          if [ -z "$pck" ]; then
+            echo "::error::No .pck in the Xcode project"
+            ls -la "$RUNNER_TEMP/xcode"
+            exit 1
+          fi
+          ls -la "$pck"
+          python3 tools/ci/save_base_pack.py "$pck"
 
       - name: Archive
         working-directory: ${{ runner.temp }}/xcode
@@ -166,3 +193,4 @@ jobs:
         run: |
           echo "### Frog Quest $VERSION ($BUILD) uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
           echo "Apple takes 5 to 30 minutes to process it; then it shows up in App Store Connect > TestFlight and in the TestFlight app." >> "$GITHUB_STEP_SUMMARY"
+          echo "Its own game pack is kept on the release build-$BUILD, for updates over the air (tools/ota/publish_update.ps1)." >> "$GITHUB_STEP_SUMMARY"

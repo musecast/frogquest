@@ -8,3 +8,6 @@ itch/
 
 # Python bytecode from the CI scripts
 __pycache__/
+
+# A build's number and version, written by the TestFlight workflow into its pack (scripts/Updater.gd); never kept here
+/build_info.cfg
