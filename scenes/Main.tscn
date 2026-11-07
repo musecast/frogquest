@@ -1094,6 +1094,9 @@ size = Vector2(32.488117, 25.0032)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_w2rxg"]
 size = Vector2(27.7965, 25.6556)
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_fg26t"]
+size = Vector2(80.952, 25.826)
+
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_y1ilb"]
 size = Vector2(1093.55, 321.731)
 
@@ -1801,7 +1804,7 @@ shape = SubResource("RectangleShape2D_w2rxg")
 [node name="FROG KING24" type="Sprite2D" parent="finale/Control" unique_id=1455868320]
 visible = false
 self_modulate = Color(0, 0, 0, 0.866667)
-position = Vector2(3055.68, -4718.23)
+position = Vector2(3006, -4718.23)
 scale = Vector2(2.978, 3.146)
 texture = ExtResource("10_ycu6t")
 
@@ -1814,7 +1817,7 @@ shape = SubResource("RectangleShape2D_w2rxg")
 [node name="FROG KING25" type="Sprite2D" parent="finale/Control" unique_id=1971892301]
 visible = false
 self_modulate = Color(0, 0, 0, 0.866667)
-position = Vector2(3069.05, -4797.52)
+position = Vector2(3055, -4797.52)
 scale = Vector2(2.208, 2.333)
 texture = ExtResource("10_ycu6t")
 
@@ -1823,6 +1826,19 @@ texture = ExtResource("10_ycu6t")
 [node name="frogking25" type="CollisionShape2D" parent="finale/Control/FROG KING25/frogking25" unique_id=1968401190]
 position = Vector2(-1.89441, 2.82776)
 shape = SubResource("RectangleShape2D_w2rxg")
+
+[node name="FROG KING26" type="Sprite2D" parent="finale/Control" unique_id=1846203517]
+visible = false
+self_modulate = Color(0, 0, 0, 0.866667)
+position = Vector2(2806, -4855.36)
+scale = Vector2(3.15, 3.33)
+texture = ExtResource("10_ycu6t")
+
+[node name="frogking26" type="Area2D" parent="finale/Control/FROG KING26" unique_id=702945318]
+
+[node name="frogking26" type="CollisionShape2D" parent="finale/Control/FROG KING26/frogking26" unique_id=1290381164]
+position = Vector2(0.794, -1.117)
+shape = SubResource("RectangleShape2D_fg26t")
 
 [node name="glassbreak" type="AudioStreamPlayer" parent="finale" unique_id=1489356993]
 stream = ExtResource("73_w4q1h")
@@ -3359,6 +3375,7 @@ texture = ExtResource("157_w0c4r")
 [connection signal="body_shape_entered" from="finale/Control/FROG KING23/frogking23" to="." method="_on_frogking_23_body_shape_entered"]
 [connection signal="body_shape_entered" from="finale/Control/FROG KING24/frogking24" to="." method="_on_frogking_24_body_shape_entered"]
 [connection signal="body_shape_entered" from="finale/Control/FROG KING25/frogking25" to="." method="_on_frogking_25_body_shape_entered"]
+[connection signal="body_shape_entered" from="finale/Control/FROG KING26/frogking26" to="." method="_on_frogking_26_body_shape_entered"]
 [connection signal="area_entered" from="frogNPC1/Area2D" to="." method="_on_area_2d_area_entered"]
 [connection signal="area_exited" from="frogNPC1/Area2D" to="." method="_on_area_2d_area_exited"]
 [connection signal="area_shape_entered" from="frogNPC1/Area2D" to="." method="_on_area_2d_area_shape_entered"]

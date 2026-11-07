@@ -31,6 +31,7 @@ const KICK_SIDE := Vector2(25.0, 85.0)  # (and away from him)
 const KICK_SLOW := 260.0  # (a throw dying away, px/s every second)
 const BRUSH := 20.0  # (a falling one this near him as he flies by fast is swept along)
 const SETTLE := 0.3  # (landed mid-turn: how long it takes to settle flat)
+const THINNEST := 0.5  # (turning, the thinnest one gets: half its width, every column of its pixels still drawn)
 ## The white petals' colours, for the leaf's own three (its outline, its light and its shade): the white
 ## petals' own, as they're drawn on the ledges (a white shine, icy white, the slate outline).
 const PETAL_OF := {"345551": Color8(68, 75, 96), "36e377": Color8(254, 254, 254), "2eb082": Color8(232, 251, 250)}
@@ -136,7 +137,7 @@ func _land(leaf: Dictionary, was: Vector2, space: PhysicsDirectSpaceState2D) -> 
 	leaf.vx = 0.0
 	leaf.vy = 0.0
 	leaf.side = 1.0 if spin > 0.0 else -1.0  # (lying on the side it came down on, settling flat: _place)
-	leaf.face_at = absf(spin)
+	leaf.face_at = lerpf(THINNEST, 1.0, absf(spin))
 	leaf.x = hit.position.x
 	leaf.y = hit.position.y - edge
 
@@ -223,14 +224,15 @@ func _draw_one(on: CanvasItem, leaf: Dictionary) -> void:
 		on.draw_texture_rect_region(_art, at.rect, at.frame, fade)
 
 
-## Where a leaf's drawn, and which way round: turning over as it sways, narrowing to its edge at each end of
-## its swing and widening again on its other side, so its side changes while it's edge-on, where nothing can
-## jump; about its own middle (its pixels', not its frame's: they're not centred in it). Lying, it settles
-## flat on the side it came down on.
+## Where a leaf's drawn, and which way round: turning over as it sways, narrowing at each end of its swing
+## and widening again on its other side, so its side changes while it's at its thinnest, where nothing can
+## jump; about its own middle (its pixels', not its frame's: they're not centred in it). Never thinner than
+## half its width (THINNEST): it's flat, so edge-on it'd be gone, and every column of its pixels stays drawn.
+## Lying, it settles flat on the side it came down on.
 func _place(leaf: Dictionary) -> Dictionary:
 	var spin := cos(leaf.t * leaf.sway + leaf.phase)
 	var side := 1.0 if spin > 0.0 else -1.0
-	var face := absf(spin)  # (how much of it shows: 1 flat on, 0 edge-on)
+	var face := lerpf(THINNEST, 1.0, absf(spin))  # (how much of it shows: 1 flat on, THINNEST as it turns)
 	if leaf.down:
 		side = leaf.side
 		face = lerpf(leaf.face_at, 1.0, smoothstep(0.0, SETTLE, leaf.rest))
@@ -239,7 +241,7 @@ func _place(leaf: Dictionary) -> Dictionary:
 	var middle: Vector2 = _middles[2 if leaf.gold else i] * _scale
 	var mirror: bool = leaf.flip != (side < 0.0)
 	var size := frame.size * _scale
-	var w := maxf(size.x * face, 1.0)
+	var w := size.x * face
 	var x := roundf(leaf.x - middle.x * face * (-1.0 if mirror else 1.0))
 	var y := roundf(leaf.y - size.y * 0.5 - middle.y)
 	var rect := Rect2(x - w * 0.5, y, w, size.y)

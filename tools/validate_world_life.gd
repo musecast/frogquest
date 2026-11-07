@@ -283,18 +283,27 @@ func _run() -> void:
 		await process_frame
 	_expect(leaves._leaves.any(func(l: Dictionary) -> bool: return l.petal and l.x0 > 3700.0),
 		"and across the castle's whole width, not just the tree's (%s)" % [leaves._leaves.map(func(l: Dictionary) -> int: return int(l.x0))])
-	# Turning over as they fall, leaves and petals change sides while edge-on, about their own middle: they don't
-	# jump a few pixels as they turn (their pixels aren't centred in their frames). Lying, they settle flat.
+	# Turning over as they fall, leaves and petals change sides at their thinnest, about their own middle: they
+	# don't jump a few pixels as they turn (their pixels aren't centred in their frames), and they never go so
+	# thin they're gone (half their width at the least: all 4 columns of their pixels still drawn). Lying, they
+	# settle flat.
 	var turning := {"x0": 3000.0, "x": 3000.0, "y": -900.0, "t": 0.0, "phase": PI * 0.5 - 0.02, "fall": 0.0,
 		"sway": 1.0, "wide": 0.0, "gold": false, "flip": false, "petal": false, "vx": 0.0, "vy": 0.0, "down": false,
 		"rest": 0.0, "lies": 8.0, "side": 1.0, "face_at": 1.0}
 	var one_side: Dictionary = leaves._place(turning)
 	turning.t = 0.04
 	var other_side: Dictionary = leaves._place(turning)
-	_expect(one_side.i != other_side.i and absf(one_side.rect.size.x) < 2.0 and absf(other_side.rect.size.x) < 2.0
+	var at_thinnest: float = 4.0 * leaves._scale * (leaves.THINNEST + 0.05)
+	_expect(one_side.i != other_side.i and absf(one_side.rect.size.x) < at_thinnest
+		and absf(other_side.rect.size.x) < at_thinnest
 		and absf(one_side.rect.get_center().x - other_side.rect.get_center().x) <= 1.0
 		and absf(one_side.rect.position.y - other_side.rect.position.y) <= 2.0,
-		"a leaf changes sides edge-on, about its own middle: no jump (%s, %s)" % [one_side.rect, other_side.rect])
+		"a leaf changes sides at its thinnest, about its own middle: no jump (%s, %s)" % [one_side.rect, other_side.rect])
+	var thinnest := INF
+	for k in 240:
+		turning.t = k * TAU / 240.0
+		thinnest = minf(thinnest, absf(leaves._place(turning).rect.size.x))
+	_expect(thinnest >= 4.0, "and never so thin it's gone, all the way round: every column of it drawn (%.1f px)" % thinnest)
 	turning.t = PI * 0.5 + 0.02
 	var flat: Dictionary = leaves._place(turning)
 	_expect(absf(absf(flat.rect.size.x) - 4.0 * leaves._scale) < 0.01, "and flat on, its whole width (%s)" % flat.rect)

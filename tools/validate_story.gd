@@ -217,6 +217,13 @@ func _run() -> void:
 	var shade := god.self_modulate
 	_expect(god.material == null and shade.r == 0.0 and shade.g == 0.0 and shade.b == 0.0 and eyes_look != null
 		and float(eyes_look.get_shader_parameter("glow")) == 0.0, "a glimpse of the frog god: its plain shadow, as it always was")
+	var room: Rect2 = god_eyes.region_rect if god_eyes else Rect2()
+	var eye_at: Array = [eyes_look.get_shader_parameter("left_eye"), eyes_look.get_shader_parameter("right_eye")] \
+		if eyes_look else [Vector2.INF, Vector2.INF]
+	_expect(god_eyes != null and god_eyes.region_enabled and room.position.x < 0.0 and room.end.x > god.texture.get_width()
+		and room.get_center() == god.texture.get_size() / 2.0
+		and (eye_at[0] as Vector2).distance_to(Vector2(6.1, 8.3)) < 0.2 and (eye_at[1] as Vector2).distance_to(Vector2(25.21, 8.21)) < 0.2,
+		"its eyes found in its picture, and room all round him for their glow to spill into (%s, %s)" % [room, eye_at])
 	god.visible = true
 	await _game_time(main.GOD_EYES_WAIT.x * 0.5)
 	_expect(float(eyes_look.get_shader_parameter("glow")) == 0.0, "its eyes wait a while")
@@ -406,6 +413,24 @@ func _run() -> void:
 		"saved up in the finale: his time kept, from the last place below it (%s)" % kept.get("position"))
 	await _put(player, was_at)
 
+	# The frog god on the pillar under the glass (FROG KING26): not there till he's up on it, and only for him;
+	# then, a moment after, the two on the pillars to its right (24, 25: their own boxes are out to the right,
+	# off his way up), where they can be seen from the middle of the top (the camera on him under the glass).
+	var top_god: Sprite2D = main.get_node("finale/Control/FROG KING26")
+	var beside: Array[Sprite2D] = [main.get_node("finale/Control/FROG KING24"), main.get_node("finale/Control/FROG KING25")]
+	_expect(not top_god.visible and not beside[0].visible and not beside[1].visible, "the frog gods at the top wait for him")
+	var top_drawn := _drawn(top_god)
+	_expect(absf(top_drawn.get_center().x - 2807.0) < 6.0 and absf(top_drawn.end.y + 8144.0) < 3.0
+		and top_drawn.position.y + 4.0 * top_god.scale.y > -8247.0 and top_god.has_node("eyes"),
+		"the one under the glass stands on its pillar, his head under the plank (%s)" % top_drawn)
+	await _put(player, Vector2(2804, -8180))
+	_expect(top_god.visible and not beside[0].visible, "and comes as he gets up there")
+	await _game_time(main.GODS_BESIDE_COME + 0.2)
+	_expect(beside[0].visible and beside[1].visible and _drawn(beside[0]).position.x < 3044.0 - 70.0
+		and _drawn(beside[1]).position.x < 3044.0 - 20.0,
+		"the two to its right a moment after, in sight from under the glass (%s, %s)" % [_drawn(beside[0]), _drawn(beside[1])])
+	await _put(player, was_at)
+
 	# The glass, hit until it gives: the last words come up, under the plank below it.
 	_expect(main._no_gods.modulate.a == 0.0, "the last words wait for the glass")
 	for _i in 6:
@@ -414,6 +439,13 @@ func _run() -> void:
 	_expect(main._no_gods.modulate.a > 0.99, "and come up as it gives (%.2f)" % main._no_gods.modulate.a)
 	var middle: Vector2 = main._no_gods.position + main._no_gods.size / 2.0
 	_expect(middle.distance_to(main.NO_GODS_AT) < 1.0, "under the plank below the glass")
+	# Once the ending starts (the camera off on its flight home), they fade away, slowly.
+	(player.get_node("Camera2D/AnimationPlayer") as AnimationPlayer).animation_started.emit(&"end")
+	await _game_time(main.NO_GODS_GO * 0.5)
+	var going: float = main._no_gods.modulate.a
+	_expect(going > 0.1 and going < 0.9, "and once the ending starts, they fade away slowly (%.2f half way)" % going)
+	await _game_time(main.NO_GODS_GO * 0.5 + 0.3)
+	_expect(main._no_gods.modulate.a == 0.0, "till they're gone")
 
 	# The ending comes to rest on his bedroom, framed as he wakes up there (his camera's own offset aside).
 	var anim: Animation = player.get_node("Camera2D/AnimationPlayer").get_animation("end")
@@ -578,6 +610,12 @@ func _game() -> Node:
 	for _i in 10:
 		await process_frame
 	return main
+
+
+## Where a sprite's drawn, in the world.
+func _drawn(sprite: Sprite2D) -> Rect2:
+	var r := sprite.get_rect()
+	return Rect2(sprite.global_transform * r.position, sprite.global_transform.basis_xform(r.size)).abs()
 
 
 func _put(player: CharacterBody2D, at: Vector2) -> void:

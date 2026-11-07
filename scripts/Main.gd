@@ -51,6 +51,9 @@ const FROGGY_RISE := 103.0  # (the most Froggy's jump rises: 450 px/s up against
 const LOST_FROG_SETTLES := 1.0  # (landed: a moment before he says anything)
 const GOD_EYES_WAIT := Vector2(2.0, 4.0)  # (a frog god's shadow come: a while before its eyes start to glow)
 const GOD_EYES_IN := Vector2(9.0, 13.0)  # (and so slowly up: it's a while before you're sure they're there)
+const GOD_EYES_ROOM := 6  # (a frog god's eyes are drawn this many of his pixels bigger all round: room for their glow)
+const GODS_BESIDE_COME := 0.8  # (the frog god under the glass come: a moment, and the two to its right come too)
+const NO_GODS_GO := 3.5  # (the last words fading away as the ending starts: slowly)
 const NO_GODS_AT := Vector2(2804, -8160)  # (the middle of the climb's last words: under the plank below the glass)
 var _fell_turn := {}
 var _tv_bubble: Label
@@ -86,6 +89,7 @@ var _lost_frog_arriving := false  # (hopping up out of the dark, and a moment on
 var _dark_top := 313.0  # (where the dark ends: AreaTitle.DARK_TOP, read in _ready)
 var way_open := false  # (the frog at the castle door has opened the way up to the top of the tree: _open_the_way)
 var _no_gods: Label
+var _no_gods_in: Tween  # (the last words coming up: stopped if the ending starts first)
 
 #top of script
 @onready var previous_window = DisplayServer.window_get_mode()
@@ -389,11 +393,23 @@ func wake_up(from_dark: bool) -> void:
 
 ## The frog god's glimpses up the climb (FROG KING2 on: a shadow of him come as he passes each): each the plain
 ## shadow it always was, and then, a while after it's come, its eyes glowing up out of it, so slowly it's
-## subtle (_god_eyes). Only the eyes: drawn over the shadow (frog_god_eyes.gdshader), the shadow left as it is.
+## subtle at first (_god_eyes), till they glow white, pulsing. Only the eyes: drawn over the shadow
+## (frog_god_eyes.gdshader, on a sprite a little bigger than his, for the glow to spill past him), the shadow
+## left as it is. (One drawn twice, in the same place, glows once: on the one drawn over the other.)
 func _frog_gods() -> void:
 	var eyes_look: Shader = load("res://assets/frog_god_eyes.gdshader")
-	for god in $"finale/Control".get_children():
+	var middles := {}  # (each picture's eyes, found once)
+	var places := {}
+	var gods := $"finale/Control".get_children()
+	gods.reverse()  # (the one drawn last first: a god drawn twice gets its eyes on the one over the other)
+	for god in gods:
 		if god is Sprite2D and str(god.name).begins_with("FROG KING"):
+			var place := "%s %s" % [god.position, god.scale]
+			if places.has(place):
+				continue
+			places[place] = true
+			if not middles.has(god.texture):
+				middles[god.texture] = _eye_middles(god.texture)
 			var eyes := Sprite2D.new()
 			eyes.name = "eyes"
 			eyes.texture = god.texture
@@ -401,13 +417,37 @@ func _frog_gods() -> void:
 			eyes.offset = god.offset
 			eyes.flip_h = god.flip_h
 			eyes.flip_v = god.flip_v
+			eyes.texture_repeat = CanvasItem.TEXTURE_REPEAT_DISABLED  # (past his edges, nothing: only the glow)
+			eyes.region_enabled = true
+			eyes.region_rect = Rect2(Vector2.ONE * -GOD_EYES_ROOM, god.texture.get_size() + Vector2.ONE * GOD_EYES_ROOM * 2)
 			var look := ShaderMaterial.new()
 			look.shader = eyes_look
 			look.set_shader_parameter("glow", 0.0)  # (none yet: set, so the tween has it to start from)
-			look.set_shader_parameter("phase", randf() * TAU)  # (each breathing in its own time)
+			look.set_shader_parameter("phase", randf() * TAU)  # (each pulsing in its own time)
+			look.set_shader_parameter("left_eye", middles[god.texture][0])
+			look.set_shader_parameter("right_eye", middles[god.texture][1])
 			eyes.material = look
 			god.add_child(eyes)
 			god.visibility_changed.connect(_god_eyes.bind(god))
+
+
+## Where a frog god's eyes are in his picture: the middles of their dark pixels (the ones his eyes' look lights),
+## the left eye's and the right's, in his pixels.
+func _eye_middles(picture: Texture2D) -> Array[Vector2]:
+	var img := picture.get_image()
+	if img.is_compressed():
+		img.decompress()
+	var sums: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]
+	var counts: Array[int] = [0, 0]
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a > 0.5 and maxf(c.r, maxf(c.g, c.b)) < 0.12:
+				var i := 0 if x < img.get_width() / 2 else 1
+				sums[i] += Vector2(x + 0.5, y + 0.5)
+				counts[i] += 1
+	var out: Array[Vector2] = [sums[0] / maxf(counts[0], 1.0), sums[1] / maxf(counts[1], 1.0)]
+	return out
 
 
 ## A frog god's shadow come: after a while (GOD_EYES_WAIT), its eyes start to glow, and slowly, slowly come
@@ -653,7 +693,8 @@ func _words_out_of_the_dark() -> void:
 
 
 ## The climb's last words, in the finale's own look ("you are the"'s), just under the plank below the glass
-## (the top of what the camera shows): they come up once the glass gives.
+## (the top of what the camera shows): they come up once the glass gives, and fade away slowly once the
+## ending starts.
 func _make_no_gods_line() -> void:
 	var you_are: Label = $"finale/finale sprites/frog quest2"
 	_no_gods = you_are.duplicate()
@@ -665,6 +706,17 @@ func _make_no_gods_line() -> void:
 	_no_gods.position = NO_GODS_AT - _no_gods.size / 2.0
 	_no_gods.modulate.a = 0.0
 	add_child(_no_gods)
+	($Player/Camera2D/AnimationPlayer as AnimationPlayer).animation_started.connect(_on_ending_started)
+
+
+## The ending started (the camera off on its flight home): the last words fade away, slowly.
+func _on_ending_started(anim: StringName) -> void:
+	if anim != &"end":
+		return
+	if _no_gods_in:
+		_no_gods_in.kill()
+	create_tween().tween_property(_no_gods, "modulate:a", 0.0, NO_GODS_GO).set_trans(Tween.TRANS_SINE) \
+		.set_ease(Tween.EASE_IN_OUT)
 
 
 func _physics_process(delta: float) -> void:
@@ -1191,10 +1243,28 @@ func _on_frogking_25_body_shape_entered(body_rid, body, body_shape_index, local_
 	$"finale/Control/FROG KING25".visible = true
 	$finale/Control/frogappear.play()
 	
-func _on_frogking_26_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
+## The frog god on the pillar under the glass (FROG KING26), come as he gets up onto it; and a moment after,
+## the two on the pillars to its right (FROG KING24, 25), if they've not come yet: their own boxes are out to
+## the right, off his way up, so he'd hardly ever have seen them.
+func _on_frogking_26_body_shape_entered(_body_rid, body, _body_shape_index, _local_shape_index):
+	if body != $Player or $"finale/Control/FROG KING26".visible:
+		return
 	$"finale/Control/FROG KING26/frogking26".queue_free()
 	$"finale/Control/FROG KING26".visible = true
 	$finale/Control/frogappear.play()
+	await get_tree().create_timer(GODS_BESIDE_COME, false).timeout
+	var came := false
+	for n in [24, 25]:
+		var god := get_node("finale/Control/FROG KING%d" % n) as Sprite2D
+		if god.visible:
+			continue
+		var box := god.get_node_or_null("frogking%d" % n)
+		if box:
+			box.queue_free()
+		god.visible = true
+		came = true
+	if came:
+		$finale/Control/frogappear.play()
 
 
 func _on_blockedpath_area_2d_body_shape_entered(body_rid, body, body_shape_index, local_shape_index):
@@ -1233,7 +1303,8 @@ func _on_finaleexit_body_entered(body):
 		$finale/Control/froggod.stop()
 		$finale/glassbreak.play()
 		$"World Sprites/GodraysContainer3".visible = true
-		create_tween().tween_property(_no_gods, "modulate:a", 1.0, 2.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		_no_gods_in = create_tween()
+		_no_gods_in.tween_property(_no_gods, "modulate:a", 1.0, 2.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 func _on_area_2d_5_body_shape_entered(_body_rid, body, _body_shape_index, local_shape_index):
