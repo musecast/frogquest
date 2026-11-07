@@ -1,2 +1,5 @@
 # Normalize EOL for all files that Git considers text files.
 * text=auto eol=lf
+
+# The update list and updates (scripts/Updater.gd) are signed and hashed byte for byte: never rewritten
+ota/** -text
