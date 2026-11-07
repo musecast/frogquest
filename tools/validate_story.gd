@@ -224,6 +224,8 @@ func _run() -> void:
 		and room.get_center() == god.texture.get_size() / 2.0
 		and (eye_at[0] as Vector2).distance_to(Vector2(6.1, 8.3)) < 0.2 and (eye_at[1] as Vector2).distance_to(Vector2(25.21, 8.21)) < 0.2,
 		"its eyes found in its picture, and room all round him for their glow to spill into (%s, %s)" % [room, eye_at])
+	_expect(eyes_look != null and eyes_look.shader.code.contains("floor(UV / TEXTURE_PIXEL_SIZE)"),
+		"their glow drawn in his own pixels: pixelated, as he is")
 	god.visible = true
 	await _game_time(main.GOD_EYES_WAIT.x * 0.5)
 	_expect(float(eyes_look.get_shader_parameter("glow")) == 0.0, "its eyes wait a while")
@@ -415,20 +417,29 @@ func _run() -> void:
 
 	# The frog god on the pillar under the glass (FROG KING26): not there till he's up on it, and only for him;
 	# then, a moment after, the two on the pillars to its right (24, 25: their own boxes are out to the right,
-	# off his way up), where they can be seen from the middle of the top (the camera on him under the glass).
+	# off his way up). 24 stands on the middle of the wide pillar (x 2980-3131, its top at -8023), in front of
+	# the narrow one standing on it (x 3023-3109, its top at -8109), its head under that one's top; 25 stands
+	# on the narrow one's middle. (His art's row 4 is the top of his head, row 30 under his feet.)
 	var top_god: Sprite2D = main.get_node("finale/Control/FROG KING26")
 	var beside: Array[Sprite2D] = [main.get_node("finale/Control/FROG KING24"), main.get_node("finale/Control/FROG KING25")]
 	_expect(not top_god.visible and not beside[0].visible and not beside[1].visible, "the frog gods at the top wait for him")
 	var top_drawn := _drawn(top_god)
 	_expect(absf(top_drawn.get_center().x - 2807.0) < 6.0 and absf(top_drawn.end.y + 8144.0) < 3.0
-		and top_drawn.position.y + 4.0 * top_god.scale.y > -8247.0 and top_god.has_node("eyes"),
-		"the one under the glass stands on its pillar, his head under the plank (%s)" % top_drawn)
+		and top_drawn.position.y + 4.0 * top_god.scale.y > -8247.0 and top_god.scale.x > 3.15 * 1.05 and top_god.has_node("eyes"),
+		"the one under the glass stands on its pillar, a little bigger than at first, his head under the plank (%s)" % top_drawn)
+	var on_wide := _drawn(beside[0])
+	var on_narrow := _drawn(beside[1])
+	var wide_feet: float = on_wide.position.y + 30.0 * beside[0].scale.y
+	var narrow_feet: float = on_narrow.position.y + 30.0 * beside[1].scale.y
+	_expect(absf(on_wide.get_center().x - 3055.5) < 1.5 and beside[0].scale.x > 2.978 * 1.1 and wide_feet > -8023.0
+		and wide_feet < -8012.0 and on_wide.position.y + 4.0 * beside[0].scale.y > -8109.0,
+		"the one on the wide pillar on its middle, bigger than at first, his head under the narrow one's top (%s)" % on_wide)
+	_expect(absf(on_narrow.get_center().x - 3066.0) < 3.0 and narrow_feet > -8109.0 and narrow_feet < -8104.0,
+		"the one on the narrow pillar on its middle (%s)" % on_narrow)
 	await _put(player, Vector2(2804, -8180))
 	_expect(top_god.visible and not beside[0].visible, "and comes as he gets up there")
 	await _game_time(main.GODS_BESIDE_COME + 0.2)
-	_expect(beside[0].visible and beside[1].visible and _drawn(beside[0]).position.x < 3044.0 - 70.0
-		and _drawn(beside[1]).position.x < 3044.0 - 20.0,
-		"the two to its right a moment after, in sight from under the glass (%s, %s)" % [_drawn(beside[0]), _drawn(beside[1])])
+	_expect(beside[0].visible and beside[1].visible, "the two to its right a moment after")
 	await _put(player, was_at)
 
 	# The glass, hit until it gives: the last words come up, under the plank below it.

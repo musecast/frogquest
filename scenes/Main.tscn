@@ -1095,7 +1095,7 @@ size = Vector2(32.488117, 25.0032)
 size = Vector2(27.7965, 25.6556)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_fg26t"]
-size = Vector2(80.952, 25.826)
+size = Vector2(73.593, 23.478)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_y1ilb"]
 size = Vector2(1093.55, 321.731)
@@ -1804,8 +1804,8 @@ shape = SubResource("RectangleShape2D_w2rxg")
 [node name="FROG KING24" type="Sprite2D" parent="finale/Control" unique_id=1455868320]
 visible = false
 self_modulate = Color(0, 0, 0, 0.866667)
-position = Vector2(3006, -4718.23)
-scale = Vector2(2.978, 3.146)
+position = Vector2(3056.5, -4722.85)
+scale = Vector2(3.3651, 3.555)
 texture = ExtResource("10_ycu6t")
 
 [node name="frogking24" type="Area2D" parent="finale/Control/FROG KING24" unique_id=406475097]
@@ -1817,7 +1817,7 @@ shape = SubResource("RectangleShape2D_w2rxg")
 [node name="FROG KING25" type="Sprite2D" parent="finale/Control" unique_id=1971892301]
 visible = false
 self_modulate = Color(0, 0, 0, 0.866667)
-position = Vector2(3055, -4797.52)
+position = Vector2(3069.05, -4797.52)
 scale = Vector2(2.208, 2.333)
 texture = ExtResource("10_ycu6t")
 
@@ -1830,14 +1830,14 @@ shape = SubResource("RectangleShape2D_w2rxg")
 [node name="FROG KING26" type="Sprite2D" parent="finale/Control" unique_id=1846203517]
 visible = false
 self_modulate = Color(0, 0, 0, 0.866667)
-position = Vector2(2806, -4855.36)
-scale = Vector2(3.15, 3.33)
+position = Vector2(2806, -4860.36)
+scale = Vector2(3.465, 3.663)
 texture = ExtResource("10_ycu6t")
 
 [node name="frogking26" type="Area2D" parent="finale/Control/FROG KING26" unique_id=702945318]
 
 [node name="frogking26" type="CollisionShape2D" parent="finale/Control/FROG KING26/frogking26" unique_id=1290381164]
-position = Vector2(0.794, -1.117)
+position = Vector2(0.722, 0.35)
 shape = SubResource("RectangleShape2D_fg26t")
 
 [node name="glassbreak" type="AudioStreamPlayer" parent="finale" unique_id=1489356993]
