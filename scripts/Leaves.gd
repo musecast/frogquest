@@ -30,6 +30,7 @@ const KICK_UP := Vector2(90.0, 200.0)  # (how hard up: by how hard he came down,
 const KICK_SIDE := Vector2(25.0, 85.0)  # (and away from him)
 const KICK_SLOW := 260.0  # (a throw dying away, px/s every second)
 const BRUSH := 20.0  # (a falling one this near him as he flies by fast is swept along)
+const SETTLE := 0.3  # (landed mid-turn: how long it takes to settle flat)
 ## The white petals' colours, for the leaf's own three (its outline, its light and its shade): the white
 ## petals' own, as they're drawn on the ledges (a white shine, icy white, the slate outline).
 const PETAL_OF := {"345551": Color8(68, 75, 96), "36e377": Color8(254, 254, 254), "2eb082": Color8(232, 251, 250)}
@@ -42,6 +43,8 @@ var _scale := 2.4
 var _leaves: Array[Dictionary] = []
 var _wait := 0.0
 var story: Node  # (Main: whether the castle's way is open yet, for its petals; and Froggy, who scatters them)
+var _middles: Array[Vector2] = []  # (where each frame's leaf is in it: its pixels' middle, from the frame's; leaf0, leaf1, gold)
+var _lows: Array[float] = []  # (and how far below that middle its lowest pixel's bottom is, drawn: what it lies on)
 var _petal_layer: Node2D  # (drawn here, over the platforms: the petals, and whatever's lying on a floor (over its edge))
 var _frog: CharacterBody2D
 var _frog_on := true
@@ -56,6 +59,11 @@ func _ready() -> void:
 	_scale = art.PIXEL
 	for frame in _kinds:
 		_petals.append(_petal(frame))
+	var art_img := _art.get_image()
+	if art_img.is_compressed():
+		art_img.decompress()
+	for frame in [_kinds[0], _kinds[1], _gold]:
+		_measure(art_img, frame)
 	z_index = -1
 	_petal_layer = Node2D.new()
 	_petal_layer.name = "Petals"
@@ -105,6 +113,7 @@ func _process(delta: float) -> void:
 				"wide": randf_range(14.0, 28.0) if petal else randf_range(10.0, 22.0),
 				"gold": not petal and randf() < 0.18, "flip": randf() < 0.5, "petal": petal,
 				"vx": 0.0, "vy": 0.0, "down": false, "rest": 0.0, "lies": randf_range(REST.x, REST.y),
+				"side": 1.0, "face_at": 1.0,
 			})
 	if any or not _leaves.is_empty():
 		queue_redraw()
@@ -114,7 +123,8 @@ func _process(delta: float) -> void:
 ## A falling one reaching a floor (its top, from above, as it fell this step): there it comes to rest, lying
 ## on it. Not on Froggy: he'd carry it off.
 func _land(leaf: Dictionary, was: Vector2, space: PhysicsDirectSpaceState2D) -> void:
-	var edge := _half_height()
+	var spin := cos(leaf.t * leaf.sway + leaf.phase)
+	var edge: float = _lows[2 if leaf.gold else (0 if spin > 0.0 else 1)]
 	var ray := PhysicsRayQueryParameters2D.create(was + Vector2(0.0, edge), Vector2(leaf.x, leaf.y + edge), FLOOR_MASK,
 		[_frog.get_rid()] if is_instance_valid(_frog) else [])
 	ray.hit_from_inside = false
@@ -125,6 +135,8 @@ func _land(leaf: Dictionary, was: Vector2, space: PhysicsDirectSpaceState2D) -> 
 	leaf.rest = 0.0
 	leaf.vx = 0.0
 	leaf.vy = 0.0
+	leaf.side = 1.0 if spin > 0.0 else -1.0  # (lying on the side it came down on, settling flat: _place)
+	leaf.face_at = absf(spin)
 	leaf.x = hit.position.x
 	leaf.y = hit.position.y - edge
 
@@ -166,7 +178,8 @@ func kick(feet: Vector2, hard: float) -> void:
 		var near := 1.0 - absf(off.x) / KICK_NEAR.x
 		leaf.down = false
 		leaf.rest = 0.0
-		leaf.x0 = leaf.x - sin(leaf.t * leaf.sway + leaf.phase) * leaf.wide  # (its sway going on from where it lay)
+		leaf.phase = (0.0 if leaf.side > 0.0 else PI) - leaf.t * leaf.sway  # (turning on from flat, the side it lay)
+		leaf.x0 = leaf.x  # (and its sway from where it lay)
 		leaf.vy = -lerpf(KICK_UP.x, KICK_UP.y, power) * (0.55 + 0.45 * near)
 		var away := signf(off.x) if off.x != 0.0 else (1.0 if randf() < 0.5 else -1.0)
 		leaf.vx = away * randf_range(KICK_SIDE.x, KICK_SIDE.y) * power
@@ -202,20 +215,54 @@ func _draw_front() -> void:
 
 
 func _draw_one(on: CanvasItem, leaf: Dictionary) -> void:
-	# Turning over as it sways: one way up, then the other (lying still, as it landed; slowly fading there).
-	var turn := cos(leaf.t * leaf.sway + leaf.phase)
-	var frame: Rect2 = _gold if leaf.gold else _kinds[0 if turn > 0.0 else 1]
-	var size := frame.size * _scale
-	var at := Vector2(roundf(leaf.x - size.x * 0.5), roundf(leaf.y - size.y * 0.5))
-	var flip: bool = leaf.flip != (turn < -0.6)
-	var rect := Rect2(at, size)
-	if flip:
-		rect = Rect2(at.x + size.x, at.y, -size.x, size.y)
+	var at := _place(leaf)
 	var fade := Color(1.0, 1.0, 1.0, 1.0 - smoothstep(leaf.lies, leaf.lies + FADE, leaf.rest) if leaf.down else 1.0)
 	if leaf.petal:
-		on.draw_texture_rect(_petals[0 if turn > 0.0 else 1], rect, false, fade)
+		on.draw_texture_rect(_petals[at.i], at.rect, false, fade)
 	else:
-		on.draw_texture_rect_region(_art, rect, frame, fade)
+		on.draw_texture_rect_region(_art, at.rect, at.frame, fade)
+
+
+## Where a leaf's drawn, and which way round: turning over as it sways, narrowing to its edge at each end of
+## its swing and widening again on its other side, so its side changes while it's edge-on, where nothing can
+## jump; about its own middle (its pixels', not its frame's: they're not centred in it). Lying, it settles
+## flat on the side it came down on.
+func _place(leaf: Dictionary) -> Dictionary:
+	var spin := cos(leaf.t * leaf.sway + leaf.phase)
+	var side := 1.0 if spin > 0.0 else -1.0
+	var face := absf(spin)  # (how much of it shows: 1 flat on, 0 edge-on)
+	if leaf.down:
+		side = leaf.side
+		face = lerpf(leaf.face_at, 1.0, smoothstep(0.0, SETTLE, leaf.rest))
+	var i := 0 if side > 0.0 else 1
+	var frame: Rect2 = _gold if leaf.gold else _kinds[i]
+	var middle: Vector2 = _middles[2 if leaf.gold else i] * _scale
+	var mirror: bool = leaf.flip != (side < 0.0)
+	var size := frame.size * _scale
+	var w := maxf(size.x * face, 1.0)
+	var x := roundf(leaf.x - middle.x * face * (-1.0 if mirror else 1.0))
+	var y := roundf(leaf.y - size.y * 0.5 - middle.y)
+	var rect := Rect2(x - w * 0.5, y, w, size.y)
+	if mirror:
+		rect = Rect2(x + w * 0.5, y, -w, size.y)
+	return {"rect": rect, "frame": frame, "i": i}
+
+
+## A frame's leaf: its pixels' middle (from the frame's own middle), and how far below that its lowest pixel's
+## bottom is, both as drawn.
+func _measure(img: Image, frame: Rect2) -> void:
+	var sum := Vector2.ZERO
+	var n := 0
+	var low := 0
+	for y in int(frame.size.y):
+		for x in int(frame.size.x):
+			if img.get_pixel(int(frame.position.x) + x, int(frame.position.y) + y).a > 0.0:
+				sum += Vector2(x + 0.5, y + 0.5)
+				n += 1
+				low = maxi(low, y + 1)
+	var middle := sum / float(n) if n > 0 else frame.size * 0.5
+	_middles.append(middle - frame.size * 0.5)
+	_lows.append((float(low) - middle.y) * _scale)
 
 
 ## Whether it's the castle the camera's at: the white petals, not leaves.

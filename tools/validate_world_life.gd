@@ -283,6 +283,26 @@ func _run() -> void:
 		await process_frame
 	_expect(leaves._leaves.any(func(l: Dictionary) -> bool: return l.petal and l.x0 > 3700.0),
 		"and across the castle's whole width, not just the tree's (%s)" % [leaves._leaves.map(func(l: Dictionary) -> int: return int(l.x0))])
+	# Turning over as they fall, leaves and petals change sides while edge-on, about their own middle: they don't
+	# jump a few pixels as they turn (their pixels aren't centred in their frames). Lying, they settle flat.
+	var turning := {"x0": 3000.0, "x": 3000.0, "y": -900.0, "t": 0.0, "phase": PI * 0.5 - 0.02, "fall": 0.0,
+		"sway": 1.0, "wide": 0.0, "gold": false, "flip": false, "petal": false, "vx": 0.0, "vy": 0.0, "down": false,
+		"rest": 0.0, "lies": 8.0, "side": 1.0, "face_at": 1.0}
+	var one_side: Dictionary = leaves._place(turning)
+	turning.t = 0.04
+	var other_side: Dictionary = leaves._place(turning)
+	_expect(one_side.i != other_side.i and absf(one_side.rect.size.x) < 2.0 and absf(other_side.rect.size.x) < 2.0
+		and absf(one_side.rect.get_center().x - other_side.rect.get_center().x) <= 1.0
+		and absf(one_side.rect.position.y - other_side.rect.position.y) <= 2.0,
+		"a leaf changes sides edge-on, about its own middle: no jump (%s, %s)" % [one_side.rect, other_side.rect])
+	turning.t = PI * 0.5 + 0.02
+	var flat: Dictionary = leaves._place(turning)
+	_expect(absf(absf(flat.rect.size.x) - 4.0 * leaves._scale) < 0.01, "and flat on, its whole width (%s)" % flat.rect)
+	turning.down = true
+	turning.face_at = 0.1
+	turning.rest = leaves.SETTLE + 0.05
+	_expect(absf(absf(leaves._place(turning).rect.size.x) - 4.0 * leaves._scale) < 0.01, "lying, settled flat")
+
 	# Petals fall in front of the platforms (the leaves behind them); what falls comes to rest on the floor it
 	# lands on, lies there, and slowly fades; Froggy landing by it throws it up, and it flutters back down.
 	_expect(leaves._petal_layer.z_index > 0 and not leaves._petal_layer.z_as_relative and leaves.z_index < 0,
@@ -292,7 +312,7 @@ func _run() -> void:
 	leaves._wait = 9999.0  # (just this one)
 	var petal := {"x0": 2740.0, "x": 2740.0, "y": -5660.0, "t": 0.0, "phase": 0.0, "fall": 200.0, "sway": 1.5,
 		"wide": 0.0, "gold": false, "flip": false, "petal": true, "vx": 0.0, "vy": 0.0, "down": false, "rest": 0.0,
-		"lies": 8.0}
+		"lies": 8.0, "side": 1.0, "face_at": 1.0}
 	leaves._leaves.append(petal)
 	for _i in 600:
 		if petal.down:
