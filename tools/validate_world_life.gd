@@ -283,6 +283,42 @@ func _run() -> void:
 		await process_frame
 	_expect(leaves._leaves.any(func(l: Dictionary) -> bool: return l.petal and l.x0 > 3700.0),
 		"and across the castle's whole width, not just the tree's (%s)" % [leaves._leaves.map(func(l: Dictionary) -> int: return int(l.x0))])
+	# Petals fall in front of the platforms (the leaves behind them); what falls comes to rest on the floor it
+	# lands on, lies there, and slowly fades; Froggy landing by it throws it up, and it flutters back down.
+	_expect(leaves._petal_layer.z_index > 0 and not leaves._petal_layer.z_as_relative and leaves.z_index < 0,
+		"the petals fall in front of the platforms, the leaves behind them")
+	await _look(player, Vector2(2780, -5650))  # (the castle door: its floor)
+	leaves._leaves.clear()
+	leaves._wait = 9999.0  # (just this one)
+	var petal := {"x0": 2740.0, "x": 2740.0, "y": -5660.0, "t": 0.0, "phase": 0.0, "fall": 200.0, "sway": 1.5,
+		"wide": 0.0, "gold": false, "flip": false, "petal": true, "vx": 0.0, "vy": 0.0, "down": false, "rest": 0.0,
+		"lies": 8.0}
+	leaves._leaves.append(petal)
+	for _i in 600:
+		if petal.down:
+			break
+		await process_frame
+	var floor_hit: Dictionary = main.get_world_2d().direct_space_state.intersect_ray(PhysicsRayQueryParameters2D.create(
+		Vector2(petal.x, petal.y - 4.0), Vector2(petal.x, petal.y + 40.0), 1, [player.get_rid()]))
+	_expect(petal.down and not floor_hit.is_empty() and absf(floor_hit.position.y - (petal.y + leaves._half_height())) < 2.0,
+		"a petal lands on the floor, and lies on it (%s, %s)" % [Vector2(petal.x, petal.y).round(), floor_hit.get("position")])
+	var lay_at: float = petal.y
+	for _i in 30:
+		await process_frame
+	_expect(petal.down and petal.y == lay_at and petal in leaves._leaves, "it stays there a while")
+	leaves.kick(Vector2(petal.x + 12.0, petal.y + leaves._half_height()), 600.0)
+	_expect(not petal.down and petal.vy < 0.0 and petal.vx < 0.0, "Froggy landing by it throws it up, away from him")
+	for _i in 900:
+		if petal.down:
+			break
+		await process_frame
+	_expect(petal.down, "and it flutters back down, to lie where it lands")
+	petal.rest = petal.lies + leaves.FADE + 0.1
+	for _i in 3:
+		await process_frame
+	_expect(not petal in leaves._leaves, "it fades away in time")
+	leaves._wait = 0.0
+
 	await _look(player, Vector2(2900, -900))
 	leaves._leaves.clear()
 	leaves._wait = 0.0

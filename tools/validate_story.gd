@@ -376,6 +376,36 @@ func _run() -> void:
 	await _game_time(0.5)
 	_expect(main._lost_frog_thanked and lost_words.text == "i'm not lost anymore...", "found, he's just not lost anymore (%s)" % lost_words.text)
 
+	# The climb's time: as played (the game's own steps), only while he's climbing, not paused; shown with its
+	# hours once there are any; kept in the save to the fraction, and saved up in the finale too (from the
+	# last place below it, where he'd be put back).
+	var played: float = player.play_secs
+	await _physics(60)
+	_expect(absf(player.play_secs - played - 1.0) < 0.05, "a second climbing is a second on his time (%.3f)" % (player.play_secs - played))
+	Engine.time_scale = 0.05  # (paused)
+	played = player.play_secs
+	await _physics(20)
+	Engine.time_scale = 1.0
+	_expect(player.play_secs == played, "paused, it doesn't count (%.3f)" % (player.play_secs - played))
+	player.play_secs = 3725.4
+	_expect(player.play_time_text() == "1:02:05", "over an hour: shown with its hours (%s)" % player.play_time_text())
+	player.play_secs = 125.9
+	_expect(player.play_time_text() == "2:05", "under an hour: minutes and seconds (%s)" % player.play_time_text())
+	player.play_secs = 1234.5
+	player.save_game()
+	var kept: Dictionary = _saved()
+	_expect(is_equal_approx(float(kept.get("play_secs", -1.0)), 1234.5), "kept in the save to the fraction (%s)" % kept.get("play_secs"))
+	var below: Vector2 = player.position
+	var was_at: Vector2 = player.position
+	player.position = Vector2(2804, -8000)
+	player.currentHeight = (8000.0 - 472.0) / 10.0
+	player.play_secs = 2000.25
+	player.save_game()
+	kept = _saved()
+	_expect(kept.get("position") == below and is_equal_approx(float(kept.get("play_secs", -1.0)), 2000.25),
+		"saved up in the finale: his time kept, from the last place below it (%s)" % kept.get("position"))
+	await _put(player, was_at)
+
 	# The glass, hit until it gives: the last words come up, under the plank below it.
 	_expect(main._no_gods.modulate.a == 0.0, "the last words wait for the glass")
 	for _i in 6:
@@ -392,17 +422,46 @@ func _run() -> void:
 	_expect(last == player.END_IN_BEDROOM, "the ending's last keyframe is where the win screen rests (%s)" % last)
 	var rests: Vector2 = Vector2(2804, -8382) + player.END_IN_BEDROOM * player.scale
 	_expect(rests.distance_to(Vector2(1291.19, 262.8)) < 2.0, "which is his bedroom, where he wakes up (%s)" % rests)
+	# (on its way: past the World Tree's sign without stopping, down through the underground, curving
+	# smoothly through its points)
+	var stops := 0
+	var under := false
+	for k in range(1, anim.track_get_key_count(track)):
+		var at: Vector2 = anim.track_get_key_value(track, k)
+		if at == anim.track_get_key_value(track, k - 1):
+			stops += 1
+		var spot: Vector2 = Vector2(2804, -8382) + at * player.scale
+		if k < anim.track_get_key_count(track) - 1 and spot.y > -300.0 and spot.x < 1000.0:
+			under = true
+	_expect(stops == 0 and under and anim.track_get_interpolation_type(track) == Animation.INTERPOLATION_CUBIC,
+		"the ending doesn't stop at the sign: on past it, down through the underground, curving, to his bedroom")
 
 	# The win screen, upright: every line of its words across the screen. (No Lil Froggy let out onto this
 	# computer's desktop by it.)
 	var real_frog_out: bool = mm.desktop_frog_unlocked
+	var real_achievements: Array = mm.achievements.duplicate()
+	var real_skins: Array = mm.unlocked_skins.duplicate()
+	var real_wins: int = mm.wins
+	var real_crown = mm.froggyCrown
+	var real_hat: String = mm.equipped_hat
 	mm.desktop_frog_unlocked = true
+	mm.achievements.erase("beat_game")  # (his first win: its achievement new)
+	mm.held_news.clear()
 	player.finalTime = "12:34"
 	player.jumpCount = 1234
 	player._on_end_animation_finished()
 	for _i in 2:
 		await process_frame
 	mm.desktop_frog_unlocked = real_frog_out
+	_expect("beat_game" in mm.achievements and mm.held_news.has(["achievement", "beat_game"])
+		and not mm._toasts.any(func(t: Array) -> bool: return t[0] == "Achievement!"),
+		"the win's achievement earned, but not said over the win screen: kept for the next START")
+	var congrats: CanvasItem = player.get_node("winscreen/congrats")
+	var made_by: CanvasItem = player.get_node("winscreen/by muse2")
+	_expect(congrats.modulate.a < 0.5 and made_by.modulate.a < 0.05,
+		"the win screen's lines easing in, one after another (%.2f, %.2f)" % [congrats.modulate.a, made_by.modulate.a])
+	await _game_time(player.WIN_STAGGER * 4.0 + player.WIN_FADE + 0.4)
+	_expect(congrats.modulate.a > 0.99 and made_by.modulate.a > 0.99, "and all there")
 	for path in ["winscreen/congrats", "winscreen/time2"]:
 		var label: Label = player.get_node(path)
 		var size: int = label.get_theme_font_size("font_size")
@@ -411,6 +470,17 @@ func _run() -> void:
 			widest = maxf(widest, label.get_theme_font("font").get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
 		_expect(widest + 2.0 * label.get_theme_constant("outline_size") <= PORTRAIT.x - 16.0,
 			"%s fits across a phone held upright (%d px at %d)" % [path, int(widest), size])
+	# "Thanks for playing!": easing in; pressed, the screen eases to black, the game starting over under it.
+	var thanks: Button = player.get_node("winscreen/thanksforplayingButton")
+	player._on_thanksforplaying_timer_timeout()
+	_expect(thanks.visible and thanks.modulate.a < 0.1, "Thanks for playing! easing in (%.2f)" % thanks.modulate.a)
+	await _game_time(player.WIN_FADE + 0.3)
+	_expect(thanks.modulate.a > 0.99, "and there")
+	player._on_thanksforplaying_button_pressed()
+	await create_timer(0.15, true, false, true).timeout
+	_expect(not mm.curtain_shut(), "pressed: the screen easing to black, not cut to")
+	await create_timer(player.HOME_FADE + 0.3, true, false, true).timeout
+	_expect(mm.curtain_shut(), "and black")
 
 	mm.wardrobe_path = real_wardrobe
 	mm.game_beaten = real_beaten
@@ -425,6 +495,14 @@ func _run() -> void:
 	for _i in 3:
 		await process_frame
 	_expect(not main._tv_done and not main._tv_bubble.visible, "the TV keeps quiet once he's won")
+	_expect(mm.held_news.is_empty() and mm._toast_up, "what the win earned, said now, at the next START")
+	await create_timer(1.8, true, false, true).timeout
+	_expect(not mm.curtain_shut(), "the title came up out of the black")
+	mm.achievements = real_achievements
+	mm.unlocked_skins = real_skins
+	mm.wins = real_wins
+	mm.froggyCrown = real_crown
+	mm.equipped_hat = real_hat
 	main.queue_free()
 	await process_frame
 
@@ -481,6 +559,16 @@ func _tap_screen(at: Vector2) -> void:
 		tap.position = at
 		tap.global_position = at
 		_view.push_input(tap)
+
+
+## The save as it was written (its scratch file).
+func _saved() -> Dictionary:
+	var f := FileAccess.open(SAVE, FileAccess.READ)
+	if f == null:
+		return {}
+	var d = f.get_var()
+	f.close()
+	return d if d is Dictionary else {}
 
 
 func _game() -> Node:

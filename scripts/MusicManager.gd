@@ -73,6 +73,7 @@ func save_wardrobe() -> void:
 		"achievements": achievements,
 		"unlocked_modes": unlocked_modes,
 		"frenzy_best": frenzy_best,
+		"held_news": held_news,
 	})
 	f.close()
 	_trace("MusicManager save_wardrobe end")
@@ -96,6 +97,7 @@ func load_wardrobe() -> void:
 		unlocked_modes = []
 		frenzy_best = 0
 		wins = 0
+		held_news = []
 		_trace("MusicManager load_wardrobe end missing file")
 		return
 	var f = FileAccess.open(wardrobe_path, FileAccess.READ)
@@ -125,6 +127,7 @@ func load_wardrobe() -> void:
 	achievements        = d.get("achievements", []) if d.get("achievements") is Array else []
 	unlocked_modes      = d.get("unlocked_modes", []) if d.get("unlocked_modes") is Array else []
 	frenzy_best         = maxi(0, int(d.get("frenzy_best", 0)))
+	held_news           = d.get("held_news", []) if d.get("held_news") is Array else []
 	_take_off_unfound()
 	_trace("MusicManager load_wardrobe end")
 
@@ -149,10 +152,39 @@ func unlock(id: String) -> bool:
 	if id in unlocked_skins:
 		return false
 	unlocked_skins.append(id)
+	if holding_news:  # (the win screen coming up: said at the next START instead, so nothing covers it)
+		held_news.append(["unlock", id])
+		save_wardrobe()
+		return true
 	save_wardrobe()
 	var kind: String = load("res://scripts/FroggyLook.gd").UNLOCKS.get(id, ["skin"])[0]
 	show_unlock_notification(kind, id)
 	return true
+
+
+## While the win screen comes up (player._on_end_animation_finished): what it earns is kept, but not said
+## yet, so no toast covers the congratulations. Said the next time START's pressed (tell_held_news).
+var holding_news := false
+var held_news: Array = []  # (each ["achievement" or "unlock", its id]; kept in the wardrobe till said)
+
+
+## What the win earned, said now (START, the next climb): each its toast, in turn; an achievement told to
+## Game Center and Muse too.
+func tell_held_news() -> void:
+	if held_news.is_empty():
+		return
+	var news := held_news.duplicate()
+	held_news.clear()
+	save_wardrobe()
+	var achievements_list: GDScript = load("res://scripts/Achievements.gd")
+	var looks: GDScript = load("res://scripts/FroggyLook.gd")
+	for item in news:
+		if not (item is Array and item.size() == 2):
+			continue
+		if item[0] == "achievement" and achievements_list.LIST.has(item[1]):
+			achievements_list.announce(item[1])
+		elif item[0] == "unlock":
+			show_unlock_notification(looks.UNLOCKS.get(item[1], ["skin"])[0], item[1])
 
 
 ## "New Hat Unlocked!", with the hat (or the frog wearing the skin) when item_id says which.
@@ -164,6 +196,36 @@ func show_unlock_notification(item_type: String, item_id := "") -> void:
 		icon = wardrobe.item_icon(item_id, 0.0)
 		detail = "%s, in your wardrobe" % wardrobe.ITEMS[item_id]["label"]
 	show_toast("New %s Unlocked!" % {"hat": "Hat", "pattern": "Pattern"}.get(item_type, "Skin"), icon, detail)
+
+
+var _curtain: ColorRect
+
+
+## A black curtain over everything, drawn to `to` (0 open, 1 shut) over `secs`, eased in and out, at its own
+## pace (time scale aside, paused or not). It's here, so it outlasts a scene starting over: shut on one
+## screen, it's opened again on the next (the win's "Thanks for playing!": player.gd). Nothing gets through
+## it while it's shut or on its way.
+func curtain(to: float, secs: float) -> Tween:
+	if not is_instance_valid(_curtain):
+		var layer := CanvasLayer.new()
+		layer.layer = 250  # (over the game, its menus and its toasts)
+		(toast_host if is_instance_valid(toast_host) else self).add_child(layer)
+		_curtain = ColorRect.new()
+		_curtain.color = Color.BLACK
+		_curtain.modulate.a = 0.0
+		_curtain.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		layer.add_child(_curtain)
+	_curtain.mouse_filter = Control.MOUSE_FILTER_STOP
+	var draw := create_tween().set_ignore_time_scale(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	draw.tween_property(_curtain, "modulate:a", to, secs).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if to <= 0.0:
+		draw.tween_callback(func() -> void: _curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE)
+	return draw
+
+
+## Whether the curtain's drawn (or mostly), waiting to be opened.
+func curtain_shut() -> bool:
+	return is_instance_valid(_curtain) and _curtain.modulate.a > 0.5
 
 
 var _toasts: Array = []  # waiting their turn: [text, icon, detail]

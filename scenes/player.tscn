@@ -116,13 +116,13 @@ tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
 tracks/0/path = NodePath(".:position")
-tracks/0/interp = 1
+tracks/0/interp = 2
 tracks/0/loop_wrap = false
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.1, 10, 11.6, 12.3, 14.033334),
-"transitions": PackedFloat32Array(1, 2, -2, 1, -2, 0.732043),
+"times": PackedFloat32Array(0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.2, 2.4, 2.6, 2.8, 3, 3.2, 3.4, 3.6, 3.8, 4, 4.2, 4.4, 4.6, 4.8, 5, 5.2, 5.4, 5.6, 5.8, 6, 6.2, 6.4, 6.6, 6.8, 7, 7.2, 7.4, 7.6, 7.8, 8, 8.2, 8.4, 8.6, 8.8, 9, 9.2, 9.4, 9.6, 9.8, 10, 10.2, 10.4, 10.6, 10.8, 11, 11.2, 11.4, 11.6, 11.8, 12, 12.2, 12.4, 12.6, 12.8, 13, 13.2, 13.4, 13.6, 13.8, 14, 14.0333),
+"transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
 "update": 0,
-"values": [Vector2(0, 0), Vector2(0, 200), Vector2(0, 6350), Vector2(-903.33, 6585), Vector2(-903.33, 6585), Vector2(-1260.67, 7204)]
+"values": [Vector2(0, 0), Vector2(0, 2.5), Vector2(0, 10.01), Vector2(0, 22.52), Vector2(0, 40.03), Vector2(0, 62.55), Vector2(0, 90.08), Vector2(0, 122.61), Vector2(0, 160.14), Vector2(0, 202.68), Vector2(0, 250.22), Vector2(0, 302.76), Vector2(0, 360.31), Vector2(0, 422.87), Vector2(0, 490.43), Vector2(0, 562.99), Vector2(0, 640.56), Vector2(0, 723.13), Vector2(0, 810.71), Vector2(0, 903.29), Vector2(0, 1000.87), Vector2(0, 1103.46), Vector2(0, 1211.05), Vector2(0, 1323.65), Vector2(0, 1441.25), Vector2(0, 1563.86), Vector2(0, 1691.47), Vector2(0, 1824.09), Vector2(0, 1961.71), Vector2(0, 2104.33), Vector2(0, 2251.96), Vector2(0, 2404.59), Vector2(0, 2562.23), Vector2(0, 2724.87), Vector2(0, 2892.52), Vector2(0, 3065.17), Vector2(0, 3242.82), Vector2(0, 3425.48), Vector2(0, 3613.14), Vector2(0, 3805.81), Vector2(0, 4003.48), Vector2(0, 4206.16), Vector2(0, 4413.84), Vector2(0, 4626.53), Vector2(0, 4844.21), Vector2(0, 5066.91), Vector2(0, 5294.61), Vector2(0, 5527.31), Vector2(-0.19, 5765.01), Vector2(-33.19, 6004.7), Vector2(-148.4, 6221.82), Vector2(-346.51, 6367.43), Vector2(-578.93, 6434.95), Vector2(-814.03, 6469.71), Vector2(-1043.87, 6503.51), Vector2(-1268.25, 6536.51), Vector2(-1486.94, 6568.67), Vector2(-1699.7, 6599.96), Vector2(-1906.26, 6630.33), Vector2(-2106.32, 6659.75), Vector2(-2292.05, 6712.09), Vector2(-2343.17, 6882.79), Vector2(-2271.35, 7044.92), Vector2(-2119.37, 7117.64), Vector2(-1957.62, 7134.26), Vector2(-1805.75, 7149.46), Vector2(-1664.95, 7163.55), Vector2(-1536.8, 7176.37), Vector2(-1423.66, 7187.69), Vector2(-1329.65, 7197.1), Vector2(-1265.29, 7203.54), Vector2(-1260.67, 7204)]
 }
 tracks/1/type = "value"
 tracks/1/imported = false

@@ -25,9 +25,15 @@ const JUMP_VELOCITY = -400.0
 const END_IN_BEDROOM := Vector2(-1260.67, 7204)
 var bestRun = 1
 var jumpCount = 0
-var time_elapsed
-var time_now
-var time_start
+## The climb's time, as played: the game's own steps, counted only while he's climbing (not on the title,
+## waking, paused, won, or while the game's away: then its steps don't run). Never the clock, which goes on
+## while the game's put away. hours, minutes and seconds are split off it (_split_play_time).
+var play_secs := 0.0
+var _safe_spot := Vector2.INF  # (the last place saved below the finale: a save up in it puts him back there)
+var _going_home := false  # ("Thanks for playing!" pressed: the curtain on its way down)
+const WIN_FADE := 1.4  # (each of the win screen's lines easing in)
+const WIN_STAGGER := 0.6  # (one after another)
+const HOME_FADE := 0.9  # ("Thanks for playing!": the screen easing to black, and the title easing up out of it)
 var tempVelocityx = 0.0
 var minutes = 0
 var seconds = 0
@@ -103,7 +109,6 @@ func _ready():
 
 	currentHeight = (-position.y - 472) /10
 	highScore = currentHeight
-	time_start = Time.get_unix_time_from_system()
 
 	load_game()
 	if easiest_rank < 0:  # (a new climb: the difficulty chosen now)
@@ -200,23 +205,9 @@ func _physics_process(delta):
 	
 	currentHeight = (-position.y - 472) /10
 	
-	if Engine.time_scale != 0.05 and $Trajectory.endGame == 0 and not waking:
-		time_now = Time.get_unix_time_from_system()
-		var time_elapsed = time_now - time_start
-
-		seconds = time_elapsed
-
-		if time_elapsed >= 60:
-			minutes += 1
-			time_elapsed = 0
-			seconds = 0
-			time_start = Time.get_unix_time_from_system()
-
-		if minutes >= 60:
-			hours += 1
-			minutes = 0
-	else:
-		time_start = Time.get_unix_time_from_system() - seconds
+	if Engine.time_scale == 1.0 and $Trajectory.endGame == 0 and not waking:
+		play_secs += delta
+	_split_play_time()
 		
 	
 	if $Trajectory.endGame == 0:
@@ -258,7 +249,7 @@ func _physics_process(delta):
 			$Camera2D/AnimationPlayer.play("end")
 			if finalTimeBool == 0:
 				# THIS HAPPENS ONCE WHEN GAME ENDS
-				finalTime = str(int(minutes))+ ":"+str("%02d" % seconds)
+				finalTime = play_time_text()
 				finalTimeBool =1
 				MusicManager.unlock("shadow")  # (he's beaten it: the frog god's own shadow is his to wear)
 				if int(hours) == 0:
@@ -380,13 +371,7 @@ func _physics_process(delta):
 	$CanvasLayer/MarginContainer/VBoxContainer/jumpcount.text = ("jumps: " + str(int(jumpCount)))
 	
 	if Engine.time_scale != 0.05:
-		if hours == 0:
-			$CanvasLayer/MarginContainer/VBoxContainer/time.text = ("time: " + str(int(minutes))+ ":"+str("%02d" % seconds) )
-		else:
-			if minutes < 10:
-				$CanvasLayer/MarginContainer/VBoxContainer/time.text = ("time: "+ str(int(hours)) + ":0" + str(int(minutes))+ ":"+str("%02d" % seconds) )
-			else:
-				$CanvasLayer/MarginContainer/VBoxContainer/time.text = ("time: "+ str(int(hours)) + ":" + str(int(minutes))+ ":"+str("%02d" % seconds) )
+		$CanvasLayer/MarginContainer/VBoxContainer/time.text = "time: " + play_time_text()
 	
 	
 	fade_darkness()
@@ -515,6 +500,7 @@ func _on_button_pressed():
 		# (his first climb: what does he look like? then he wakes, and climbs; START's own sounds are the cut's)
 		_meet_the_frog_god(_on_button_pressed, false)
 		return
+	MusicManager.tell_held_news()  # (what the last win earned, said now: not over its win screen)
 	$Trajectory.endGame = 0
 	$".".visible = true
 	$titlescreen. visible = false
@@ -763,18 +749,27 @@ func _meet_the_frog_god(then: Callable, cut_sound := true, fade_in := false) -> 
 
 
 func _on_thanksforplaying_timer_timeout():
-	$winscreen/thanksforplayingButton.visible = true
+	var thanks: Button = $winscreen/thanksforplayingButton
+	thanks.modulate.a = 0.0
+	thanks.visible = true
+	create_tween().tween_property(thanks, "modulate:a", 1.0, WIN_FADE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
+## Home: the climb done (its save gone, the crown his), the screen easing to black, and the game starting
+## again under it: the title comes up out of the black (_initial_title_layout), the goodbye song going on.
 func _on_thanksforplaying_button_pressed():
+	if _going_home:
+		return
+	_going_home = true
 	if FileAccess.file_exists(save_path):
 		DirAccess.remove_absolute(save_path)
 		print("Save file deleted on game complete.")
-	MusicManager.MusicPosition = $winscreen/goodbyefroggy.get_playback_position()
 	MusicManager.froggyCrown = 1
 	MusicManager.equipped_hat = "froggycrown"
 	MusicManager.game_beaten = true
 	MusicManager.save_wardrobe()
+	await MusicManager.curtain(1.0, HOME_FADE).finished
+	MusicManager.MusicPosition = $winscreen/goodbyefroggy.get_playback_position()
 	get_tree().reload_current_scene()
 	Engine.time_scale = 1.0
 
@@ -927,12 +922,44 @@ func setup_key_trail():
 		key_trail_pos = position
 
 
-func save_game():
-	if currentHeight > 513:  # skip autosave in finale area
+## The climb's time played, split into hours, minutes and seconds (the corner, the save, the win screen).
+func _split_play_time() -> void:
+	var whole := int(play_secs)
+	hours = whole / 3600
+	minutes = (whole / 60) % 60
+	seconds = whole % 60
+
+
+## The climb's time played, as it's shown: 1:02:03, or 2:03 under an hour.
+func play_time_text() -> String:
+	_split_play_time()
+	return "%d:%02d:%02d" % [hours, minutes, seconds] if hours > 0 else "%d:%02d" % [minutes, seconds]
+
+
+## The game put away (a phone's home screen, another app) or closed, mid-climb: the climb's saved as it is,
+## its time and jumps to the second, so none of it's lost.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_APPLICATION_PAUSED and what != NOTIFICATION_WM_CLOSE_REQUEST and what != NOTIFICATION_APPLICATION_FOCUS_OUT:
 		return
+	if is_inside_tree() and has_node("Trajectory") and $Trajectory.endGame == 0 and not waking and not _end_triggered:
+		save_game()
+
+
+func save_game():
+	# (up in the finale he can't be put back where he is: the climb's still kept, its time and jumps to the
+	# second, but from the last place saved below it)
+	var at := position
+	if currentHeight > 513:
+		if _safe_spot == Vector2.INF:
+			return
+		at = _safe_spot
+	else:
+		_safe_spot = position
 	_trace("Player save_game start")
+	_split_play_time()
 	var save_data = {
-		"position": position,
+		"position": at,
+		"play_secs": play_secs,
 		"has_key": has_key,
 		"has_lantern": has_lantern,
 		"hours": hours,
@@ -988,7 +1015,10 @@ func load_game():
 	hours = save_data.get("hours", 0)
 	minutes = save_data.get("minutes", 0)
 	seconds = save_data.get("seconds", 0)
-	time_start = Time.get_unix_time_from_system() - seconds
+	# (time played; a save from before it was kept to the fraction: its hours, minutes and seconds)
+	play_secs = float(save_data.get("play_secs", int(hours) * 3600 + int(minutes) * 60 + float(seconds)))
+	_split_play_time()
+	_safe_spot = position  # (a save's always somewhere below the finale)
 	SpeedrunMode = save_data.get("SpeedrunMode", false)
 	easiest_rank = int(save_data.get("easiest", 1))  # (a climb from before difficulties: Normal)
 	MusicManager.froggyCrown = save_data.get("froggyCrown", MusicManager.froggyCrown)
@@ -1464,9 +1494,12 @@ func _on_end_animation_finished() -> void:
 				_duck_crt_for_goodbye(_crt_audio)
 		$winscreen.visible = true
 		$winscreen/thanksforplayingButton.visible = false
+		_ease_in_win_screen()
 		$winscreen/thanksforplayingTimer.start()
 		finalbuttonBool = 1
+		MusicManager.holding_news = true  # (its achievements and unlocks: said at the next START, not over this)
 		_record_win()
+		MusicManager.holding_news = false
 		$Camera2D.position = END_IN_BEDROOM
 		_apply_win_layout()
 		_maybe_let_desktop_frog_out()
@@ -1667,6 +1700,24 @@ func _initial_title_layout() -> void:
 		return
 	$titlescreen.visible = true
 	_maybe_og_news()
+	if MusicManager.curtain_shut():  # (home from the win: the title easing up out of the black)
+		await get_tree().create_timer(0.25, true, false, true).timeout
+		MusicManager.curtain(0.0, HOME_FADE * 1.2)
+
+
+## The win screen's lines easing in, one after another: the congratulations, the title, the time and jumps,
+## who made it.
+func _ease_in_win_screen() -> void:
+	var i := 0
+	for line in ["congrats", "Title2", "time2", "jumpcount2", "by muse2"]:
+		var item := get_node_or_null("winscreen/" + line) as CanvasItem
+		if item == null or not item.visible:
+			continue
+		item.modulate.a = 0.0
+		var up := create_tween()
+		up.tween_interval(WIN_STAGGER * i)
+		up.tween_property(item, "modulate:a", 1.0, WIN_FADE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		i += 1
 
 
 func _apply_ui_layout() -> void:

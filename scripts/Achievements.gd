@@ -17,15 +17,25 @@ const LIST := {
 const MUSE_RPC := "muse_game_achievement_earn"  # (p_game, p_achievement)
 
 
-## Earns one: true the first time (a toast says so, and it's told to Game Center and Muse).
+## Earns one: true the first time (a toast says so, and it's told to Game Center and Muse). As the win
+## screen comes up, though, it's kept but not said yet (MusicManager.holding_news): said at the next START.
 static func earn(id: String) -> bool:
 	if not LIST.has(id) or id in MusicManager.achievements:
 		return false
 	MusicManager.achievements.append(id)
+	if MusicManager.holding_news:  # (the win screen coming up: nothing over its congratulations)
+		MusicManager.held_news.append(["achievement", id])
+		MusicManager.save_wardrobe()
+		return true
 	MusicManager.save_wardrobe()
+	announce(id)
+	return true
+
+
+## Says so: "Achievement!" (its name, what it's for), and tells Game Center and Muse.
+static func announce(id: String) -> void:
 	MusicManager.show_toast("Achievement!", trophy(), LIST[id].name + "\n" + LIST[id].about)
 	_tell(id)
-	return true
 
 
 ## A little gold trophy (pixel art, for the toast).
